@@ -1,0 +1,12 @@
+[
+    {
+        "symbol":"AAPl",
+        "quantity":1,
+        "target":10.0 
+    },
+    {
+        "symbol":"AAPl",
+        "quantity":1,
+        "target":7.5
+    }
+]
