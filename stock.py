@@ -3,6 +3,8 @@ from dataclasses import dataclass
 @dataclass
 class Stock:
 
-    name: str
+    #name: str
     symbol: str
-    price: float
+    #price: float
+    quantity: int
+    target: float

@@ -1,5 +1,7 @@
 import argparse
 from api import load_shares
+from stock import Stock
+from file_loader import load_file
 
 def main():
     parser = argparse.ArgumentParser(description='Balance portfolio')
@@ -8,7 +10,7 @@ def main():
     parser.add_argument('-m', '--min_amount', type=int, required=False, default=0, help='Minimum amount that need to be invested per line')
     parser.add_argument('-fs', '--full_share', action='store_true', help='Only buy full share')
     #args = parser.parse_args()
-    load_shares()
+    print(load_file('test.json'))
     return 0
 if __name__ == '__main__':
     main()
