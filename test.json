@@ -2,11 +2,11 @@
     {
         "symbol":"AAPl",
         "quantity":1,
-        "target":10.0 
+        "distribution_target":10.0 
     },
     {
-        "symbol":"AAPl",
+        "symbol":"MSFT",
         "quantity":1,
-        "target":7.5
+        "distribution_target":7.5
     }
 ]

@@ -1,4 +1,4 @@
-from portfolio_balancer.stock import Stock
+from stock import Stock
 import json
 
 def load_file(filename: str) -> list[Stock]:
