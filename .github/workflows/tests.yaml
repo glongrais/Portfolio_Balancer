@@ -30,4 +30,4 @@ jobs:
 
             - name: Test with pytest
               run: |
-                  pytest tests/file_loader_tests.py
+                  pytest

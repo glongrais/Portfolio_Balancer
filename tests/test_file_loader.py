@@ -2,10 +2,10 @@ import pytest
 import json
 from unittest import mock
 from portfolio_balancer.stock import Stock
-from portfolio_balancer.file_loader import load_file  # Replace 'your_module' with the name of your module
+from portfolio_balancer.file_loader import load_file
 
 def test_load_valid_file():
-    valid_data = [{'symbol': 'ABC', 'quantity': 100, 'target': 80.0}, {'symbol': 'XYZ', 'quantity': 200, 'target': 20.0}]
+    valid_data = [{'symbol': 'ABC', 'quantity': 100, 'distribution_target': 80.0}, {'symbol': 'XYZ', 'quantity': 200, 'distribution_target': 20.0}]
     with mock.patch('builtins.open', mock.mock_open(read_data=json.dumps(valid_data))):
         result = load_file('dummy_file.json')
         assert len(result) == 2
