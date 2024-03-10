@@ -1,7 +1,7 @@
 import yfinance as yf
 import requests_cache
 from multiprocessing import Pool
-from stock import Stock
+from portfolio_balancer.stock import Stock
 session = requests_cache.CachedSession('yfinance.cache')
 session.headers['User-agent'] = 'my-program/1.0'
 

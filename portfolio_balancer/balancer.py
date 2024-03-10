@@ -1,7 +1,7 @@
 import argparse
-from api import load_shares
-from stock import Stock
-from file_loader import load_file
+from portfolio_balancer.api import load_shares
+from portfolio_balancer.stock import Stock
+from portfolio_balancer.file_loader import load_file
 
 def _total_value(stocks: list[Stock]) -> float:
     result = 0.0
