@@ -1,4 +1,5 @@
 import argparse
+import math
 from portfolio_balancer.api import load_shares
 from portfolio_balancer.stock import Stock
 from portfolio_balancer.file_loader import load_file
@@ -16,17 +17,33 @@ def _real_distribution(stocks: list[Stock], total_value: float) -> list[Stock]:
 
 # Rank the stocks by difference between the distribution_target and distribution_real
 def _stocks_ranking(stocks: list[Stock]) -> list[Stock]:
-    return sorted(stocks, key=lambda stock: abs(stock.distribution_target - stock.distribution_real))
+    result = sorted(stocks, key=lambda stock: (stock.distribution_target - stock.distribution_real))
+    result.reverse()
+    return result
+
+def _numbers_shares_to_buy(stocks: list[Stock], total_value: float, amount: int, min_amount: int):
+    for stock in stocks:
+        if stock.price > amount:
+            continue
+        target = (stock.distribution_target - stock.distribution_real)/100
+        money_to_buy = target * (total_value+amount)
+        if money_to_buy < min_amount:
+            continue
+        tmp = math.floor(min(amount, money_to_buy)/stock.price)
+        amount = amount - (tmp*stock.price)
+
+        print(stock.name, tmp, tmp*stock.price)
 
 
 def main(args):
     stocks: list[Stock] = load_file(args.portfolio_file)
     stocks = load_shares(stocks)
     total_value = _total_value(stocks)
-    stocks = _real_distribution(stocks, total_value)
+    stocks = _real_distribution(stocks, total_value+args.amount)
     stocks = _stocks_ranking(stocks)
-    print(stocks)
+    _numbers_shares_to_buy(stocks, total_value, args.amount, args.min_amount)
     return 0
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Balance portfolio')
     parser.add_argument('-f', '--portfolio_file', type=str, required=True, help='JSON file containing the portfolio information')
