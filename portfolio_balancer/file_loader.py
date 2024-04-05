@@ -1,7 +1,19 @@
 from portfolio_balancer.stock import Stock
+from portfolio_balancer.exception import UnsupportedFileTypeError
+import os
 import json
 
 def load_file(filename: str) -> list[Stock]:
+    try:
+        if filename.lower().endswith('.json'):
+            return _load_json(filename)
+        else:
+            _, file_extension = os.path.splitext(filename)
+            raise UnsupportedFileTypeError(file_extension)
+    except UnsupportedFileTypeError as e:
+        raise e
+
+def _load_json(filename: str) -> list[Stock]:
     try:
         with open(filename, 'r') as f:
             data = json.load(f)
