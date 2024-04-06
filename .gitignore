@@ -4,3 +4,4 @@ yfinance.cache
 tests/__pycache__/*
 portfolio_balancer/__pycache__/*
 portfolio.json
+Makefile

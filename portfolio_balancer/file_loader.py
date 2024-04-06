@@ -28,17 +28,26 @@ def _load_json(filename: str) -> list[Stock]:
     return [Stock(**i) for i in data]
 
 def _load_numbers(filename: str) -> list[Stock]:
+
+    # Value to adapt 
+    SHEET = 'Dividends'
+    TABLE = 'Repartition'
+    SYMBOL = 0
+    QUANTITY = 2
+    DISTRIBUTION_TARGET = -1
+    
     try:
         doc = Document(filename)
     except Exception as e:
         raise e
-    table = doc.sheets['Dividends'].tables['Repartition']
+    
+    table = doc.sheets[SHEET].tables[TABLE]
     table.delete_row(num_rows=table.num_header_rows, start_row=0)
 
     data = []
     for row in table.rows(values_only=True):
         if row[0] is None:
             continue
-        data.append(Stock(symbol=row[0], quantity=int(row[2]), distribution_target=row[-1]*100))
+        data.append(Stock(symbol=row[SYMBOL], quantity=int(row[QUANTITY]), distribution_target=row[DISTRIBUTION_TARGET]*100))
 
     return data
