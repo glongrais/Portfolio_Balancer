@@ -3,6 +3,7 @@ import json
 from unittest import mock
 from portfolio_balancer.stock import Stock
 from portfolio_balancer.file_loader import load_file
+from portfolio_balancer.exception import UnsupportedFileTypeError
 
 def test_load_valid_file():
     valid_data = [{'symbol': 'ABC', 'quantity': 100, 'distribution_target': 80.0}, {'symbol': 'XYZ', 'quantity': 200, 'distribution_target': 20.0}]
@@ -39,3 +40,7 @@ def test_non_json_file():
     with mock.patch('builtins.open', mock.mock_open(read_data=non_json_data)):
         with pytest.raises(json.JSONDecodeError):
             load_file('dummy_file.json')
+
+def test_file_type_not_supported():
+    with pytest.raises(UnsupportedFileTypeError):
+        load_file('non_supported_file.aaa')
