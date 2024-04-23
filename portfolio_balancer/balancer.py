@@ -27,12 +27,14 @@ def _numbers_shares_to_buy(stocks: list[Stock], total_value: float, amount: int,
             continue
         target = (stock.distribution_target - stock.distribution_real)/100
         money_to_buy = target * (total_value+amount)
-        if money_to_buy < min_amount:
-            continue
         tmp = math.floor(min(amount, money_to_buy)/stock.price)
+        if (tmp*stock.price) < min_amount:
+            continue
         amount = amount - (tmp*stock.price)
 
-        print(stock.name, tmp, tmp*stock.price)
+        print(stock.name, tmp, tmp*stock.price, " Stock price: ", stock.price)
+    
+    print("Leftover: ", math.floor(amount))
 
 
 def main(args):
