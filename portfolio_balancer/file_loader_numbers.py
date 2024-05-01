@@ -1,4 +1,4 @@
-from numbers_parser import Document, EmptyCell
+from numbers_parser import Document
 from portfolio_balancer.stock import Stock
 
 def load_numbers(filename: str) -> list[Stock]:

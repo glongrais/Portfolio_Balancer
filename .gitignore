@@ -6,3 +6,5 @@ portfolio_balancer/__pycache__/*
 portfolio.json
 Makefile
 .DS_Store
+stock_data/*
+.vscode/settings.json
