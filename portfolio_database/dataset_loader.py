@@ -4,12 +4,12 @@ import pandas as pd
 
 def fetch_stock_data(tickers):
     stocks = yf.Tickers(tickers)
-    tickers_list = tickers.split(',')
+    #tickers_list = tickers.split(',')
     data = None
-    for ticker in tickers_list:
+    for ticker in tickers:
         hist = stocks.tickers[ticker].history(period="max")  # Fetches max historical data
         hist.reset_index(inplace=True)
-        hist['ticker'] = ticker  # Add ticker column for reference
+        hist['Ticker'] = ticker  # Add ticker column for reference
         if data is None:
             data = hist
         else:
@@ -32,17 +32,23 @@ def write_data_to_hudi(data_frame, hudi_table_path):
         .option("hoodie.table.name", "stock_data") \
         .option("hoodie.datasource.write.recordkey.field", "Date") \
         .option("hoodie.datasource.write.precombine.field", "Date") \
-        .option("hoodie.datasource.write.partitionpath.field", "ticker") \
+        .option("hoodie.datasource.write.partitionpath.field", "Ticker") \
         .option("hoodie.datasource.write.operation", "upsert") \
         .option("hoodie.datasource.write.table.name", "stock_data") \
         .option("path", hudi_table_path) \
         .mode("append") \
         .save()
 
+data_path = "/Users/guillaumelongrais/Documents/Code/Python/Portfolio_Balancing/stock_data"
+portfolio_path = "/Users/guillaumelongrais/Documents/Code/Python/Portfolio_Balancing/portfolio_data"
 # Example usage
 spark = create_spark_session()
-df = fetch_stock_data("AAPL,MSFT")
-df.rename(columns = {'Stock Splits':'Splits'}, inplace = True)
+spark.sql(f"CREATE TABLE hudi_portfolio_data USING Hudi LOCATION '{portfolio_path}'")
+tickers = spark.sql("SELECT symbol FROM hudi_portfolio_data")
+tickers_list = tickers.select("symbol").rdd.flatMap(lambda x: x).collect()
+df = fetch_stock_data(tickers_list)
+df.rename(columns = {'Stock Splits':'Splits', 'Capital Gains':'Capital_Gains'}, inplace = True)
+print(df.head(2))
 spark_df = spark.createDataFrame(df)
-write_data_to_hudi(spark_df, "/Users/guillaumelongrais/Documents/Code/Python/Portfolio_Balancing/stock_data")
+write_data_to_hudi(spark_df, data_path)
 
