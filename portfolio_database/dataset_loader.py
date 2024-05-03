@@ -44,5 +44,5 @@ spark = create_spark_session()
 df = fetch_stock_data("AAPL,MSFT")
 df.rename(columns = {'Stock Splits':'Splits'}, inplace = True)
 spark_df = spark.createDataFrame(df)
-write_data_to_hudi(spark, spark_df, "/Users/guillaumelongrais/Documents/Code/Python/Portfolio_Balancing/stock_data")
+write_data_to_hudi(spark_df, "/Users/guillaumelongrais/Documents/Code/Python/Portfolio_Balancing/stock_data")
 

@@ -8,3 +8,5 @@ Makefile
 .DS_Store
 stock_data/*
 .vscode/settings.json
+portfolio_data/*
+portfolio_database/__pycache__/*

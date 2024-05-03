@@ -26,7 +26,10 @@ def load_numbers(filename: str) -> list[Stock]:
             continue
         datas.append(Stock(symbol=row[SYMBOL], quantity=int(row[QUANTITY]), distribution_target=row[DISTRIBUTION_TARGET]*100))
 
-    return pd.DataFrame([data.__dict__ for data in datas])
+    df =  pd.DataFrame([data.__dict__ for data in datas])
+    df['date'] = pd.Timestamp.today()#.strftime('%Y-%m-%d')
+
+    return df
 
 def create_spark_session():
     return SparkSession.builder \
@@ -40,11 +43,14 @@ def write_data_to_hudi(data_frame, hudi_table_path):
     data_frame.write.format("hudi") \
         .option("hoodie.table.name", "portfolio_data") \
         .option("hoodie.datasource.write.recordkey.field", "symbol") \
-        .option("hoodie.datasource.write.precombine.field", "Date") \
+        .option("hoodie.datasource.write.precombine.field", "date") \
         .option("hoodie.datasource.write.operation", "upsert") \
         .option("hoodie.datasource.write.table.name", "portfolio_data") \
         .option("path", hudi_table_path) \
         .mode("append") \
         .save()
 
-print(load_numbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers"))
+portfolio = load_numbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
+spark = create_spark_session()
+spark_df = spark.createDataFrame(portfolio)
+write_data_to_hudi(spark_df, "/Users/guillaumelongrais/Documents/Code/Python/Portfolio_Balancing/portfolio_data")
