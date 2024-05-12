@@ -1,4 +1,3 @@
-from numbers_parser import Document
 from portfolio_balancer.stock import Stock
 from pyspark.sql import SparkSession
 
