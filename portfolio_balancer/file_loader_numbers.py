@@ -1,27 +1,25 @@
 from numbers_parser import Document
 from portfolio_balancer.stock import Stock
+from pyspark.sql import SparkSession
 
-def load_numbers(filename: str) -> list[Stock]:
+def _create_spark_session():
+    return SparkSession.builder \
+        .appName("Hudi Data Lake") \
+        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
+        .config("spark.sql.extensions", "org.apache.spark.sql.hudi.HoodieSparkSessionExtension") \
+        .config("spark.jars.packages", "org.apache.hudi:hudi-spark3.4-bundle_2.12:0.14.1") \
+        .getOrCreate()
 
-    # Value to adapt 
-    SHEET = 'Dividends'
-    TABLE = 'Repartition'
-    SYMBOL = 0
-    QUANTITY = 2
-    DISTRIBUTION_TARGET = -1
-    
-    try:
-        doc = Document(filename)
-    except Exception as e:
-        raise e
-    
-    table = doc.sheets[SHEET].tables[TABLE]
-    table.delete_row(num_rows=table.num_header_rows, start_row=0)
+def load_numbers() -> list[Stock]:
+
+    spark_session = _create_spark_session()
+
+    portfolio_path = "/Users/guillaumelongrais/Documents/Code/Python/Portfolio_Balancing/portfolio_data"
+    spark_session.sql(f"CREATE TABLE hudi_portfolio_data USING Hudi LOCATION '{portfolio_path}'")
+    df = spark_session.sql("SELECT symbol, quantity, distribution_target FROM hudi_portfolio_data")
 
     data = []
-    for row in table.rows(values_only=True):
-        if row[0] is None:
-            continue
-        data.append(Stock(symbol=row[SYMBOL], quantity=int(row[QUANTITY]), distribution_target=row[DISTRIBUTION_TARGET]*100))
+    for row in df.collect():
+        data.append(Stock(symbol=row['symbol'], quantity=int(row['quantity']), distribution_target=row['distribution_target']*100))
 
     return data

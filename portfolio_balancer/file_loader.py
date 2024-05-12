@@ -8,8 +8,8 @@ def load_file(filename: str) -> list[Stock]:
     try:
         if filename.lower().endswith('.json'):
             return _load_json(filename)
-        elif filename.lower().endswith('.numbers'):
-            return load_numbers(filename)
+        elif filename == 'No file':
+            return load_numbers()
         else:
             _, file_extension = os.path.splitext(filename)
             raise UnsupportedFileTypeError(file_extension)
