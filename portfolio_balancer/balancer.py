@@ -1,6 +1,6 @@
 import argparse
 import math
-from portfolio_balancer.api import API
+from api.api import API
 from portfolio_balancer.stock import Stock
 from portfolio_balancer.file_loader import FileLoader
 
