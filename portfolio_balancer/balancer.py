@@ -1,8 +1,8 @@
 import argparse
 import math
-from portfolio_balancer.api import load_shares
+from portfolio_balancer.api import API
 from portfolio_balancer.stock import Stock
-from portfolio_balancer.file_loader import load_file
+from portfolio_balancer.file_loader import FileLoader
 
 def _total_value(stocks: list[Stock]) -> float:
     result = 0.0
@@ -38,8 +38,8 @@ def _numbers_shares_to_buy(stocks: list[Stock], total_value: float, amount: int,
 
 
 def main(args):
-    stocks: list[Stock] = load_file(args.portfolio_file)
-    stocks = load_shares(stocks)
+    stocks: list[Stock] = FileLoader.load_file(args.portfolio_file)
+    stocks = API.load_shares(stocks=stocks)
     total_value = _total_value(stocks)
     stocks = _real_distribution(stocks, total_value+args.amount)
     stocks = _stocks_ranking(stocks)

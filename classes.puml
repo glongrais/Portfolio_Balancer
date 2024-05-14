@@ -1,0 +1,21 @@
+@startuml classes
+set namespaceSeparator none
+class "API" as Portfolio_Balancing.portfolio_balancer.api.API {
+  load_shares(stocks: list[Stock]) -> list[Stock]
+}
+class "FileLoader" as Portfolio_Balancing.portfolio_balancer.file_loader.FileLoader {
+  load_file(filename: str) -> list[Stock]
+}
+class "Stock" as Portfolio_Balancing.portfolio_balancer.stock.Stock {
+  distribution_real : float
+  distribution_target : float
+  name : str
+  price : float
+  quantity : int
+  symbol : str
+}
+class "<color:red>UnsupportedFileTypeError</color>" as Portfolio_Balancing.portfolio_balancer.exception.UnsupportedFileTypeError {
+  file_type
+  message
+}
+@enduml
