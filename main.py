@@ -1,9 +1,11 @@
 import tkinter as tk
+from portfolio_balancer.balancer import Balancer
 
 class MainApplication(tk.Frame):
     def __init__(self, parent, *args, **kwargs):
         tk.Frame.__init__(self, parent, *args, **kwargs)
         self.parent = parent
+        Balancer.balance("No file", 500, 100)
 
 if __name__ == "__main__":
     root = tk.Tk()

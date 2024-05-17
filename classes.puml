@@ -1,7 +1,10 @@
 @startuml classes
 set namespaceSeparator none
-class "API" as Portfolio_Balancing.portfolio_balancer.api.API {
+class "API" as Portfolio_Balancing.api.api.API {
   load_shares(stocks: list[Stock]) -> list[Stock]
+}
+class "Balancer" as Portfolio_Balancing.portfolio_balancer.balancer.Balancer {
+  balance(portfolio_file, amount, min_amount)
 }
 class "FileLoader" as Portfolio_Balancing.portfolio_balancer.file_loader.FileLoader {
   load_file(filename: str) -> list[Stock]

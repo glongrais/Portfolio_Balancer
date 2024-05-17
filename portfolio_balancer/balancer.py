@@ -4,7 +4,7 @@ from api.api import API
 from portfolio_balancer.stock import Stock
 from portfolio_balancer.file_loader import FileLoader
 
-def total_value(stocks: list[Stock]) -> float:
+def total_value_portfolio(stocks: list[Stock]) -> float:
     result = 0.0
     for stock in stocks:
         result += stock.price * stock.quantity
@@ -39,13 +39,13 @@ def numbers_shares_to_buy(stocks: list[Stock], total_value: float, amount: int, 
 class Balancer:
 
     @staticmethod
-    def balance(args):
-        stocks: list[Stock] = FileLoader.load_file(args.portfolio_file)
+    def balance(portfolio_file, amount, min_amount):
+        stocks: list[Stock] = FileLoader.load_file(portfolio_file)
         stocks = API.load_shares(stocks=stocks)
-        total_value = total_value(stocks)
-        stocks = real_distribution(stocks, total_value+args.amount)
+        total_value = total_value_portfolio(stocks)
+        stocks = real_distribution(stocks, total_value+amount)
         stocks = stocks_ranking(stocks)
-        numbers_shares_to_buy(stocks, total_value, args.amount, args.min_amount)
+        numbers_shares_to_buy(stocks, total_value, amount, min_amount)
         return 0
 
 if __name__ == '__main__':
@@ -55,4 +55,4 @@ if __name__ == '__main__':
     parser.add_argument('-m', '--min_amount', type=int, required=False, default=100, help='Minimum amount that need to be invested per line')
     parser.add_argument('-fs', '--full_share', action='store_true', help='Only buy full share')
     args = parser.parse_args()
-    Balancer.balance(args)
+    Balancer.balance(args.portfolio_file, args.amount, args.min_amount)
