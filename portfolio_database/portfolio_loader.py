@@ -24,7 +24,7 @@ def load_numbers(filename: str) -> list[Stock]:
     for row in table.rows(values_only=True):
         if row[0] is None:
             continue
-        datas.append(Stock(symbol=row[SYMBOL], quantity=int(row[QUANTITY]), distribution_target=row[DISTRIBUTION_TARGET]*100))
+        datas.append(Stock(symbol=row[SYMBOL], quantity=int(row[QUANTITY]), distribution_target=row[DISTRIBUTION_TARGET]))
 
     df =  pd.DataFrame([data.__dict__ for data in datas])
     df['date'] = pd.Timestamp.today()#.strftime('%Y-%m-%d')
