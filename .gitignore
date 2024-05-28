@@ -11,3 +11,4 @@ stock_data/*
 portfolio_data/*
 portfolio_database/__pycache__/*
 packages.puml
+data.db
