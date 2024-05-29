@@ -58,4 +58,3 @@ def load_numbers(filename: str):
 
 cursor = init_table()
 portfolio = load_numbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
-
