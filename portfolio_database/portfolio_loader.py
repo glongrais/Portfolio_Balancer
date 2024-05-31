@@ -1,24 +1,8 @@
 from numbers_parser import Document
 from portfolio_balancer.stock import Stock
+from portfolio_database.utilities import init_tables
 import pandas as pd
 import sqlite3
-
-def init_table():
-    connection = sqlite3.connect("data.db")
-    cursor = connection.cursor()
-    cursor.execute('''
-    CREATE TABLE IF NOT EXISTS portfolio (
-                   symbol TEXT PRIMARY KEY,
-                   name TEXT,
-                   price FLOAT,
-                   quantity INTEGER,
-                   distribution_target FLOAT,
-                   distribution_real FLOAT
-
-    )
-    ''')
-    connection.commit()
-    connection.close()
 
 def insert_stock(stock: Stock):
     with sqlite3.connect("data.db") as connection:
@@ -56,5 +40,5 @@ def load_numbers(filename: str):
                            ON CONFLICT(symbol) DO UPDATE SET quantity=excluded.quantity,  distribution_target=excluded. distribution_target 
             ''', (row[SYMBOL], int(row[QUANTITY]), row[DISTRIBUTION_TARGET]))
 
-cursor = init_table()
+init_tables()
 portfolio = load_numbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
