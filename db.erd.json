@@ -9,7 +9,7 @@
     "zoomLevel": 1,
     "show": 431,
     "database": 32,
-    "databaseName": "",
+    "databaseName": "data",
     "canvasType": "ERD",
     "language": 1,
     "tableNameCase": 4,
@@ -114,13 +114,15 @@
         "comment": "",
         "columnIds": [
           "L72ay-voAYK76rCTT1N4H",
-          "zvEHsU8dIYpQTXNO1Pbjp"
+          "zvEHsU8dIYpQTXNO1Pbjp",
+          "BCgG8_WLLWZH5Rc0Wm5vF"
         ],
         "seqColumnIds": [
           "RkzsG2YCTzmvALEq3--Lw",
           "PkPKBdQoaoBL3jnCyr1rf",
           "L72ay-voAYK76rCTT1N4H",
-          "zvEHsU8dIYpQTXNO1Pbjp"
+          "zvEHsU8dIYpQTXNO1Pbjp",
+          "BCgG8_WLLWZH5Rc0Wm5vF"
         ],
         "ui": {
           "x": 812,
@@ -131,7 +133,7 @@
           "color": ""
         },
         "meta": {
-          "updateAt": 1717146559307,
+          "updateAt": 1717146826050,
           "createAt": 1717083923606
         }
       },
@@ -613,21 +615,41 @@
       "gXS9FRbJrUZ9v7e5l7NaP": {
         "id": "gXS9FRbJrUZ9v7e5l7NaP",
         "tableId": "GbD7yUXfwHckwRkiJiQLr",
-        "name": "date",
+        "name": "datestamp",
         "comment": "",
         "dataType": "",
         "default": "",
         "options": 0,
         "ui": {
           "keys": 0,
-          "widthName": 60,
+          "widthName": 62,
           "widthComment": 60,
           "widthDataType": 60,
           "widthDefault": 60
         },
         "meta": {
-          "updateAt": 1717146695047,
+          "updateAt": 1717146822352,
           "createAt": 1717146680174
+        }
+      },
+      "BCgG8_WLLWZH5Rc0Wm5vF": {
+        "id": "BCgG8_WLLWZH5Rc0Wm5vF",
+        "tableId": "sbP9KE1wcXQAs2UwMw2Qy",
+        "name": "datestamp",
+        "comment": "",
+        "dataType": "",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 62,
+          "widthComment": 60,
+          "widthDataType": 60,
+          "widthDefault": 60
+        },
+        "meta": {
+          "updateAt": 1717146829300,
+          "createAt": 1717146826050
         }
       }
     },
@@ -763,7 +785,7 @@
           "columnIds": [
             "zvEHsU8dIYpQTXNO1Pbjp"
           ],
-          "x": 994.5,
+          "x": 995.5,
           "y": 392,
           "direction": 4
         },
@@ -1122,8 +1144,24 @@
       1717146680173,
       -1,
       {
-        "name": 1717146682857,
+        "name": 1717146822352,
         "dataType": 1717146695047
+      }
+    ],
+    "BCgG8_WLLWZH5Rc0Wm5vF": [
+      "tableColumnEntities",
+      1717146826050,
+      -1,
+      {
+        "name": 1717146829299
+      }
+    ],
+    "settings.databaseName": [
+      "settings",
+      -1,
+      -1,
+      {
+        "databaseName": 1717146855580
       }
     ]
   }
