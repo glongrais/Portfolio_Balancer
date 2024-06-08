@@ -36,9 +36,9 @@ def load_numbers(filename: str):
             if row[0] is None:
                 continue
             cursor.execute('''
-                           INSERT INTO portfolio (symbol, quantity, distribution_target) VALUES (?, ?, ?)
-                           ON CONFLICT(symbol) DO UPDATE SET quantity=excluded.quantity,  distribution_target=excluded. distribution_target 
-            ''', (row[SYMBOL], int(row[QUANTITY]), row[DISTRIBUTION_TARGET]))
+                           INSERT INTO portfolio (stockid, quantity, distribution_target) VALUES (?, ?, ?)
+                           ON CONFLICT(stockid) DO UPDATE SET quantity=excluded.quantity,  distribution_target=excluded.distribution_target 
+            ''', (int(row[QUANTITY]), row[DISTRIBUTION_TARGET]))
 
 init_tables()
 portfolio = load_numbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
