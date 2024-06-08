@@ -4,9 +4,9 @@
   "settings": {
     "width": 2000,
     "height": 2000,
-    "scrollTop": -1,
-    "scrollLeft": -49,
-    "zoomLevel": 1,
+    "scrollTop": 0,
+    "scrollLeft": -222.4,
+    "zoomLevel": 0.8,
     "show": 431,
     "database": 32,
     "databaseName": "data",
@@ -617,7 +617,7 @@
         "tableId": "GbD7yUXfwHckwRkiJiQLr",
         "name": "datestamp",
         "comment": "",
-        "dataType": "",
+        "dataType": "TEXT",
         "default": "",
         "options": 0,
         "ui": {
@@ -628,7 +628,7 @@
           "widthDefault": 60
         },
         "meta": {
-          "updateAt": 1717146822352,
+          "updateAt": 1717163521480,
           "createAt": 1717146680174
         }
       },
@@ -637,7 +637,7 @@
         "tableId": "sbP9KE1wcXQAs2UwMw2Qy",
         "name": "datestamp",
         "comment": "",
-        "dataType": "",
+        "dataType": "TEXT",
         "default": "",
         "options": 0,
         "ui": {
@@ -648,7 +648,7 @@
           "widthDefault": 60
         },
         "meta": {
-          "updateAt": 1717146829300,
+          "updateAt": 1717163513735,
           "createAt": 1717146826050
         }
       }
@@ -1145,7 +1145,7 @@
       -1,
       {
         "name": 1717146822352,
-        "dataType": 1717146695047
+        "dataType": 1717163521479
       }
     ],
     "BCgG8_WLLWZH5Rc0Wm5vF": [
@@ -1153,7 +1153,8 @@
       1717146826050,
       -1,
       {
-        "name": 1717146829299
+        "name": 1717146829299,
+        "dataType": 1717163513734
       }
     ],
     "settings.databaseName": [
