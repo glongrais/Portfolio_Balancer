@@ -1,12 +1,18 @@
 from models.Base import BaseModel
 
 class Stock(BaseModel):
+
+    def __init__(self, db_path='data/portfolio.db'):
+        super().__init__('stocks', db_path)
+        self.create_table()
+
     def create_table(self):
         self.execute_query('''
         CREATE TABLE IF NOT EXISTS stocks (
             stockid INTEGER PRIMARY KEY AUTOINCREMENT,
             symbol TEXT NOT NULL,
-            name TEXT
+            name TEXT,
+            price REAL
         )
         ''')
 
