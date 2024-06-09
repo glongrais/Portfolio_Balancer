@@ -12,3 +12,4 @@ portfolio_data/*
 portfolio_database/__pycache__/*
 packages.puml
 data.db
+stock_portofolio_app/data/portfolio.db
