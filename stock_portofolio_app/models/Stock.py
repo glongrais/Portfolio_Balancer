@@ -16,8 +16,8 @@ class Stock(BaseModel):
         )
         ''')
 
-    def add_stock(self, symbol, name):
-        self.execute_query('INSERT INTO stocks (symbol, name) VALUES (?, ?)', (symbol, name))
+    def add_stock(self, symbol):
+        self.execute_query('INSERT INTO stocks symbol VALUES ?', (symbol))
 
     def get_stock(self, stockid):
         return self.execute_query('SELECT * FROM stocks WHERE stockid = ?', (stockid,))
