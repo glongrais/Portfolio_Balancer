@@ -16,7 +16,7 @@ class Portfolio(BaseModel):
     def create_table(self):
         self.execute_query('''
         CREATE TABLE IF NOT EXISTS portfolio (
-            stockid INTEGER,
+            stockid INTEGER PRIMARY KEY,
             quantity INTEGER NOT NULL,
             distribution_target REAL,
             distribution_real REAL,
@@ -26,8 +26,8 @@ class Portfolio(BaseModel):
 
     def add_to_portfolio(self, stockid, quantity, distribution_target):
         self.execute_query('''
-        INSERT INTO portfolio (stockid, quantity, distribution_target)
-        VALUES (?, ?, ?)
+            INSERT INTO portfolio (stockid, quantity, distribution_target) VALUES (?, ?, ?)
+            ON CONFLICT(stockid) DO UPDATE SET quantity=excluded.quantity,  distribution_target=excluded.distribution_target 
         ''', (stockid, quantity, distribution_target))
 
     def update_field(self, stockid, value, field: Field):

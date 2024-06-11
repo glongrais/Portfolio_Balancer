@@ -8,8 +8,9 @@ class BaseModel:
     def execute_query(self, query, params=()):
         with sqlite3.connect(self.db_path) as connection:
             cursor = connection.cursor()
-            cursor.execute(query, params)
+            answer = cursor.execute(query, params).fetchall()
             connection.commit()
+        return answer
 
     def fetchall(self):
         with sqlite3.connect(self.db_path) as connection:
