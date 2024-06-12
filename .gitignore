@@ -1,5 +1,5 @@
 /venv/*
-/__pycache__/*
+**/__pycache__/*
 yfinance.cache
 tests/__pycache__/*
 portfolio_balancer/__pycache__/*
@@ -11,3 +11,5 @@ stock_data/*
 portfolio_data/*
 portfolio_database/__pycache__/*
 packages.puml
+data.db
+stock_portofolio_app/data/portfolio.db

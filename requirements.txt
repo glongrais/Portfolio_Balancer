@@ -1,4 +1,3 @@
-#numbers-parser==4.10.4
+#numbers-parser==4.10.6
 yfinance==0.2.37
 yfinance[nospam]
-pyspark==3.4.1
