@@ -30,4 +30,4 @@ def load_numbers(filename: str):
         if stockid == None:
             stock.add_stock(row[SYMBOL])
             stockid = stock.get_sotckid_from_symbol(row[SYMBOL])
-        portfolio.add_to_portfolio(stockid, int(row[QUANTITY]), row[DISTRIBUTION_TARGET])
+        portfolio.add_to_portfolio(stockid, int(row[QUANTITY]), row[DISTRIBUTION_TARGET]*100)
