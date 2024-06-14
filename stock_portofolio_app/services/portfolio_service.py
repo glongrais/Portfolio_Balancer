@@ -34,26 +34,26 @@ class PortfolioService:
 
     @classmethod
     def balance_portfolio(cls, amount_to_buy, min_amount_to_buy=100):
-        total_value = cls.calculate_portfolio_value()
+        total_value = cls.calculate_portfolio_value()+amount_to_buy
 
         cls.update_real_distribution()
 
         portfolio = Portfolio()
         stocks = portfolio.execute_query(
             '''
-                SELECT stocks.stockid, stocks.symbol, stocks.price, (portfolio.distribution_target - portfolio.distribution_real) as delta FROM portfolio LEFT JOIN stocks ON portfolio.stockid = stocks.stockid ORDER BY delta DESC
+                SELECT stocks.stockid, stocks.symbol, stocks.price, portfolio.quantity, portfolio.distribution_target, portfolio.distribution_real, (portfolio.distribution_target - portfolio.distribution_real) as delta FROM portfolio LEFT JOIN stocks ON portfolio.stockid = stocks.stockid ORDER BY delta DESC
             '''
         )
-        for stockid, symbol, price, delta in stocks:
+        for stockid, symbol, price, quantity, distribution_target, distribution_real, delta in stocks:
             if price > amount_to_buy:
                 continue
-            target = delta/100
-            money_to_buy = target * (total_value+amount_to_buy)
+            target = distribution_target/100 - round((price*quantity)/(total_value), 4)
+            money_to_buy = target * (total_value)
             tmp = math.floor(min(amount_to_buy, money_to_buy)/price)
             if (tmp*price) < min_amount_to_buy:
                 continue
             amount_to_buy = amount_to_buy - (tmp*price)
-            print(symbol, tmp, tmp*price, " Stock price: ", price)
+            print(symbol, tmp, round(tmp*price, 2), " Stock price: ", price)
         
         print("Leftover: ", math.floor(amount_to_buy))
 
