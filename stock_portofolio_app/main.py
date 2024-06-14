@@ -7,4 +7,4 @@ if __name__ == '__main__':
     S.update_prices()
     load_numbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
     print(PortfolioService().calculate_portfolio_value())
-    PortfolioService.balance_portfolio(1000)
+    PortfolioService.balance_portfolio(3700)
