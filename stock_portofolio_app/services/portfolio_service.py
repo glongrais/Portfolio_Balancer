@@ -4,7 +4,6 @@ from models.Stock import Stock
 from models.Transaction import Transaction
 #from models.historical_stock import HistoricalStock
 #from external.stock_price_api import StockPriceAPI
-from external.historical_data_api import HistoricalDataAPI
 import time
 import math
 from functools import lru_cache
