@@ -4,7 +4,7 @@ from cachetools import cached, TTLCache
 class StockPriceAPI:
 
     @classmethod
-    @cached(cache=TTLCache(ttl=60))
+    @cached(cache=TTLCache(maxsize=1024, ttl=60))
     def _get_ticker(cls, symbol: str):
         del ttl_hash
         return yf.Ticker(symbol)

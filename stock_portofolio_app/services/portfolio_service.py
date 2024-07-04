@@ -10,7 +10,7 @@ from cachetools import cached, TTLCache
 class PortfolioService:
 
     @classmethod
-    @cached(cache=TTLCache(ttl=60))
+    @cached(cache=TTLCache(maxsize=1024, ttl=60))
     def calculate_portfolio_value(cls) -> float:
         """
         Calculates the total value of the portfolio.
