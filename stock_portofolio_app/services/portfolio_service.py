@@ -4,15 +4,14 @@ from models.Stock import Stock
 from models.Transaction import Transaction
 #from models.historical_stock import HistoricalStock
 #from external.stock_price_api import StockPriceAPI
-import time
 import math
-from functools import lru_cache
+from cachetools import cached, TTLCache
 
 class PortfolioService:
 
     @classmethod
-    @lru_cache()
-    def calculate_portfolio_value(cls, ttl_hash=round(time.time() / 60)) -> float:
+    @cached(cache=TTLCache(ttl=60))
+    def calculate_portfolio_value(cls) -> float:
         """
         Calculates the total value of the portfolio.
 
