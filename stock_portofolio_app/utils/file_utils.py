@@ -1,7 +1,6 @@
 from numbers_parser import Document
 from models.Stock import Stock
 from models.Portfolio import Portfolio
-import sqlite3
 
 def load_numbers(filename: str):
 
