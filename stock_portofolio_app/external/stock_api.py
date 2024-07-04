@@ -1,12 +1,11 @@
 import yfinance as yf
-from functools import lru_cache
-import time
+from cachetools import cached, TTLCache
 
 class StockPriceAPI:
 
     @classmethod
-    @lru_cache()
-    def _get_ticker(cls, symbol: str, ttl_hash=round(time.time() / 60)):
+    @cached(cache=TTLCache(ttl=60))
+    def _get_ticker(cls, symbol: str):
         del ttl_hash
         return yf.Ticker(symbol)
 
