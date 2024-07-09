@@ -1,7 +1,7 @@
 import yfinance as yf
 from cachetools import cached, TTLCache
 
-class StockPriceAPI:
+class StockAPI:
 
     @classmethod
     @cached(cache=TTLCache(maxsize=1024, ttl=60))
