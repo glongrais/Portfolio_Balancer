@@ -4,8 +4,8 @@
   "settings": {
     "width": 2000,
     "height": 2000,
-    "scrollTop": 0,
-    "scrollLeft": -222.4,
+    "scrollTop": -172,
+    "scrollLeft": -261.4,
     "zoomLevel": 0.8,
     "show": 431,
     "database": 32,
@@ -34,12 +34,14 @@
       "axwOsNhMWgBTzZYESIbSz",
       "NwiFOgfP_LIwSUv0xlG6S",
       "sbP9KE1wcXQAs2UwMw2Qy",
-      "GbD7yUXfwHckwRkiJiQLr"
+      "GbD7yUXfwHckwRkiJiQLr",
+      "aEfLcXA-3yQEvsSBlhktZ"
     ],
     "relationshipIds": [
       "kj5PZGlhC_w6SKq2ZO_AR",
       "Aefq9vug7fPSCn6QCof0m",
-      "FbLaqmHKCLTYWfIoUiFK7"
+      "FbLaqmHKCLTYWfIoUiFK7",
+      "ZKvsvNw5RG0tLF5VE4TFF"
     ],
     "indexIds": [],
     "memoIds": []
@@ -170,6 +172,33 @@
         "meta": {
           "updateAt": 1717146680174,
           "createAt": 1717146559102
+        }
+      },
+      "aEfLcXA-3yQEvsSBlhktZ": {
+        "id": "aEfLcXA-3yQEvsSBlhktZ",
+        "name": "historicaldividends",
+        "comment": "",
+        "columnIds": [
+          "2Z5v7bjuLcSZcigkmAtvl",
+          "ssM5Lw69Kb1Mo0PU_qaEv",
+          "dgdhB9YRcgOX1bNFp4vST"
+        ],
+        "seqColumnIds": [
+          "2Z5v7bjuLcSZcigkmAtvl",
+          "ssM5Lw69Kb1Mo0PU_qaEv",
+          "dgdhB9YRcgOX1bNFp4vST"
+        ],
+        "ui": {
+          "x": 1346.75,
+          "y": 110,
+          "zIndex": 72,
+          "widthName": 108,
+          "widthComment": 60,
+          "color": ""
+        },
+        "meta": {
+          "updateAt": 1720266090339,
+          "createAt": 1720265806496
         }
       }
     },
@@ -673,6 +702,66 @@
           "updateAt": 1717943322370,
           "createAt": 1717943311166
         }
+      },
+      "2Z5v7bjuLcSZcigkmAtvl": {
+        "id": "2Z5v7bjuLcSZcigkmAtvl",
+        "tableId": "aEfLcXA-3yQEvsSBlhktZ",
+        "name": "datestamp",
+        "comment": "",
+        "dataType": "TEXT",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 62,
+          "widthComment": 60,
+          "widthDataType": 60,
+          "widthDefault": 60
+        },
+        "meta": {
+          "updateAt": 1720265931981,
+          "createAt": 1720265871569
+        }
+      },
+      "ssM5Lw69Kb1Mo0PU_qaEv": {
+        "id": "ssM5Lw69Kb1Mo0PU_qaEv",
+        "tableId": "aEfLcXA-3yQEvsSBlhktZ",
+        "name": "dividendvalue",
+        "comment": "",
+        "dataType": "REAL",
+        "default": "",
+        "options": 0,
+        "ui": {
+          "keys": 0,
+          "widthName": 80,
+          "widthComment": 60,
+          "widthDataType": 60,
+          "widthDefault": 60
+        },
+        "meta": {
+          "updateAt": 1720266081276,
+          "createAt": 1720265934882
+        }
+      },
+      "dgdhB9YRcgOX1bNFp4vST": {
+        "id": "dgdhB9YRcgOX1bNFp4vST",
+        "tableId": "aEfLcXA-3yQEvsSBlhktZ",
+        "name": "stockid",
+        "comment": "",
+        "dataType": "INTEGER",
+        "default": "",
+        "options": 8,
+        "ui": {
+          "keys": 2,
+          "widthName": 60,
+          "widthComment": 60,
+          "widthDataType": 60,
+          "widthDefault": 60
+        },
+        "meta": {
+          "updateAt": 1720266066050,
+          "createAt": 1720266066050
+        }
       }
     },
     "relationshipEntities": {
@@ -758,6 +847,34 @@
         "meta": {
           "updateAt": 1717146593901,
           "createAt": 1717146593901
+        }
+      },
+      "ZKvsvNw5RG0tLF5VE4TFF": {
+        "id": "ZKvsvNw5RG0tLF5VE4TFF",
+        "identification": false,
+        "relationshipType": 16,
+        "startRelationshipType": 2,
+        "start": {
+          "tableId": "NwiFOgfP_LIwSUv0xlG6S",
+          "columnIds": [
+            "-ck1_TFXPkSyu4LjnAmAR"
+          ],
+          "x": 1177,
+          "y": 176,
+          "direction": 2
+        },
+        "end": {
+          "tableId": "aEfLcXA-3yQEvsSBlhktZ",
+          "columnIds": [
+            "dgdhB9YRcgOX1bNFp4vST"
+          ],
+          "x": 1346.75,
+          "y": 174,
+          "direction": 1
+        },
+        "meta": {
+          "updateAt": 1720266066050,
+          "createAt": 1720266066050
         }
       }
     },
@@ -1074,6 +1191,50 @@
         "name": 1717943315372,
         "dataType": 1717943322368
       }
+    ],
+    "aEfLcXA-3yQEvsSBlhktZ": [
+      "tableEntities",
+      1720265806491,
+      -1,
+      {
+        "name": 1720265868031
+      }
+    ],
+    "2Z5v7bjuLcSZcigkmAtvl": [
+      "tableColumnEntities",
+      1720265871568,
+      -1,
+      {
+        "name": 1720265924323,
+        "dataType": 1720265931980
+      }
+    ],
+    "ssM5Lw69Kb1Mo0PU_qaEv": [
+      "tableColumnEntities",
+      1720265934882,
+      -1,
+      {
+        "name": 1720266037677,
+        "dataType": 1720266081274
+      }
+    ],
+    "dgdhB9YRcgOX1bNFp4vST": [
+      "tableColumnEntities",
+      1720266066047,
+      -1,
+      {
+        "options(notNull)": 1720266066047,
+        "name": 1720266066047,
+        "dataType": 1720266066047,
+        "default": 1720266066047,
+        "comment": 1720266066047
+      }
+    ],
+    "ZKvsvNw5RG0tLF5VE4TFF": [
+      "relationshipEntities",
+      1720266066047,
+      -1,
+      {}
     ]
   }
 }

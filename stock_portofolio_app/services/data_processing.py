@@ -47,5 +47,17 @@ class DataProcessing:
     
     @classmethod
     def fetch_historical_dividends(cls, symbols: list):
-        StockPriceAPI.get_historical_dividends(symbols)
+        """
+        Fetches the historical dividend data of a set of stock symbols.
+
+        Parameters:
+        - symbols: list
+
+        Returns:
+        - dict: Historical dividend data points
+        """
+        dividends = StockPriceAPI.get_historical_dividends(symbols)
+        for d in dividends:
+            print(d)
+            print(list(dividends[d])[0].year)
         return 

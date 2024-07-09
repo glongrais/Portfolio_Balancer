@@ -45,5 +45,14 @@ def initialize_database(db_path: str):
                     FOREIGN KEY (stockid) REFERENCES stocks (stockid)
     )
     ''')
+    cursor.execute('''
+    CREATE TABLE historicaldividends
+    (
+                    datestamp     TEXT    NULL    ,
+                    dividendvalue REAL    NULL    ,
+                    stockid       INTEGER NOT NULL
+                    FOREIGN KEY (stockid) REFERENCES stocks (stockid)
+    )
+    ''')
     connection.commit()
     connection.close()
