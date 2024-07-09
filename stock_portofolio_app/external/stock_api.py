@@ -51,7 +51,7 @@ class StockPriceAPI:
     
     @classmethod
     def get_historical_dividends(cls, symbols: list):
-        data = []
+        data = {}
         for symbol in symbols:
             data[symbol] = cls._get_ticker(symbol).dividends.to_dict()
         return data
