@@ -1,4 +1,4 @@
-from external.stock_api import StockPriceAPI
+from external.stock_api import StockAPI
 
 class DataProcessing:
 
@@ -13,7 +13,7 @@ class DataProcessing:
         Returns:
         - float: Real-time price
         """
-        return StockPriceAPI.get_current_price(symbol)
+        return StockAPI.get_current_price(symbol)
 
     @classmethod
     def fetch_historical_data(cls, symbol: str, start_date: str, end_date: str) -> list:
@@ -28,7 +28,7 @@ class DataProcessing:
         Returns:
         - list: Historical data points
         """
-        return StockPriceAPI.get_historical_data([symbol], start_date, end_date)[0]
+        return StockAPI.get_historical_data([symbol], start_date, end_date)[0]
     
     @classmethod
     def fetch_historical_data(cls, symbols: list, start_date: str, end_date: str) -> list:
@@ -43,7 +43,7 @@ class DataProcessing:
         Returns:
         - list: Historical data points
         """
-        return StockPriceAPI.get_historical_data(symbols, start_date, end_date)
+        return StockAPI.get_historical_data(symbols, start_date, end_date)
     
     @classmethod
     def fetch_historical_dividends(cls, symbols: list):
@@ -56,7 +56,7 @@ class DataProcessing:
         Returns:
         - dict: Historical dividend data points
         """
-        dividends = StockPriceAPI.get_historical_dividends(symbols)
+        dividends = StockAPI.get_historical_dividends(symbols)
         for d in dividends:
             print(d)
             print(list(dividends[d])[0].year)
