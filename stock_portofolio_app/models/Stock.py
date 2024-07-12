@@ -1,7 +1,8 @@
 from models.Base import BaseModel
 from services.data_processing import DataProcessing
+from dataclasses import dataclass, field
 
-class Stock(BaseModel):
+""" class Stock(BaseModel):
 
     def __init__(self, db_path='data/portfolio.db'):
         super().__init__('stocks', db_path)
@@ -36,5 +37,16 @@ class Stock(BaseModel):
 
         for symbol in symbols:
             price = DataProcessing.fetch_real_time_price(symbol[0])
-            self.execute_query('UPDATE stocks SET price = ? WHERE symbol = ?', (price, symbol[0],))
+            self.execute_query('UPDATE stocks SET price = ? WHERE symbol = ?', (price, symbol[0],)) """
 
+@dataclass
+class Stock:
+    stockid: int
+    symbol: str
+    name: str = field(default="")
+    price: float = field(default=0.0)
+
+    @classmethod
+    def dataclass_factory(cls, cursor, row):
+        fields = [column[0] for column in cursor.description]
+        return Stock(**{k: v for k, v in zip(fields, row)})
