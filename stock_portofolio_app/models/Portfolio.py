@@ -1,5 +1,7 @@
 from models.Base import BaseModel
 from enum import Enum
+from dataclasses import dataclass, field
+from models.Stock import Stock
 
 class Portfolio(BaseModel):
 
@@ -35,3 +37,17 @@ class Portfolio(BaseModel):
         UPDATE portfolio SET ? = ?
         WHERE stockid = ?
         ''', (field, value, stockid))
+
+@dataclass
+class Portfolio:
+    stockid: int
+    quantity: int
+    distribution_target: float
+    distribution_real: float
+    stock: Stock = field(default=None)
+
+    @classmethod
+    def dataclass_factory(cls, cursor, row):
+        fields = [column[0] for column in cursor.description]
+        return Portfolio(**{k: v for k, v in zip(fields, row)})
+
