@@ -78,3 +78,9 @@ class DatabaseService:
         for answer in answers:
             cls.stocks[answer.stockid] = answer
             cls.symbol_map[answer.symbol] = answer.stockid
+    
+    @classmethod
+    def getPortfolios(cls):
+        with sqlite3.connect('data/portfolio.db') as connection:
+            answers = connection.execute("SELECT * FROM portfolio")  
+            print(answers.fetchall())  
