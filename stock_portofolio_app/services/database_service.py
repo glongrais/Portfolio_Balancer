@@ -2,6 +2,7 @@ from typing import Dict
 import sqlite3
 import logging
 from models.Stock import Stock
+from models.Portfolio import Portfolio
 from services.data_processing import DataProcessing
 
 logger = logging.getLogger(__name__)
@@ -10,6 +11,7 @@ class DatabaseService:
 
     symbol_map: Dict[str, int] = {}
     stocks: Dict[int, Stock] = {}
+    portfolio: Dict[int, Portfolio] = {}
 
     @classmethod
     def addStock(cls, symbol):
@@ -57,7 +59,7 @@ class DatabaseService:
             cls.stocks[answer.stockid] = answer
             cls.symbol_map[answer.symbol] = answer.stockid
             log_count += 1
-        logger.info("getStocks(): %d stock(s) fetch from the database", log_count)
+        logger.info("getStocks(): %d stock(s) fetched from the database", log_count)
 
     @classmethod
     def getStock(cls, stockid=None, symbol=None) -> None:
@@ -74,13 +76,24 @@ class DatabaseService:
             logger.warning("getStock(): Both stockid and symbol are set; the search will be done using stockid.")
         with sqlite3.connect('data/portfolio.db') as connection:
             connection.row_factory = Stock.dataclass_factory
-            answers = connection.execute("SELECT * FROM stocks WHERE symbol = ?", (symbol,))
+            if stockid is not None:
+                answers = connection.execute("SELECT * FROM stocks WHERE stockid = ?", (stockid,))
+            else:
+                answers = connection.execute("SELECT * FROM stocks WHERE symbol = ?", (symbol,))
         for answer in answers:
             cls.stocks[answer.stockid] = answer
             cls.symbol_map[answer.symbol] = answer.stockid
     
     @classmethod
-    def getPortfolios(cls):
+    def getPortfolio(cls):
+        """
+        Fetches all portfolio positions from the database and updates the in-memory cache.
+        """
         with sqlite3.connect('data/portfolio.db') as connection:
-            answers = connection.execute("SELECT * FROM portfolio")  
-            print(answers.fetchall())  
+            connection.row_factory = Portfolio.dataclass_factory
+            answers = connection.execute("SELECT * FROM portfolio")
+        log_count = 0  
+        for answer in answers:
+            cls.portfolio[answer.stockid] = answer
+            log_count += 1
+        logger.info("getPortfolio(): %d portfolio position(s) fetched from the database", log_count)
