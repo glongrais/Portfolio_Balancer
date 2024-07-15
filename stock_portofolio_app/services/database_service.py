@@ -5,6 +5,8 @@ from models.Stock import Stock
 from models.Portfolio import Portfolio
 from services.data_processing import DataProcessing
 
+DB_PATH = 'data/portfolio.db'
+
 logger = logging.getLogger(__name__)
 
 class DatabaseService:
@@ -24,7 +26,7 @@ class DatabaseService:
             logger.info("addStock(): Stock %s already in the database", symbol)
             return
         price = DataProcessing.fetch_real_time_price(symbol)
-        with sqlite3.connect('data/portfolio.db') as connection:
+        with sqlite3.connect(DB_PATH) as connection:
             connection.execute('INSERT INTO stocks (symbol, price) VALUES (?, ?)', (symbol,price,))
             connection.commit()
         cls.getStock(symbol=symbol)
@@ -35,7 +37,7 @@ class DatabaseService:
         """
         Updates all stocks price in the database and in the in-memory cache
         """
-        with sqlite3.connect('data/portfolio.db') as connection:
+        with sqlite3.connect(DB_PATH) as connection:
             log_count = 0
             for stockid in cls.stocks:
                 stock = cls.stocks[stockid]
@@ -51,7 +53,7 @@ class DatabaseService:
         """
         Fetches all stocks from the database and updates the in-memory cache.
         """
-        with sqlite3.connect('data/portfolio.db') as connection:
+        with sqlite3.connect(DB_PATH) as connection:
             connection.row_factory = Stock.dataclass_factory
             answers = connection.execute("SELECT * FROM stocks")
         log_count = 0
@@ -74,7 +76,7 @@ class DatabaseService:
             return
         if stockid is not None and symbol is not None:
             logger.warning("getStock(): Both stockid and symbol are set; the search will be done using stockid.")
-        with sqlite3.connect('data/portfolio.db') as connection:
+        with sqlite3.connect(DB_PATH) as connection:
             connection.row_factory = Stock.dataclass_factory
             if stockid is not None:
                 answers = connection.execute("SELECT * FROM stocks WHERE stockid = ?", (stockid,))
@@ -89,7 +91,7 @@ class DatabaseService:
         """
         Fetches all portfolio positions from the database and updates the in-memory cache.
         """
-        with sqlite3.connect('data/portfolio.db') as connection:
+        with sqlite3.connect(DB_PATH) as connection:
             connection.row_factory = Portfolio.dataclass_factory
             answers = connection.execute("SELECT * FROM portfolio")
         log_count = 0  
