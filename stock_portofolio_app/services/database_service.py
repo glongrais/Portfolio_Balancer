@@ -64,16 +64,17 @@ class DatabaseService:
         logger.info("getStocks(): %d stock(s) fetched from the database", log_count)
 
     @classmethod
-    def getStock(cls, stockid=None, symbol=None) -> None:
+    def getStock(cls, stockid=None, symbol=None) -> bool:
         """
         Fetches a specific stock by its ID or symbol and updates the in-memory cache.
 
         :param stockid: The stock ID to search for (default is None).
         :param symbol: The stock symbol to search for (default is None).
+        :return: True if the stock was found and updated in the cache, False otherwise.
         """
         if stockid is None and symbol is None:
             logger.error("getStock(): At least one parameter (stockid or symbol) must be set.")
-            return
+            return False
         if stockid is not None and symbol is not None:
             logger.warning("getStock(): Both stockid and symbol are set; the search will be done using stockid.")
         with sqlite3.connect(DB_PATH) as connection:
@@ -82,9 +83,18 @@ class DatabaseService:
                 answers = connection.execute("SELECT * FROM stocks WHERE stockid = ?", (stockid,))
             else:
                 answers = connection.execute("SELECT * FROM stocks WHERE symbol = ?", (symbol,))
+        log_count = 0
         for answer in answers:
             cls.stocks[answer.stockid] = answer
             cls.symbol_map[answer.symbol] = answer.stockid
+            log_count +=1
+        if log_count == 0:
+            if stockid is not None:
+                logger.warning("getStock(): Stock with stockid %d not in databse", stockid)
+            else:
+                logger.warning("getStock(): Stock with symbol %s not in databse", symbol)
+            return False
+        return True
     
     @classmethod
     def getPortfolio(cls):
@@ -96,6 +106,13 @@ class DatabaseService:
             answers = connection.execute("SELECT * FROM portfolio")
         log_count = 0  
         for answer in answers:
+            if answer.stockid not in cls.stocks:
+                if cls.getStock(stockid=answer.stockid):
+                    answer.stock = cls.stocks[answer.stockid]
+                else:
+                    logger.error("getPortfolio(): Stock with id %d not in the database", answer.stockid)
+            else:
+                answer.stock = cls.stocks[answer.stockid]
             cls.portfolio[answer.stockid] = answer
             log_count += 1
         logger.info("getPortfolio(): %d portfolio position(s) fetched from the database", log_count)
