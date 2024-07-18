@@ -22,12 +22,27 @@ def test_addStock(mock_fetch_stock, mock_fetch_price, mock_connect, setup_databa
     mock_connect.return_value = mock_conn
     mock_cursor = MagicMock()
     mock_conn.__enter__.return_value = mock_cursor
-    DatabaseService.addStock("AAPL")
+    mock_fetch_stock.return_value = 1
+
+    assert DatabaseService.addStock("AAPL") == 1
 
     mock_fetch_price.assert_called_once_with("AAPL")
     mock_cursor.execute.assert_called_once_with('INSERT INTO stocks (symbol, price) VALUES (?, ?)', ("AAPL", 100.0,))
     mock_cursor.commit.assert_called_once()
     mock_fetch_stock.assert_called_once_with(symbol="AAPL")
+
+@patch('sqlite3.connect')
+@patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=100.0)
+@patch('services.database_service.DatabaseService.getStock')
+@patch('logging.Logger.info')
+def test_addStock_already_in_database(mock_logger, mock_fetch_stock, mock_fetch_price, mock_connect, setup_database_service):
+    DatabaseService.symbol_map = {"AAPL": 1}
+    assert DatabaseService.addStock("AAPL") == 1
+
+    mock_logger.assert_called_once()
+    mock_fetch_price.assert_not_called()
+    mock_connect.assert_not_called()
+    mock_fetch_stock.assert_not_called()
     
 
 @patch('sqlite3.connect')
@@ -49,7 +64,7 @@ def test_getStock(mock_connect, setup_database_service):
     mock_cursor = MagicMock()
     mock_cursor.execute.return_value = [Stock(1, 'AAPL', 'Apple Inc.', 150.0)]
     mock_conn.__enter__.return_value = mock_cursor
-    assert DatabaseService.getStock(symbol='AAPL') == True
+    assert DatabaseService.getStock(symbol='AAPL') == 1
 
     assert DatabaseService.stocks[1].symbol == 'AAPL'
     assert DatabaseService.symbol_map['AAPL'] == 1
@@ -57,7 +72,7 @@ def test_getStock(mock_connect, setup_database_service):
 @patch('sqlite3.connect')
 def test_getStock_zero_parameter(mock_connect, setup_database_service):
 
-    assert DatabaseService.getStock() == False
+    assert DatabaseService.getStock() == -1
 
     mock_connect.assert_not_called()
 
@@ -69,7 +84,7 @@ def test_getStock_two_parameters(mock_logger, mock_connect, setup_database_servi
     mock_cursor = MagicMock()
     mock_cursor.execute.return_value = [Stock(1, 'AAPL', 'Apple Inc.', 150.0)]
     mock_conn.__enter__.return_value = mock_cursor
-    assert DatabaseService.getStock(symbol='AAPL', stockid=1) == True
+    assert DatabaseService.getStock(symbol='AAPL', stockid=1) == 1
 
     mock_logger.assert_called_once()
     mock_cursor.execute.assert_called_once_with("SELECT * FROM stocks WHERE stockid = ?", (1,))
@@ -121,7 +136,7 @@ def test_getPortfolio_stock_in_database(mock_stocks_dict, mock_getStock, mock_co
     mock_conn.__enter__.return_value = mock_cursor
     mock_values = {1: Stock(stockid=1, symbol='AAPL', price=150.0)}
     mock_stocks_dict.__getitem__.side_effect = mock_values.__getitem__
-    mock_getStock.return_value = True
+    mock_getStock.return_value = 1
 
     DatabaseService.getPortfolio()
 
@@ -139,7 +154,7 @@ def test_getPortfolio_stock_not_in_database(mock_logger, mock_getStock, mock_con
     mock_cursor = MagicMock()
     mock_cursor.execute.return_value = [Portfolio(stockid=1, quantity=10, distribution_real=5.0, distribution_target=10.0)]
     mock_conn.__enter__.return_value = mock_cursor
-    mock_getStock.return_value = False
+    mock_getStock.return_value = -1
 
     DatabaseService.getPortfolio()
 

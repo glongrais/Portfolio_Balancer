@@ -16,21 +16,23 @@ class DatabaseService:
     portfolio: Dict[int, Portfolio] = {}
 
     @classmethod
-    def addStock(cls, symbol):
+    def addStock(cls, symbol) -> int:
         """
         Adds a new stock to the database if it does not already exist.
 
         :param symbol: The stock symbol to be added.
+        :return: The stockid of the stock added. Also return stockid if the stock is already in the database
         """
         if symbol in cls.symbol_map:
             logger.info("addStock(): Stock %s already in the database", symbol)
-            return
+            return cls.symbol_map[symbol]
         price = DataProcessing.fetch_real_time_price(symbol)
         with sqlite3.connect(DB_PATH) as connection:
             connection.execute('INSERT INTO stocks (symbol, price) VALUES (?, ?)', (symbol,price,))
             connection.commit()
-        cls.getStock(symbol=symbol)
+        stockid = cls.getStock(symbol=symbol)
         logger.info("addStock(): %s added in the database", symbol)
+        return stockid
     
     @classmethod
     def updateStocksPrice(cls):
@@ -64,17 +66,17 @@ class DatabaseService:
         logger.info("getStocks(): %d stock(s) fetched from the database", log_count)
 
     @classmethod
-    def getStock(cls, stockid=None, symbol=None) -> bool:
+    def getStock(cls, stockid=None, symbol=None) -> int:
         """
         Fetches a specific stock by its ID or symbol and updates the in-memory cache.
 
         :param stockid: The stock ID to search for (default is None).
         :param symbol: The stock symbol to search for (default is None).
-        :return: True if the stock was found and updated in the cache, False otherwise.
+        :return: The stockid if the stock was found and updated in the cache, -1 otherwise.
         """
         if stockid is None and symbol is None:
             logger.error("getStock(): At least one parameter (stockid or symbol) must be set.")
-            return False
+            return -1
         if stockid is not None and symbol is not None:
             logger.warning("getStock(): Both stockid and symbol are set; the search will be done using stockid.")
         with sqlite3.connect(DB_PATH) as connection:
@@ -87,14 +89,15 @@ class DatabaseService:
         for answer in answers:
             cls.stocks[answer.stockid] = answer
             cls.symbol_map[answer.symbol] = answer.stockid
+            result = answer.stockid
             log_count +=1
         if log_count == 0:
             if stockid is not None:
                 logger.warning("getStock(): Stock with stockid %d not in databse", stockid)
             else:
                 logger.warning("getStock(): Stock with symbol %s not in databse", symbol)
-            return False
-        return True
+            return -1
+        return result
     
     @classmethod
     def getPortfolio(cls):
@@ -107,7 +110,7 @@ class DatabaseService:
         log_count = 0  
         for answer in answers:
             if answer.stockid not in cls.stocks:
-                if cls.getStock(stockid=answer.stockid):
+                if cls.getStock(stockid=answer.stockid) > -1:
                     answer.stock = cls.stocks[answer.stockid]
                 else:
                     logger.error("getPortfolio(): Stock with id %d not in the database", answer.stockid)
@@ -116,3 +119,14 @@ class DatabaseService:
             cls.portfolio[answer.stockid] = answer
             log_count += 1
         logger.info("getPortfolio(): %d portfolio position(s) fetched from the database", log_count)
+    
+    @classmethod
+    def addPortfolio(cls, symbol):
+        """
+        Add a new position in the portfolio database and in-memory cache.
+
+        :param symbol: The symbol of the stock in the position
+        """
+        stockid = cls.addStock(symbol=symbol)
+        with sqlite3.connect(DB_PATH) as connection:
+            return
