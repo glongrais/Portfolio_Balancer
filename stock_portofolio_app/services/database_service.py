@@ -121,12 +121,19 @@ class DatabaseService:
         logger.info("getPortfolio(): %d portfolio position(s) fetched from the database", log_count)
     
     @classmethod
-    def addPortfolio(cls, symbol):
+    def addPortfolio(cls, symbol, quantity, distribution_target=None):
         """
         Add a new position in the portfolio database and in-memory cache.
 
         :param symbol: The symbol of the stock in the position
         """
         stockid = cls.addStock(symbol=symbol)
-        with sqlite3.connect(DB_PATH) as connection:
+
+        if stockid in cls.portfolio:
+            logger.warning("addPortfolio(): Position %s already in the portfolio", symbol)
             return
+        with sqlite3.connect(DB_PATH) as connection:
+            connection.execute("INSERT INTO portfolio (stockid, quantity, distribution_target) VALUES (?, ?, ?)", (stockid, quantity, distribution_target))
+            connection.commit()
+        cls.portfolio[stockid] = Portfolio(stockid=stockid, quantity=quantity, distribution_target=distribution_target, stock=cls.stocks[stockid])
+        logger.info("addPortfolio(): Added position %s to the portfolio", symbol)

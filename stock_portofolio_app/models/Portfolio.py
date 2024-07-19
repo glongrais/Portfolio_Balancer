@@ -42,8 +42,8 @@ from models.Stock import Stock
 class Portfolio:
     stockid: int
     quantity: int
-    distribution_target: float
-    distribution_real: float
+    distribution_target: float = field(default=None)
+    distribution_real: float = field(default=0.0)
     stock: Stock = field(default=None)
 
     @classmethod
