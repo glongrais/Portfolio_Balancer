@@ -26,11 +26,11 @@ def test_portfolio_creation(portfolio_data):
     assert portfolio.stock != None
 
 def test_portfolio_default_values():
-    portfolio = Portfolio(stockid=2, quantity=10, distribution_target=10.0, distribution_real=5.0)
+    portfolio = Portfolio(stockid=2, quantity=10)
     assert portfolio.stockid == 2
     assert portfolio.quantity == 10
-    assert portfolio.distribution_target == 10.0
-    assert portfolio.distribution_real == 5.0
+    assert portfolio.distribution_target == None
+    assert portfolio.distribution_real == 0.0
     assert portfolio.stock == None
 
 def test_dataclass_factory():

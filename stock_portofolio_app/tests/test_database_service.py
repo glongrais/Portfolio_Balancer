@@ -164,3 +164,32 @@ def test_getPortfolio_stock_not_in_database(mock_logger, mock_getStock, mock_con
     assert DatabaseService.portfolio[1].quantity == 10
     assert DatabaseService.portfolio[1].stock == None
 
+@patch('sqlite3.connect')
+@patch('services.database_service.DatabaseService.addStock')
+@patch('services.database_service.DatabaseService.stocks')
+def test_addPortfolio(mock_stocks_dict, mock_addStock, mock_connect, setup_database_service):
+    mock_addStock.return_value = 1
+    mock_conn = MagicMock()
+    mock_connect.return_value = mock_conn
+    mock_cursor = MagicMock()
+    mock_conn.__enter__.return_value = mock_cursor
+    mock_values = {1: Stock(stockid=1, symbol='AAPL', price=150.0)}
+    mock_stocks_dict.__getitem__.side_effect = mock_values.__getitem__
+    DatabaseService.addPortfolio(symbol="AAPL", quantity=10, distribution_target=10.0)
+
+    mock_addStock.assert_called_once_with(symbol="AAPL")
+    mock_cursor.execute.assert_called_once()
+    mock_cursor.commit.assert_called_once()
+    assert 1 in DatabaseService.portfolio
+
+@patch('sqlite3.connect')
+@patch('services.database_service.DatabaseService.addStock')
+@patch('logging.Logger.warning')
+def test_addPortfolio_already_in_database(mock_logger, mock_addStock, mock_connect, setup_database_service):
+    mock_addStock.return_value = 1
+    DatabaseService.portfolio = {1: Portfolio(stockid=1, quantity=10)}
+    DatabaseService.addPortfolio(symbol="AAPL", quantity=10, distribution_target=10.0)
+
+    mock_addStock.assert_called_once_with(symbol="AAPL")
+    mock_logger.assert_called_once()
+    mock_connect.assert_not_called()
