@@ -3,7 +3,7 @@ from enum import Enum
 from dataclasses import dataclass, field
 from models.Stock import Stock
 
-# class Portfolio(BaseModel):
+# class Position(BaseModel):
 
 #     class Field(Enum):
 #         STOCKID = 'stockid'
@@ -12,12 +12,12 @@ from models.Stock import Stock
 #         DISTRIBUTIONREAL = 'distribution_real'
     
 #     def __init__(self, db_path='data/portfolio.db'):
-#         super().__init__('portfolio', db_path)
+#         super().__init__('Position', db_path)
 #         self.create_table()
 
 #     def create_table(self):
 #         self.execute_query('''
-#         CREATE TABLE IF NOT EXISTS portfolio (
+#         CREATE TABLE IF NOT EXISTS Position (
 #             stockid INTEGER PRIMARY KEY,
 #             quantity INTEGER NOT NULL,
 #             distribution_target REAL,
@@ -26,20 +26,20 @@ from models.Stock import Stock
 #         )
 #         ''')
 
-#     def add_to_portfolio(self, stockid, quantity, distribution_target):
+#     def add_to_Position(self, stockid, quantity, distribution_target):
 #         self.execute_query('''
-#             INSERT INTO portfolio (stockid, quantity, distribution_target) VALUES (?, ?, ?)
+#             INSERT INTO Position (stockid, quantity, distribution_target) VALUES (?, ?, ?)
 #             ON CONFLICT(stockid) DO UPDATE SET quantity=excluded.quantity,  distribution_target=excluded.distribution_target 
 #         ''', (stockid, quantity, distribution_target))
 
 #     def update_field(self, stockid, value, field: Field):
 #         self.execute_query('''
-#         UPDATE portfolio SET ? = ?
+#         UPDATE Position SET ? = ?
 #         WHERE stockid = ?
 #         ''', (field, value, stockid))
 
 @dataclass
-class Portfolio:
+class Position:
     stockid: int
     quantity: int
     distribution_target: float = field(default=None)
@@ -49,5 +49,5 @@ class Portfolio:
     @classmethod
     def dataclass_factory(cls, cursor, row):
         fields = [column[0] for column in cursor.description]
-        return Portfolio(**{k: v for k, v in zip(fields, row)})
+        return Position(**{k: v for k, v in zip(fields, row)})
 

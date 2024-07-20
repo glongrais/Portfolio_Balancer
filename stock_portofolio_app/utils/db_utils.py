@@ -18,7 +18,7 @@ def initialize_database(db_path: str):
     )
     ''')
     cursor.execute('''
-    CREATE TABLE IF NOT EXISTS portfolio (
+    CREATE TABLE IF NOT EXISTS positions (
                     stockid INTEGER PRIMARY KEY,
                     quantity INTEGER,
                     distribution_target REAL,
@@ -46,11 +46,10 @@ def initialize_database(db_path: str):
     )
     ''')
     cursor.execute('''
-    CREATE TABLE historicaldividends
-    (
+    CREATE TABLE IF NOT EXISTS historicaldividends (
                     datestamp     TEXT    NULL    ,
                     dividendvalue REAL    NULL    ,
-                    stockid       INTEGER NOT NULL
+                    stockid       INTEGER NOT NULL,
                     FOREIGN KEY (stockid) REFERENCES stocks (stockid)
     )
     ''')

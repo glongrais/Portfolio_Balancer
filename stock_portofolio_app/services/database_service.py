@@ -2,7 +2,7 @@ from typing import Dict
 import sqlite3
 import logging
 from models.Stock import Stock
-from models.Portfolio import Portfolio
+from models.Position import Position
 from services.data_processing import DataProcessing
 
 DB_PATH = 'data/portfolio.db'
@@ -13,7 +13,7 @@ class DatabaseService:
 
     symbol_map: Dict[str, int] = {}
     stocks: Dict[int, Stock] = {}
-    portfolio: Dict[int, Portfolio] = {}
+    positions: Dict[int, Position] = {}
 
     @classmethod
     def addStock(cls, symbol) -> int:
@@ -24,7 +24,7 @@ class DatabaseService:
         :return: The stockid of the stock added. Also return stockid if the stock is already in the database
         """
         if symbol in cls.symbol_map:
-            logger.info("addStock(): Stock %s already in the database", symbol)
+            logger.warning("addStock(): Stock %s already in the database", symbol)
             return cls.symbol_map[symbol]
         price = DataProcessing.fetch_real_time_price(symbol)
         with sqlite3.connect(DB_PATH) as connection:
@@ -100,28 +100,28 @@ class DatabaseService:
         return result
     
     @classmethod
-    def getPortfolio(cls):
+    def getPositions(cls):
         """
         Fetches all portfolio positions from the database and updates the in-memory cache.
         """
         with sqlite3.connect(DB_PATH) as connection:
-            connection.row_factory = Portfolio.dataclass_factory
-            answers = connection.execute("SELECT * FROM portfolio")
+            connection.row_factory = Position.dataclass_factory
+            answers = connection.execute("SELECT * FROM positions")
         log_count = 0  
         for answer in answers:
             if answer.stockid not in cls.stocks:
                 if cls.getStock(stockid=answer.stockid) > -1:
                     answer.stock = cls.stocks[answer.stockid]
                 else:
-                    logger.error("getPortfolio(): Stock with id %d not in the database", answer.stockid)
+                    logger.error("getPosition(): Stock with id %d not in the database", answer.stockid)
             else:
                 answer.stock = cls.stocks[answer.stockid]
-            cls.portfolio[answer.stockid] = answer
+            cls.positions[answer.stockid] = answer
             log_count += 1
-        logger.info("getPortfolio(): %d portfolio position(s) fetched from the database", log_count)
+        logger.info("getPosition(): %d portfolio position(s) fetched from the database", log_count)
     
     @classmethod
-    def addPortfolio(cls, symbol, quantity, distribution_target=None):
+    def addPosition(cls, symbol, quantity, distribution_target=None):
         """
         Add a new position in the portfolio database and in-memory cache.
 
@@ -129,11 +129,11 @@ class DatabaseService:
         """
         stockid = cls.addStock(symbol=symbol)
 
-        if stockid in cls.portfolio:
-            logger.warning("addPortfolio(): Position %s already in the portfolio", symbol)
+        if stockid in cls.positions:
+            logger.warning("addPosition(): Position %s already in the portfolio", symbol)
             return
         with sqlite3.connect(DB_PATH) as connection:
-            connection.execute("INSERT INTO portfolio (stockid, quantity, distribution_target) VALUES (?, ?, ?)", (stockid, quantity, distribution_target))
+            connection.execute("INSERT INTO positions (stockid, quantity, distribution_target) VALUES (?, ?, ?)", (stockid, quantity, distribution_target))
             connection.commit()
-        cls.portfolio[stockid] = Portfolio(stockid=stockid, quantity=quantity, distribution_target=distribution_target, stock=cls.stocks[stockid])
-        logger.info("addPortfolio(): Added position %s to the portfolio", symbol)
+        cls.positions[stockid] = Position(stockid=stockid, quantity=quantity, distribution_target=distribution_target, stock=cls.stocks[stockid])
+        logger.info("addPosition(): Added position %s to the portfolio", symbol)
