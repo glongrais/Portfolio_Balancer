@@ -4,14 +4,14 @@ from unittest.mock import patch, MagicMock
 from typing import Dict
 from services.database_service import DatabaseService
 from models.Stock import Stock
-from models.Portfolio import Portfolio
+from models.Position import Position
 
 @pytest.fixture
 def setup_database_service():
     # Reset the class variables before each test
     DatabaseService.symbol_map = {}
     DatabaseService.stocks = {}
-    DatabaseService.portfolio = {}
+    DatabaseService.positions = {}
     yield
 
 @patch('sqlite3.connect')
@@ -34,7 +34,7 @@ def test_addStock(mock_fetch_stock, mock_fetch_price, mock_connect, setup_databa
 @patch('sqlite3.connect')
 @patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=100.0)
 @patch('services.database_service.DatabaseService.getStock')
-@patch('logging.Logger.info')
+@patch('logging.Logger.warning')
 def test_addStock_already_in_database(mock_logger, mock_fetch_stock, mock_fetch_price, mock_connect, setup_database_service):
     DatabaseService.symbol_map = {"AAPL": 1}
     assert DatabaseService.addStock("AAPL") == 1
@@ -111,63 +111,63 @@ def test_updateStocksPrice(mock_fetch_price, mock_connect, setup_database_servic
 
 @patch('sqlite3.connect')
 @patch('services.database_service.DatabaseService.getStock')
-def test_getPortfolio(mock_getStock, mock_connect, setup_database_service):
+def test_getPositions(mock_getStock, mock_connect, setup_database_service):
     mock_conn = MagicMock()
     mock_connect.return_value = mock_conn
     mock_cursor = MagicMock()
-    mock_cursor.execute.return_value = [Portfolio(stockid=1, quantity=10, distribution_real=5.0, distribution_target=10.0)]
+    mock_cursor.execute.return_value = [Position(stockid=1, quantity=10, distribution_real=5.0, distribution_target=10.0)]
     mock_conn.__enter__.return_value = mock_cursor
     DatabaseService.stocks = {1: Stock(stockid=1, symbol='AAPL', price=150.0)}
-    DatabaseService.getPortfolio()
+    DatabaseService.getPositions()
 
     mock_getStock.assert_not_called()
-    assert len(DatabaseService.portfolio) == 1
-    assert DatabaseService.portfolio[1].quantity == 10
-    assert DatabaseService.portfolio[1].stock.stockid == 1
+    assert len(DatabaseService.positions) == 1
+    assert DatabaseService.positions[1].quantity == 10
+    assert DatabaseService.positions[1].stock.stockid == 1
 
 @patch('sqlite3.connect')
 @patch('services.database_service.DatabaseService.getStock')
 @patch('services.database_service.DatabaseService.stocks')
-def test_getPortfolio_stock_in_database(mock_stocks_dict, mock_getStock, mock_connect, setup_database_service):
+def test_getPositions_stock_in_database(mock_stocks_dict, mock_getStock, mock_connect, setup_database_service):
     mock_conn = MagicMock()
     mock_connect.return_value = mock_conn
     mock_cursor = MagicMock()
-    mock_cursor.execute.return_value = [Portfolio(stockid=1, quantity=10, distribution_real=5.0, distribution_target=10.0)]
+    mock_cursor.execute.return_value = [Position(stockid=1, quantity=10, distribution_real=5.0, distribution_target=10.0)]
     mock_conn.__enter__.return_value = mock_cursor
     mock_values = {1: Stock(stockid=1, symbol='AAPL', price=150.0)}
     mock_stocks_dict.__getitem__.side_effect = mock_values.__getitem__
     mock_getStock.return_value = 1
 
-    DatabaseService.getPortfolio()
+    DatabaseService.getPositions()
 
     mock_getStock.assert_called_once()
-    assert len(DatabaseService.portfolio) == 1
-    assert DatabaseService.portfolio[1].quantity == 10
-    assert DatabaseService.portfolio[1].stock.stockid == 1
+    assert len(DatabaseService.positions) == 1
+    assert DatabaseService.positions[1].quantity == 10
+    assert DatabaseService.positions[1].stock.stockid == 1
 
 @patch('sqlite3.connect')
 @patch('services.database_service.DatabaseService.getStock')
 @patch('logging.Logger.error')
-def test_getPortfolio_stock_not_in_database(mock_logger, mock_getStock, mock_connect, setup_database_service):
+def test_getPositions_stock_not_in_database(mock_logger, mock_getStock, mock_connect, setup_database_service):
     mock_conn = MagicMock()
     mock_connect.return_value = mock_conn
     mock_cursor = MagicMock()
-    mock_cursor.execute.return_value = [Portfolio(stockid=1, quantity=10, distribution_real=5.0, distribution_target=10.0)]
+    mock_cursor.execute.return_value = [Position(stockid=1, quantity=10, distribution_real=5.0, distribution_target=10.0)]
     mock_conn.__enter__.return_value = mock_cursor
     mock_getStock.return_value = -1
 
-    DatabaseService.getPortfolio()
+    DatabaseService.getPositions()
 
     mock_logger.assert_called_once()
     mock_getStock.assert_called_once()
-    assert len(DatabaseService.portfolio) == 1
-    assert DatabaseService.portfolio[1].quantity == 10
-    assert DatabaseService.portfolio[1].stock == None
+    assert len(DatabaseService.positions) == 1
+    assert DatabaseService.positions[1].quantity == 10
+    assert DatabaseService.positions[1].stock == None
 
 @patch('sqlite3.connect')
 @patch('services.database_service.DatabaseService.addStock')
 @patch('services.database_service.DatabaseService.stocks')
-def test_addPortfolio(mock_stocks_dict, mock_addStock, mock_connect, setup_database_service):
+def test_addPosition(mock_stocks_dict, mock_addStock, mock_connect, setup_database_service):
     mock_addStock.return_value = 1
     mock_conn = MagicMock()
     mock_connect.return_value = mock_conn
@@ -175,20 +175,20 @@ def test_addPortfolio(mock_stocks_dict, mock_addStock, mock_connect, setup_datab
     mock_conn.__enter__.return_value = mock_cursor
     mock_values = {1: Stock(stockid=1, symbol='AAPL', price=150.0)}
     mock_stocks_dict.__getitem__.side_effect = mock_values.__getitem__
-    DatabaseService.addPortfolio(symbol="AAPL", quantity=10, distribution_target=10.0)
+    DatabaseService.addPosition(symbol="AAPL", quantity=10, distribution_target=10.0)
 
     mock_addStock.assert_called_once_with(symbol="AAPL")
     mock_cursor.execute.assert_called_once()
     mock_cursor.commit.assert_called_once()
-    assert 1 in DatabaseService.portfolio
+    assert 1 in DatabaseService.positions
 
 @patch('sqlite3.connect')
 @patch('services.database_service.DatabaseService.addStock')
 @patch('logging.Logger.warning')
-def test_addPortfolio_already_in_database(mock_logger, mock_addStock, mock_connect, setup_database_service):
+def test_addPosition_already_in_database(mock_logger, mock_addStock, mock_connect, setup_database_service):
     mock_addStock.return_value = 1
-    DatabaseService.portfolio = {1: Portfolio(stockid=1, quantity=10)}
-    DatabaseService.addPortfolio(symbol="AAPL", quantity=10, distribution_target=10.0)
+    DatabaseService.positions = {1: Position(stockid=1, quantity=10)}
+    DatabaseService.addPosition(symbol="AAPL", quantity=10, distribution_target=10.0)
 
     mock_addStock.assert_called_once_with(symbol="AAPL")
     mock_logger.assert_called_once()

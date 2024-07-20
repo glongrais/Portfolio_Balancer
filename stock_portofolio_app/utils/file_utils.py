@@ -1,11 +1,10 @@
 from numbers_parser import Document
-from models.Stock import Stock
-from models.Portfolio import Portfolio
+from services.database_service import DatabaseService
 
-class fileUtils:
+class FileUtils:
 
     @classmethod
-    def load_numbers(filename: str):
+    def load_numbers(cls, filename: str):
 
         # Value to adapt 
         SHEET = 'Dividends'
@@ -13,9 +12,6 @@ class fileUtils:
         SYMBOL = 0
         QUANTITY = 2
         DISTRIBUTION_TARGET = -1
-
-        stock = Stock()
-        portfolio = Portfolio()
         
         try:
             doc = Document(filename)
@@ -28,8 +24,4 @@ class fileUtils:
         for row in table.rows(values_only=True):
             if row[0] is None:
                 continue
-            stockid = stock.get_sotckid_from_symbol(row[SYMBOL])
-            if stockid == None:
-                stock.add_stock(row[SYMBOL])
-                stockid = stock.get_sotckid_from_symbol(row[SYMBOL])
-            portfolio.add_to_portfolio(stockid, int(row[QUANTITY]), row[DISTRIBUTION_TARGET]*100)
+            DatabaseService.addPosition(symbol=row[SYMBOL], quantity=int(row[QUANTITY]), distribution_target=row[DISTRIBUTION_TARGET]*100)

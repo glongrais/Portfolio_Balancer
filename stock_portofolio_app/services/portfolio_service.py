@@ -1,34 +1,25 @@
 # services/portfolio_service.py
-from models.Portfolio import Portfolio
+from models.Position import Position
 from models.Stock import Stock
 from models.Transaction import Transaction
-#from models.historical_stock import HistoricalStock
-#from external.stock_price_api import StockPriceAPI
+from services.database_service import DatabaseService
 import math
 from cachetools import cached, TTLCache
 
 class PortfolioService:
 
     @classmethod
-    @cached(cache=TTLCache(maxsize=1024, ttl=60))
-    def calculate_portfolio_value(cls) -> float:
+    #@cached(cache=TTLCache(maxsize=1024, ttl=60))
+    def calculatePortfolioValue(cls) -> float:
         """
         Calculates the total value of the portfolio.
 
-        Returns:
-        - float: Total portfolio value
+        :return: Total portfolio value
         """
-        portfolio = Portfolio()
-        portfolio_entries = portfolio.execute_query(
-            '''
-            SELECT stocks.stockid, portfolio.quantity, stocks.price FROM portfolio LEFT JOIN stocks ON portfolio.stockid = stocks.stockid 
-            '''
-        )
-        if portfolio_entries == None:
-            return 0
-        else:
-            total_value = sum(quantity * price for stockid, quantity, price in portfolio_entries)
-            return round(total_value)
+        total_value = 0
+        for position in DatabaseService.positions.values():
+            total_value += position.quantity * position.stock.price
+        return round(total_value)
 
     @classmethod
     def balance_portfolio(cls, amount_to_buy, min_amount_to_buy=100):
