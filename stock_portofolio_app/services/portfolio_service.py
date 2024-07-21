@@ -47,22 +47,11 @@ class PortfolioService:
         print("Leftover: ", math.floor(amount_to_buy))
 
     @classmethod
-    def update_real_distribution(cls):
-        total_value = cls.calculate_portfolio_value()
+    def updateRealDistribution(cls):
+        total_value = cls.calculatePortfolioValue()
 
-        portfolio = Portfolio()
-        portfolio_entries = portfolio.execute_query(
-            '''
-            SELECT stocks.stockid, portfolio.quantity, stocks.price FROM portfolio LEFT JOIN stocks ON portfolio.stockid = stocks.stockid 
-            '''
-        )
-
-        if portfolio_entries == None:
-            return
-        else:
-            for stockid, quantity, price in portfolio_entries:
-                distribution_real = round((price*quantity)/total_value*100, 2)
-                portfolio.execute_query('UPDATE portfolio SET distribution_real = ? WHERE stockid = ?', (distribution_real, stockid,))
+        for position in DatabaseService.positions.values():
+            position.distribution_real = round((position.stock.price * position.quantity)/total_value*100, 2)
 
     @classmethod
     def get_transaction_history(cls) -> list:
