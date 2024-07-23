@@ -42,3 +42,38 @@ def test_dataclass_factory():
     assert position.quantity == 10
     assert position.distribution_target == 10.0
     assert position.distribution_real == 5.0
+
+def test_dataclass_factory_incomplete_data():
+    cursor = MockCursor(description=[('stockid',), ('quantity',)])
+    row = MockRow(values=[4, 20])
+    position = Position.dataclass_factory(cursor, row.values)
+    
+    assert position.stockid == 4
+    assert position.quantity == 20
+    assert position.distribution_target == None
+    assert position.distribution_real == 0.0
+
+def test_delta_complete_data(Position_data):
+    position = Position(**Position_data)
+
+    assert position.delta() == 2.0
+
+def test_delta_incomplete_data():
+    position = Position(stockid=2, quantity=10)
+
+    assert position.delta() == 0.0
+
+def test_delta_update_data(Position_data):
+    position = Position(**Position_data)
+
+    assert position.delta() == 2.0
+
+    position.distribution_target = 20.0
+
+    assert position.delta() == 12.0
+
+def test_delta_negative_value(Position_data):
+    position = Position(**Position_data)
+    position.distribution_real = 12.0
+
+    assert position.delta() == -2.0

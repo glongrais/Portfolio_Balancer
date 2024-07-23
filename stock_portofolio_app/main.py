@@ -19,6 +19,6 @@ if __name__ == '__main__':
     #FileUtils.load_numbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
     print(PortfolioService().calculatePortfolioValue())
     # DataProcessing.fetch_historical_dividends(["TTE.PA"])
-    # PortfolioService.balance_portfolio(3000)
+    PortfolioService.balancePortfolio(3000)
     # print(DatabaseService.portfolio)
     
