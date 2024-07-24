@@ -1,77 +1,52 @@
 # services/portfolio_service.py
-from models.Portfolio import Portfolio
+from models.Position import Position
 from models.Stock import Stock
 from models.Transaction import Transaction
-#from models.historical_stock import HistoricalStock
-#from external.stock_price_api import StockPriceAPI
+from services.database_service import DatabaseService
 import math
 from cachetools import cached, TTLCache
 
 class PortfolioService:
 
     @classmethod
-    @cached(cache=TTLCache(maxsize=1024, ttl=60))
-    def calculate_portfolio_value(cls) -> float:
+    #@cached(cache=TTLCache(maxsize=1024, ttl=60))
+    def calculatePortfolioValue(cls) -> float:
         """
         Calculates the total value of the portfolio.
 
-        Returns:
-        - float: Total portfolio value
+        :return: Total portfolio value
         """
-        portfolio = Portfolio()
-        portfolio_entries = portfolio.execute_query(
-            '''
-            SELECT stocks.stockid, portfolio.quantity, stocks.price FROM portfolio LEFT JOIN stocks ON portfolio.stockid = stocks.stockid 
-            '''
-        )
-        if portfolio_entries == None:
-            return 0
-        else:
-            total_value = sum(quantity * price for stockid, quantity, price in portfolio_entries)
-            return round(total_value)
+        total_value = 0
+        for position in DatabaseService.positions.values():
+            total_value += position.quantity * position.stock.price
+        return round(total_value)
 
     @classmethod
-    def balance_portfolio(cls, amount_to_buy, min_amount_to_buy=100):
-        total_value = cls.calculate_portfolio_value()+amount_to_buy
+    def balancePortfolio(cls, amount_to_buy, min_amount_to_buy=100):
+        total_value = cls.calculatePortfolioValue()+amount_to_buy
 
-        cls.update_real_distribution()
+        cls.updateRealDistribution()
 
-        portfolio = Portfolio()
-        stocks = portfolio.execute_query(
-            '''
-                SELECT stocks.stockid, stocks.symbol, stocks.price, portfolio.quantity, portfolio.distribution_target, portfolio.distribution_real, (portfolio.distribution_target - portfolio.distribution_real) as delta FROM portfolio LEFT JOIN stocks ON portfolio.stockid = stocks.stockid ORDER BY delta DESC
-            '''
-        )
-        for stockid, symbol, price, quantity, distribution_target, distribution_real, delta in stocks:
-            if price > amount_to_buy:
+        sorted_positions = dict(sorted(DatabaseService.positions.items(), key=lambda item: item[1].delta(), reverse=True))
+
+        for position in sorted_positions.values():
+            if position.stock.price > amount_to_buy:
                 continue
-            target = distribution_target/100 - round((price*quantity)/(total_value), 4)
+            target = position.distribution_target/100 - round((position.stock.price*position.quantity)/(total_value), 4)
             money_to_buy = target * (total_value)
-            tmp = math.floor(min(amount_to_buy, money_to_buy)/price)
-            if (tmp*price) < min_amount_to_buy:
+            tmp = math.floor(min(amount_to_buy, money_to_buy)/position.stock.price)
+            if (tmp*position.stock.price) < min_amount_to_buy:
                 continue
-            amount_to_buy = amount_to_buy - (tmp*price)
-            print(symbol, tmp, round(tmp*price, 2), " Stock price: ", price)
-        
+            amount_to_buy = amount_to_buy - (tmp*position.stock.price)
+            print(position.stock.symbol, tmp, round(tmp*position.stock.price, 2), " Stock price: ", position.stock.price)       
         print("Leftover: ", math.floor(amount_to_buy))
 
     @classmethod
-    def update_real_distribution(cls):
-        total_value = cls.calculate_portfolio_value()
+    def updateRealDistribution(cls):
+        total_value = cls.calculatePortfolioValue()
 
-        portfolio = Portfolio()
-        portfolio_entries = portfolio.execute_query(
-            '''
-            SELECT stocks.stockid, portfolio.quantity, stocks.price FROM portfolio LEFT JOIN stocks ON portfolio.stockid = stocks.stockid 
-            '''
-        )
-
-        if portfolio_entries == None:
-            return
-        else:
-            for stockid, quantity, price in portfolio_entries:
-                distribution_real = round((price*quantity)/total_value*100, 2)
-                portfolio.execute_query('UPDATE portfolio SET distribution_real = ? WHERE stockid = ?', (distribution_real, stockid,))
+        for position in DatabaseService.positions.values():
+            position.distribution_real = round((position.stock.price * position.quantity)/total_value*100, 2)
 
     @classmethod
     def get_transaction_history(cls) -> list:
