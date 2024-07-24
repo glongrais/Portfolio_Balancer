@@ -38,6 +38,120 @@ def test_calculatePortfolioValue_updated_prices(setup_portfolio_service):
     stock.price = 200.0
     assert PortfolioService.calculatePortfolioValue() == 2000
 
+@patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
+@patch('services.portfolio_service.PortfolioService.updateRealDistribution')
+@patch('services.database_service.DatabaseService.positions', new_callable=dict)
+@patch('builtins.print')
+def test_balancePortfolio(mock_print, mock_positions, mock_update_real_distribution, mock_calculate_portfolio_value, setup_portfolio_service):
+    # Setup mock return values
+    mock_calculate_portfolio_value.return_value = 10000
+
+    # Create mock positions
+    stock1 = Stock(stockid=1, symbol='AAPL', price=150)
+    position1 = Position(stockid=1, quantity=10, distribution_target=20.0, distribution_real=10.0, stock=stock1)
+    
+    stock2 = Stock(stockid=2, symbol='GOOG', price=100)
+    position2 = Position(stockid=2, quantity=5, distribution_target=30.0, distribution_real=25.0, stock=stock2)
+    
+    mock_positions[1] = position1
+    mock_positions[2] = position2
+
+    # Call the method under test
+    PortfolioService.balancePortfolio(amount_to_buy=1000, min_amount_to_buy=50)
+
+    # Assertions
+    mock_update_real_distribution.assert_called_once()
+    mock_calculate_portfolio_value.assert_called_once()
+
+    # Check the printed output
+    mock_print.assert_any_call('AAPL', 4, 600.0, ' Stock price: ', 150)
+    mock_print.assert_any_call('GOOG', 4, 400.0, ' Stock price: ', 100)
+    mock_print.assert_any_call('Leftover: ', 0)
+
+@patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
+@patch('services.portfolio_service.PortfolioService.updateRealDistribution')
+@patch('services.database_service.DatabaseService.positions', new_callable=dict)
+@patch('builtins.print')
+def test_balancePortfolio_leftover_no_purchase(mock_print, mock_positions, mock_update_real_distribution, mock_calculate_portfolio_value):
+    # Setup mock return values
+    mock_calculate_portfolio_value.return_value = 10000
+
+    # Create mock positions
+    stock1 = Stock(stockid=1, symbol='AAPL', price=150)
+    position1 = Position(stockid=1, quantity=10, distribution_target=20.0, distribution_real=10.0, stock=stock1)
+    
+    stock2 = Stock(stockid=2, symbol='GOOG', price=200)
+    position2 = Position(stockid=2, quantity=5, distribution_target=30.0, distribution_real=25.0, stock=stock2)
+    
+    mock_positions[1] = position1
+    mock_positions[2] = position2
+
+    # Call the method under test with a small amount to buy
+    PortfolioService.balancePortfolio(amount_to_buy=100, min_amount_to_buy=50)
+
+    # Assertions
+    mock_update_real_distribution.assert_called_once()
+    mock_calculate_portfolio_value.assert_called_once()
+
+    # Ensure leftover amount is handled correctly
+    mock_print.assert_any_call('Leftover: ', 100)
+
+@patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
+@patch('services.portfolio_service.PortfolioService.updateRealDistribution')
+@patch('services.database_service.DatabaseService.positions', new_callable=dict)
+@patch('builtins.print')
+def test_balancePortfolio_leftover_one_purchase(mock_print, mock_positions, mock_update_real_distribution, mock_calculate_portfolio_value):
+    # Setup mock return values
+    mock_calculate_portfolio_value.return_value = 10000
+
+    # Create mock positions
+    stock1 = Stock(stockid=1, symbol='AAPL', price=150)
+    position1 = Position(stockid=1, quantity=10, distribution_target=20.0, distribution_real=10.0, stock=stock1)
+    
+    stock2 = Stock(stockid=2, symbol='GOOG', price=100)
+    position2 = Position(stockid=2, quantity=5, distribution_target=30.0, distribution_real=25.0, stock=stock2)
+    
+    mock_positions[1] = position1
+    mock_positions[2] = position2
+
+    # Call the method under test with a small amount to buy
+    PortfolioService.balancePortfolio(amount_to_buy=120, min_amount_to_buy=50)
+
+    # Assertions
+    mock_update_real_distribution.assert_called_once()
+    mock_calculate_portfolio_value.assert_called_once()
+
+    # Ensure leftover amount is handled correctly
+    mock_print.assert_any_call('Leftover: ', 20)
+
+@patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
+@patch('services.portfolio_service.PortfolioService.updateRealDistribution')
+@patch('services.database_service.DatabaseService.positions', new_callable=dict)
+@patch('builtins.print')
+def test_balancePortfolio_leftover_multiple_purchase(mock_print, mock_positions, mock_update_real_distribution, mock_calculate_portfolio_value):
+    # Setup mock return values
+    mock_calculate_portfolio_value.return_value = 10000
+
+    # Create mock positions
+    stock1 = Stock(stockid=1, symbol='AAPL', price=150)
+    position1 = Position(stockid=1, quantity=10, distribution_target=20.0, distribution_real=10.0, stock=stock1)
+    
+    stock2 = Stock(stockid=2, symbol='GOOG', price=100)
+    position2 = Position(stockid=2, quantity=5, distribution_target=30.0, distribution_real=25.0, stock=stock2)
+    
+    mock_positions[1] = position1
+    mock_positions[2] = position2
+
+    # Call the method under test with a small amount to buy
+    PortfolioService.balancePortfolio(amount_to_buy=950, min_amount_to_buy=50)
+
+    # Assertions
+    mock_update_real_distribution.assert_called_once()
+    mock_calculate_portfolio_value.assert_called_once()
+
+    # Ensure leftover amount is handled correctly
+    mock_print.assert_any_call('Leftover: ', 50)
+
 @patch("models.Position.Position")
 def test_updateRealDistribution_empty_portfolio(mock_Position, setup_portfolio_service):
     PortfolioService.updateRealDistribution()

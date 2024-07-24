@@ -16,9 +16,9 @@ if __name__ == '__main__':
     initialize_database('data/portfolio.db')
     DatabaseService.getStocks()
     DatabaseService.getPositions()
-    #FileUtils.load_numbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
+    FileUtils.load_numbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
     print(PortfolioService().calculatePortfolioValue())
     # DataProcessing.fetch_historical_dividends(["TTE.PA"])
-    PortfolioService.balancePortfolio(3000)
+    PortfolioService.balancePortfolio(1250)
     # print(DatabaseService.portfolio)
     

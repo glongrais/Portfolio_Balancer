@@ -27,23 +27,6 @@ class PortfolioService:
 
         cls.updateRealDistribution()
 
-        # portfolio = Portfolio()
-        # stocks = portfolio.execute_query(
-        #     '''
-        #         SELECT stocks.stockid, stocks.symbol, stocks.price, portfolio.quantity, portfolio.distribution_target, portfolio.distribution_real, (portfolio.distribution_target - portfolio.distribution_real) as delta FROM portfolio LEFT JOIN stocks ON portfolio.stockid = stocks.stockid ORDER BY delta DESC
-        #     '''
-        # )
-        # for stockid, symbol, price, quantity, distribution_target, distribution_real, delta in stocks:
-        #     if price > amount_to_buy:
-        #         continue
-        #     target = distribution_target/100 - round((price*quantity)/(total_value), 4)
-        #     money_to_buy = target * (total_value)
-        #     tmp = math.floor(min(amount_to_buy, money_to_buy)/price)
-        #     if (tmp*price) < min_amount_to_buy:
-        #         continue
-        #     amount_to_buy = amount_to_buy - (tmp*price)
-        #     print(symbol, tmp, round(tmp*price, 2), " Stock price: ", price)
-
         sorted_positions = dict(sorted(DatabaseService.positions.items(), key=lambda item: item[1].delta(), reverse=True))
 
         for position in sorted_positions.values():
