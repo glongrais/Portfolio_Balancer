@@ -100,6 +100,11 @@ class DatabaseService:
         return result
     
     @classmethod
+    def updateStockPrice(cls):
+        """
+        """
+    
+    @classmethod
     def getPositions(cls):
         """
         Fetches all portfolio positions from the database and updates the in-memory cache.
