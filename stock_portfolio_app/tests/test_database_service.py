@@ -109,10 +109,10 @@ def test_updateStocksPrice(mock_fetch_price, mock_connect, setup_database_servic
     mock_cursor.commit.assert_called_once()
     assert DatabaseService.stocks[1].price == 100.0
     
-@patch('DataProcessing.fetch_real_time_price')
+@patch('services.data_processing.DataProcessing.fetch_real_time_price')
 @patch('sqlite3.connect')
 @patch('logging.Logger.warning')
-def test_updatePortfolioPositionsPrice(self, mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price):
+def test_updatePortfolioPositionsPrice(mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price, setup_database_service):
     # Mock return values for the price fetching
     mock_fetch_real_time_price.side_effect = lambda symbol: {'AAPL': 150.0, 'GOOG': 100.0}[symbol]
     
@@ -146,10 +146,10 @@ def test_updatePortfolioPositionsPrice(self, mock_logger_warning, mock_sqlite_co
     # Check if commit was called
     assert mock_connection.commit.call_count == 2
 
-@patch('DataProcessing.fetch_real_time_price')
+@patch('services.data_processing.DataProcessing.fetch_real_time_price')
 @patch('sqlite3.connect')
 @patch('logging.Logger.warning')
-def test_updatePortfolioPositionsPrice_no_positions(self, mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price):
+def test_updatePortfolioPositionsPrice_no_positions(mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price, setup_database_service):
     # Clear positions
     DatabaseService.positions = {}
     
@@ -163,10 +163,10 @@ def test_updatePortfolioPositionsPrice_no_positions(self, mock_logger_warning, m
     assert mock_fetch_real_time_price.call_count == 0
     assert mock_sqlite_connect.call_count == 0
 
-@patch('DataProcessing.fetch_real_time_price')
+@patch('services.data_processing.DataProcessing.fetch_real_time_price')
 @patch('sqlite3.connect')
 @patch('logging.Logger.warning')
-def test_updatePortfolioPositionsPrice_no_stock_in_position(self, mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price):
+def test_updatePortfolioPositionsPrice_no_stock_in_position(mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price, setup_database_service):
     # Mock positions with one missing stock
     position1 = Position(stockid=1, quantity=10, stock=None)
     DatabaseService.positions = {1: position1}

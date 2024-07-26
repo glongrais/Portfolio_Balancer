@@ -11,14 +11,13 @@ logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(name)s - %(message)s')
-    # S = Stock()
-    # S.update_prices()
     initialize_database('data/portfolio.db')
     DatabaseService.getStocks()
     DatabaseService.getPositions()
+    DatabaseService.updatePortfolioPositionsPrice()
     FileUtils.load_numbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
     print(PortfolioService().calculatePortfolioValue())
     # DataProcessing.fetch_historical_dividends(["TTE.PA"])
-    PortfolioService.balancePortfolio(1250)
+    PortfolioService.balancePortfolio(1260)
     # print(DatabaseService.portfolio)
     
