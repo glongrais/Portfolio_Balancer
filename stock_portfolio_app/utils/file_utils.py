@@ -4,7 +4,7 @@ from services.database_service import DatabaseService
 class FileUtils:
 
     @classmethod
-    def load_numbers(cls, filename: str):
+    def importNumbers(cls, filename: str) -> None:
 
         # Value to adapt 
         SHEET = 'Dividends'
@@ -25,3 +25,7 @@ class FileUtils:
             if row[0] is None:
                 continue
             DatabaseService.addPosition(symbol=row[SYMBOL], quantity=int(row[QUANTITY]), distribution_target=row[DISTRIBUTION_TARGET]*100)
+
+    @classmethod
+    def refreshNumbers(cls) -> None:
+        return
