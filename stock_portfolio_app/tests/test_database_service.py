@@ -108,6 +108,78 @@ def test_updateStocksPrice(mock_fetch_price, mock_connect, setup_database_servic
     mock_cursor.execute.assert_called_once_with('UPDATE stocks SET price = ? WHERE stockid = ?', (100.0, 1))
     mock_cursor.commit.assert_called_once()
     assert DatabaseService.stocks[1].price == 100.0
+    
+@patch('DataProcessing.fetch_real_time_price')
+@patch('sqlite3.connect')
+@patch('logging.Logger.warning')
+def test_updatePortfolioPositionsPrice(self, mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price):
+    # Mock return values for the price fetching
+    mock_fetch_real_time_price.side_effect = lambda symbol: {'AAPL': 150.0, 'GOOG': 100.0}[symbol]
+    
+    # Mock SQLite connection and cursor
+    mock_connection = MagicMock()
+    mock_cursor = MagicMock()
+    mock_sqlite_connect.return_value.__enter__.return_value = mock_connection
+    mock_connection.execute.return_value = mock_cursor
+    
+    # Mock positions with predefined stocks
+    stock1 = Stock(stockid=1, symbol='AAPL', price=140.0)
+    position1 = Position(stockid=1, quantity=10, stock=stock1)
+    
+    stock2 = Stock(stockid=2, symbol='GOOG', price=90.0)
+    position2 = Position(stockid=2, quantity=5, stock=stock2)
+    
+    DatabaseService.positions = {1: position1, 2: position2}
+    
+    # Call the method under test
+    DatabaseService.updatePortfolioPositionsPrice()
+    
+    # Check if the prices were updated correctly
+    assert position1.stock.price == 150.0
+    assert position2.stock.price == 100.0
+    
+    # Check if the database update was called with correct values
+    mock_connection.execute.assert_any_call("UPDATE stocks SET price=? WHERE stockid=?", (150.0, 1))
+    mock_connection.execute.assert_any_call("UPDATE stocks SET price=? WHERE stockid=?", (100.0, 2))
+    assert mock_connection.execute.call_count == 2
+    
+    # Check if commit was called
+    assert mock_connection.commit.call_count == 2
+
+@patch('DataProcessing.fetch_real_time_price')
+@patch('sqlite3.connect')
+@patch('logging.Logger.warning')
+def test_updatePortfolioPositionsPrice_no_positions(self, mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price):
+    # Clear positions
+    DatabaseService.positions = {}
+    
+    # Call the method under test
+    DatabaseService.updatePortfolioPositionsPrice()
+    
+    # Check if the correct warning message was logged
+    mock_logger_warning.assert_called_once_with("updatePortfolioPositionsPrice(): No position in the portfolio")
+    
+    # Check if fetch_real_time_price and database were not called
+    assert mock_fetch_real_time_price.call_count == 0
+    assert mock_sqlite_connect.call_count == 0
+
+@patch('DataProcessing.fetch_real_time_price')
+@patch('sqlite3.connect')
+@patch('logging.Logger.warning')
+def test_updatePortfolioPositionsPrice_no_stock_in_position(self, mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price):
+    # Mock positions with one missing stock
+    position1 = Position(stockid=1, quantity=10, stock=None)
+    DatabaseService.positions = {1: position1}
+    
+    # Call the method under test
+    DatabaseService.updatePortfolioPositionsPrice()
+    
+    # Check if the correct warning message was logged
+    mock_logger_warning.assert_called_once_with("updatePortfolioPositionsPrice(): Position %d has no stock set. Skipping price update for this position", 1)
+    
+    # Check if fetch_real_time_price and database were not called
+    assert mock_fetch_real_time_price.call_count == 0
+    assert mock_sqlite_connect.call_count == 0
 
 @patch('sqlite3.connect')
 @patch('services.database_service.DatabaseService.getStock')

@@ -100,9 +100,23 @@ class DatabaseService:
         return result
     
     @classmethod
-    def updateStockPrice(cls):
+    def updatePortfolioPositionsPrice(cls):
         """
+        Updates the price of all the positions in the portfolio, both in the database and in the in-memory cahce
         """
+        if not cls.positions:
+            logger.warning("updatePortfolioPositionsPrice(): No position in the portfolio")
+            return
+        for stockid in cls.positions:
+            position = cls.positions[stockid]
+            if position.stock is None:
+                logger.warning("updatePortfolioPositionsPrice(): Position %d has no stock set. Skipping price update for this position", stockid)
+                continue
+            new_price = DataProcessing.fetch_real_time_price(position.stock.symbol)
+            position.stock.price = new_price
+            with sqlite3.connect(DB_PATH) as connection:
+                connection.execute("UPDATE stocks SET price=? WHERE stockid=?", (new_price,stockid,))
+                connection.commit()
     
     @classmethod
     def getPositions(cls):
