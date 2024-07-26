@@ -35,7 +35,7 @@ class DatabaseService:
         return stockid
     
     @classmethod
-    def updateStocksPrice(cls):
+    def updateStocksPrice(cls) -> None:
         """
         Updates all stocks price in the database and in the in-memory cache
         """
@@ -100,7 +100,7 @@ class DatabaseService:
         return result
     
     @classmethod
-    def updatePortfolioPositionsPrice(cls):
+    def updatePortfolioPositionsPrice(cls) -> None:
         """
         Updates the price of all the positions in the portfolio, both in the database and in the in-memory cahce
         """
@@ -119,7 +119,7 @@ class DatabaseService:
                 connection.commit()
     
     @classmethod
-    def getPositions(cls):
+    def getPositions(cls) -> None:
         """
         Fetches all portfolio positions from the database and updates the in-memory cache.
         """
@@ -140,7 +140,7 @@ class DatabaseService:
         logger.info("getPosition(): %d portfolio position(s) fetched from the database", log_count)
     
     @classmethod
-    def addPosition(cls, symbol, quantity, distribution_target=None):
+    def addPosition(cls, symbol, quantity: int, distribution_target: float=None) -> None:
         """
         Add a new position in the portfolio database and in-memory cache.
 
@@ -156,3 +156,55 @@ class DatabaseService:
             connection.commit()
         cls.positions[stockid] = Position(stockid=stockid, quantity=quantity, distribution_target=distribution_target, stock=cls.stocks[stockid])
         logger.info("addPosition(): Added position %s to the portfolio", symbol)
+
+    @classmethod
+    def updatePosition(cls, symbol, quantity: int=None, distribution_target: float=None, distribution_real: float=None) -> None:
+        """
+        Update an existing position in the portfolio database and in-memory cache.
+        
+        :param symbol: The stock symbol of the position to update.
+        :param quantity: The new quantity of the position (default is None).
+        :param distribution_target: The new target distribution of the position (default is None).
+        :param distribution_real: The new real distribution of the position (default is None).
+        """
+        if symbol not in cls.symbol_map:
+            logger.warning("updatePosition(): Position %s not in the portfolio", symbol)
+            return
+
+        stockid = cls.symbol_map[symbol]
+        if stockid not in cls.positions:
+            logger.warning("updatePosition(): Position %s not in the portfolio", symbol)
+            return
+
+        position = cls.positions[stockid]
+        fields_to_update = []
+        params = []
+
+        if quantity is not None:
+            position.quantity = quantity
+            fields_to_update.append("quantity = ?")
+            params.append(quantity)
+        if distribution_target is not None:
+            position.distribution_target = distribution_target
+            fields_to_update.append("distribution_target = ?")
+            params.append(distribution_target)
+        if distribution_real is not None:
+            position.distribution_real = distribution_real
+            fields_to_update.append("distribution_real = ?")
+            params.append(distribution_real)
+
+        if not fields_to_update:
+            logger.warning("updatePosition(): No fields to update for position %s", symbol)
+            return
+
+        params.append(stockid)
+        query = "UPDATE positions SET " + ", ".join(fields_to_update) + " WHERE stockid = ?"
+
+        with sqlite3.connect(DB_PATH) as connection:
+            connection.execute(query, params)
+            connection.commit()
+
+        logger.info(
+            "updatePosition(): Position %s updated. Quantity: %s, Distribution target: %s, Distribution real: %s",
+            symbol, position.quantity, position.distribution_target, position.distribution_real
+        )

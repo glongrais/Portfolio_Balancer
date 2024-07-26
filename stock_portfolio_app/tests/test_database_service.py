@@ -265,3 +265,70 @@ def test_addPosition_already_in_database(mock_logger, mock_addStock, mock_connec
     mock_addStock.assert_called_once_with(symbol="AAPL")
     mock_logger.assert_called_once()
     mock_connect.assert_not_called()
+
+@patch('sqlite3.connect')
+@patch('logging.Logger.warning')
+@patch('logging.Logger.info')
+def test_update_position(mock_logger_info, mock_logger_warning, mock_sqlite_connect, setup_database_service):
+    # Mock DatabaseService.positions and symbol_map
+    stock = Stock(stockid=1, symbol='AAPL', price=140.0)
+    position = Position(stockid=1, quantity=10, distribution_target=20.0, distribution_real=15.0, stock=stock)
+    DatabaseService.positions = {1: position}
+    DatabaseService.symbol_map = {'AAPL': 1}
+    
+    # Mock SQLite connection and cursor
+    mock_connection = MagicMock()
+    mock_sqlite_connect.return_value.__enter__.return_value = mock_connection
+    
+    # Call the method under test
+    DatabaseService.updatePosition('AAPL', quantity=15, distribution_target=25.0)
+    
+    # Check if the database update was called with correct values
+    mock_connection.execute.assert_called_once_with(
+        "UPDATE positions SET quantity = ?, distribution_target = ? WHERE stockid = ?", 
+        [15, 25.0, 1]
+    )
+    mock_connection.commit.assert_called_once()
+    
+    # Check if the in-memory position was updated correctly
+    assert position.quantity == 15
+    assert position.distribution_target == 25.0
+    
+    # Check if the info log was called
+    mock_logger_info.assert_called_once_with(
+        "updatePosition(): Position %s updated. Quantity: %s, Distribution target: %s, Distribution real: %s",
+        'AAPL', 15, 25.0, 15.0
+    )
+
+@patch('sqlite3.connect')
+@patch('logging.Logger.warning')
+def test_update_position_symbol_not_in_portfolio(mock_logger_warning, mock_sqlite_connect, setup_database_service):
+    # Mock DatabaseService.symbol_map to be empty
+    DatabaseService.symbol_map = {}
+    
+    # Call the method under test
+    DatabaseService.updatePosition('AAPL', quantity=15)
+    
+    # Check if the correct warning message was logged
+    mock_logger_warning.assert_called_once_with("updatePosition(): Position %s not in the portfolio", 'AAPL')
+    
+    # Check if the database update was not called
+    mock_sqlite_connect.assert_not_called()
+
+@patch('sqlite3.connect')
+@patch('logging.Logger.warning')
+def test_update_position_no_fields_to_update(mock_logger_warning, mock_sqlite_connect, setup_database_service):
+    # Mock DatabaseService.positions and symbol_map
+    stock = Stock(stockid=1, symbol='AAPL', price=140.0)
+    position = Position(stockid=1, quantity=10, distribution_target=20.0, distribution_real=15.0, stock=stock)
+    DatabaseService.positions = {1: position}
+    DatabaseService.symbol_map = {'AAPL': 1}
+    
+    # Call the method under test with no fields to update
+    DatabaseService.updatePosition('AAPL')
+    
+    # Check if the correct warning message was logged
+    mock_logger_warning.assert_called_once_with("updatePosition(): No fields to update for position %s", 'AAPL')
+    
+    # Check if the database update was not called
+    mock_sqlite_connect.assert_not_called()
