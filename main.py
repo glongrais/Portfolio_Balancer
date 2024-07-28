@@ -1,16 +1,22 @@
-import tkinter as tk
-from portfolio_balancer.balancer import Balancer
+import customtkinter
 
+class App(customtkinter.CTk):
+    def __init__(self):
+        super().__init__()
 
-class MainApplication(tk.Frame):
-    def __init__(self, parent, *args, **kwargs):
-        tk.Frame.__init__(self, parent, *args, **kwargs)
-        self.parent = parent
-        self.parent.title("Portfolio Hub")
+        self.title("Portfolio Hub")
+        self.geometry("400x150")
+        self.grid_columnconfigure((0, 1), weight=1)
 
-        Balancer.balance("No file", 500, 100)
+        self.button = customtkinter.CTkButton(self, text="my button", command=self.button_callback)
+        self.button.grid(row=0, column=0, padx=20, pady=20, sticky="ew", columnspan=2)
+        self.checkbox_1 = customtkinter.CTkCheckBox(self, text="checkbox 1")
+        self.checkbox_1.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="w")
+        self.checkbox_2 = customtkinter.CTkCheckBox(self, text="checkbox 2")
+        self.checkbox_2.grid(row=1, column=1, padx=20, pady=(0, 20), sticky="w")
+        
+    def button_callback(self):
+        print("button pressed")
 
-if __name__ == "__main__":
-    root = tk.Tk()
-    MainApplication(root).pack(side="top", fill="both", expand=True)
-    root.mainloop()
+app = App()
+app.mainloop()
