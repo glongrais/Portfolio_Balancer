@@ -53,6 +53,13 @@ class StockAPI:
     def get_historical_dividends(cls, symbols: list):
         data = {}
         for symbol in symbols:
-            data[symbol] = cls._get_ticker(symbol).dividends.to_dict()
+            data[symbol] = cls._get_ticker(symbol).get_dividends().to_dict()
         return data
+    
+    @classmethod
+    def get_current_year_dividends(cls, symbols: list):
+        data = {}
+        for symbol in symbols:
+            data[symbol] = cls._get_ticker(symbol).get_info()["dividendRate"]
+        return data 
  

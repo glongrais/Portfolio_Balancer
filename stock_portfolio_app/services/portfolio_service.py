@@ -49,6 +49,14 @@ class PortfolioService:
             position.distribution_real = round((position.stock.price * position.quantity)/total_value*100, 2)
 
     @classmethod
+    def getDividendCalendar(cls):
+        return
+    
+    @classmethod
+    def getTotalYearlyDividend(cls):
+        return
+
+    @classmethod
     def get_transaction_history(cls) -> list:
         """
         Retrieves the transaction history.
