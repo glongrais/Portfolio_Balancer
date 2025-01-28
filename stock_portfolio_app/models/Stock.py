@@ -7,6 +7,8 @@ class Stock:
     symbol: str
     name: str = field(default="")
     price: float = field(default=0.0)
+    dividend: float = field(default=0.0)
+    dividend_yield: float = field(default=0.0)
 
     @classmethod
     def dataclass_factory(cls, cursor, row):
