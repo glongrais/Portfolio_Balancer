@@ -19,6 +19,5 @@ if __name__ == '__main__':
     FileUtils.refreshNumbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
     print(PortfolioService().calculatePortfolioValue())
     DataProcessing.fetch_current_year_dividends(["TTE.PA", "AAPL", "MC.PA"])
-    PortfolioService.balancePortfolio(1740)
+    PortfolioService.balancePortfolio(1350)
     # print(DatabaseService.portfolio)
-    
