@@ -8,3 +8,4 @@ sources:
       - name: positions
       - name: stocks
       - name: transactions
+      - name: deposits

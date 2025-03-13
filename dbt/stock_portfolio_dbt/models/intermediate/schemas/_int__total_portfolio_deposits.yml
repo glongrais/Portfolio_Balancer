@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: int__total_portfolio_deposits
+    description: "Total sum of portfolio deposits"
+    columns:
+      - name: total_deposits
+        description: "The total sum of deposits for the portfolio"
+        type: float
+        data_tests:
+          - not_null
+    data_tests:
+      - dbt_utils.expression_is_true:
+          expression: "total_deposits > 0"
