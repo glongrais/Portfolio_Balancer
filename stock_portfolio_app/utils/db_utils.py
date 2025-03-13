@@ -37,6 +37,8 @@ def initialize_database(db_path: str):
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS transactions (
                     transactionid INTEGER PRIMARY KEY AUTOINCREMENT,
+                    portfolioid   INTEGER NOT NULL,
+                    rowid         INTEGER NOT NULL,
                     stockid       INTEGER NOT NULL,
                     quantity      INTEGER NULL    ,
                     price         REAL    NOT NULL,

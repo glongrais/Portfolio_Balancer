@@ -1,0 +1,16 @@
+version: 2
+
+models:
+  - name: mar__dividends_yearly
+    description: "Yearly dividends aggregated across all stocks"
+    columns:
+      - name: year
+        description: "The year of the dividends"
+        type: string
+        data_tests:
+          - unique
+      - name: yearly_dividends
+        description: "The total dividends for all stocks in the given year"
+        type: float
+        data_tests:
+          - not_null

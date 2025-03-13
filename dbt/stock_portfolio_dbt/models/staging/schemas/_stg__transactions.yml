@@ -1,0 +1,50 @@
+version: 2
+
+models:
+  - name: stg__transactions
+    description: "Transactions table from the API"
+    columns:
+      - name: transactionid
+        description: "The primary key for this table"
+        type: integer
+        data_tests:
+          - unique
+          - not_null
+      - name: portfolioid
+        description: "The ID of the portfolio"
+        type: integer
+        data_tests:
+          - not_null
+      - name: rowid
+        description: "The row ID of the transaction"
+        type: integer
+        data_tests:
+          - not_null
+      - name: stockid
+        description: "Foreign key to the stocks table"
+        type: integer
+        data_tests:
+          - not_null
+      - name: quantity
+        description: "The quantity of stocks transacted"
+        type: integer
+      - name: price
+        description: "The price at which the transaction occurred"
+        type: float
+        data_tests:
+          - not_null
+      - name: type
+        description: "The type of transaction (e.g., buy, sell, dividend)"
+        type: string
+        data_tests:
+          - accepted_values:
+              values: ["BUY", "SELL", "DIVIDEND"]
+      - name: datestamp
+        description: "The date and time when the transaction occurred"
+        type: string
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - portfolioid
+            - rowid
+

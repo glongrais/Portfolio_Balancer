@@ -48,3 +48,29 @@ class FileUtils:
             if row[0] is None:
                 continue
             DatabaseService.updatePosition(symbol=row[SYMBOL], quantity=int(row[QUANTITY]), distribution_target=row[DISTRIBUTION_TARGET]*100)
+    
+    @classmethod
+    def upsertTransactionsNumbers(cls, filename) -> None:
+
+        # Value to adapt 
+        SHEET = 'Transactions'
+        TABLE = 'PEA'
+        DATE = 0
+        TYPE = 1
+        SYMBOL = 2
+        QUANTITY = 4
+        PRICE = 5
+        
+        try:
+            doc = Document(filename)
+        except Exception as e:
+            raise e
+        
+        table = doc.sheets[SHEET].tables[TABLE]
+        table.delete_row(num_rows=table.num_header_rows, start_row=0)
+
+        print(table.rows()[0])
+        for row in table.rows():
+            if row[0] is None:
+                continue
+            DatabaseService.upsertTransactions(rowid=row[0].row, symbol=row[SYMBOL].value, quantity=int(row[QUANTITY].value), price=row[PRICE].value, type=row[TYPE].value, date=row[DATE].value)

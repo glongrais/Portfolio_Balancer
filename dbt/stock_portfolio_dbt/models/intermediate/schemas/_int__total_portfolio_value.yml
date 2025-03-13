@@ -1,0 +1,14 @@
+version: 2
+
+models:
+  - name: int__total_portfolio_value
+    description: "Total portfolio value"
+    columns:
+      - name: total_portfolio_value
+        description: "The total value of the portfolio"
+        type: float
+        data_tests:
+          - not_null
+    data_tests:
+      - dbt_utils.expression_is_true:
+          expression: "total_portfolio_value > 0"

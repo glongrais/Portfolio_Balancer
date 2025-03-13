@@ -1,3 +1,4 @@
+import datetime
 from typing import Dict
 import sqlite3
 import logging
@@ -5,7 +6,7 @@ from models.Stock import Stock
 from models.Position import Position
 from services.data_processing import DataProcessing
 
-DB_PATH = 'data/portfolio.db'
+DB_PATH = '../data/portfolio.db'
 
 logger = logging.getLogger(__name__)
 
@@ -208,3 +209,23 @@ class DatabaseService:
             "updatePosition(): Position %s updated. Quantity: %s, Distribution target: %s, Distribution real: %s",
             symbol, position.quantity, position.distribution_target, position.distribution_real
         )
+    
+    @classmethod
+    def upsertTransactions(cls, date: datetime, rowid: int, type: str, symbol: str, quantity: int, price: float) -> None:
+        """
+        Add or update a transaction in the database.
+
+        :param date: The date of the transaction.
+        :param type: The type of the transaction (buy or sell).
+        :param symbol: The symbol of the stock in the transaction.
+        :param quantity: The quantity of the stock in the transaction.
+        :param price: The price of the stock in the transaction.
+        """
+        stockid = cls.getStock(symbol=symbol)
+        if stockid == -1:
+            logger.error("upsertTransactions(): Stock %s not in the database", symbol)
+            return
+        with sqlite3.connect(DB_PATH) as connection:
+            connection.execute("INSERT INTO transactions (stockid, portfolioid, rowid, quantity, price, type, datestamp) VALUES (?, 1, ?, ?, ?, ?, ?) ON CONFLICT(portfolioid, rowid) DO NOTHING", (stockid, rowid, quantity, price, type, date,))
+            connection.commit()
+        logger.info("upsertTransactions(): Transaction added for stock %s", symbol)

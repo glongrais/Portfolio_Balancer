@@ -1,0 +1,16 @@
+version: 2
+
+models:
+  - name: mar__dividends_monthly
+    description: "Monthly dividends aggregated across all stocks"
+    columns:
+      - name: date
+        description: "The month and year of the dividends"
+        type: string
+        data_tests:
+          - unique
+      - name: monthly_dividends
+        description: "The total dividends for all stocks in the given month"
+        type: float
+        data_tests:
+          - not_null
