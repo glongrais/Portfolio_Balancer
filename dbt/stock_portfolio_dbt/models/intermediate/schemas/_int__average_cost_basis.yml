@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: int__average_cost_basis
+    description: "Average cost basis for each stock in the portfolio"
+    columns:
+      - name: stock_id
+        description: "The unique identifier for the stock"
+        type: string
+        data_tests:
+          - not_null
+          - unique
+      - name: average_cost_basis
+        description: "The average cost basis for the stock"
+        type: float
+        data_tests:
+          - not_null
+    data_tests:
+      - dbt_utils.expression_is_true:
+          expression: "average_cost_basis > 0"

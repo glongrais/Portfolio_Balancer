@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  - name: core__transactions
+    description: "Core transactions data for the portfolio"
+    columns:
+      - name: stockid
+        description: "The unique identifier for the stock"
+        type: string
+        data_tests:
+          - not_null
+      - name: type
+        description: "The type of transaction (e.g., BUY, SELL)"
+        type: string
+        data_tests:
+          - not_null
+      - name: quantity
+        description: "The quantity of stocks involved in the transaction"
+        type: integer
+        data_tests:
+          - not_null
+      - name: price
+        description: "The price per stock in the transaction"
+        type: float
+        data_tests:
+          - not_null
+      - name: datestamp
+        description: "The date and time of the transaction"
+        type: timestamp
+        data_tests:
+          - not_null
+      - name: status
+        description: "The status of the transaction"
+        type: string
+        data_tests:
+          - not_null
+          - accepted_values:
+              values: ["UNTRACKED", "TRACKED"]

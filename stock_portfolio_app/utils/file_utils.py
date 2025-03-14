@@ -69,7 +69,6 @@ class FileUtils:
         table = doc.sheets[SHEET].tables[TABLE]
         table.delete_row(num_rows=table.num_header_rows, start_row=0)
 
-        print(table.rows()[0])
         for row in table.rows():
             if row[0] is None:
                 continue

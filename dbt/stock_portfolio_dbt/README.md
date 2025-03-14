@@ -1,10 +1,19 @@
-Welcome to your new dbt project!
+# Stock Portfolio DBT Repository
+
+## Seed Data
+
+This directory contains seed files that are used to populate static data in the database.
+
+- `untracked_transactions.csv`: Contains all the transactions that are not included (and will not be included) in the main `transactions` source table.
+
+## Utils
 
 ### Using the starter project
 
 Try running the following commands:
-- dbt run
-- dbt test
+- `dbt run`
+- `dbt test`
+- `dbt build` (run + test)
 
 
 ### Resources:

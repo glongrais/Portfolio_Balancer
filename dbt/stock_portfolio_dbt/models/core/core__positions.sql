@@ -1,4 +1,4 @@
--- models/intermediate/int__positions.sql
+-- models/intermediate/core__positions.sql
 WITH
 positions AS (SELECT * FROM {{ ref('stg__positions') }}),
 stocks AS (SELECT * FROM {{ ref('stg__stocks') }}),
