@@ -22,7 +22,11 @@ transactions_sell_grouped AS (
 
 SELECT
     tb.stockid as stock_id,
-    ROUND((tb.total_cost - COALESCE(ts.total_cost, 0)) / (tb.total_quantity - COALESCE(ts.total_quantity, 0)), 3) AS average_cost_basis
+    CASE
+        WHEN (tb.total_quantity - COALESCE(ts.total_quantity, 0)) > 0
+        THEN ROUND((tb.total_cost - COALESCE(ts.total_cost, 0)) / (tb.total_quantity - COALESCE(ts.total_quantity, 0)), 3)
+        ELSE 0
+    END AS average_cost_basis
 FROM transactions_buy_grouped tb
 LEFT JOIN transactions_sell_grouped ts
 ON tb.stockid = ts.stockid

@@ -58,7 +58,7 @@ class DatabaseService:
         """
         with sqlite3.connect(DB_PATH) as connection:
             connection.row_factory = Stock.dataclass_factory
-            answers = connection.execute("SELECT * FROM stocks")
+            answers = connection.execute("SELECT * FROM mar__stocks")
         log_count = 0
         for answer in answers:
             cls.stocks[answer.stockid] = answer
@@ -83,9 +83,9 @@ class DatabaseService:
         with sqlite3.connect(DB_PATH) as connection:
             connection.row_factory = Stock.dataclass_factory
             if stockid is not None:
-                answers = connection.execute("SELECT * FROM stocks WHERE stockid = ?", (stockid,))
+                answers = connection.execute("SELECT * FROM mar__stocks WHERE stockid = ?", (stockid,))
             else:
-                answers = connection.execute("SELECT * FROM stocks WHERE symbol = ?", (symbol,))
+                answers = connection.execute("SELECT * FROM mar__stocks WHERE symbol = ?", (symbol,))
         log_count = 0
         for answer in answers:
             cls.stocks[answer.stockid] = answer
