@@ -223,8 +223,9 @@ class DatabaseService:
         """
         stockid = cls.getStock(symbol=symbol)
         if stockid == -1:
-            logger.error("upsertTransactions(): Stock %s not in the database", symbol)
-            return
+            stockid = cls.addStock(symbol)
+            #logger.error("upsertTransactions(): Stock %s not in the database", symbol)
+            #return
         with sqlite3.connect(DB_PATH) as connection:
             connection.execute("INSERT INTO transactions (stockid, portfolioid, rowid, quantity, price, type, datestamp) VALUES (?, 1, ?, ?, ?, ?, ?) ON CONFLICT(portfolioid, rowid) DO NOTHING", (stockid, rowid, quantity, price, type, date,))
             connection.commit()

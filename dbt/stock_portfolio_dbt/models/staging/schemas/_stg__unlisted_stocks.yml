@@ -1,0 +1,25 @@
+version: 2
+
+models:
+  - name: stg__unlisted_stocks
+    description: "Unlisted stocks data"
+    columns:
+      - name: stockid
+        description: "The unique identifier for the stock"
+        type: integer
+        data_tests:
+          - not_null
+          - unique
+      - name: symbol
+        description: "The stock symbol"
+        type: string
+        data_tests:
+          - not_null
+      - name: name
+        description: "The name of the stock"
+        type: string
+        data_tests:
+          - not_null
+    data_tests:
+      - dbt_utils.expression_is_true:
+          expression: "stockid < -100"
