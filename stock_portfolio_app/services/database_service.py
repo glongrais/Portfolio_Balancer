@@ -5,6 +5,7 @@ import logging
 from models.Stock import Stock
 from models.Position import Position
 from services.data_processing import DataProcessing
+from external.stock_api import StockAPI
 
 DB_PATH = '../data/portfolio.db'
 
@@ -252,3 +253,31 @@ class DatabaseService:
             connection.execute("INSERT INTO transactions (stockid, portfolioid, rowid, quantity, price, type, datestamp) VALUES (?, 1, ?, ?, ?, ?, ?) ON CONFLICT(portfolioid, rowid) DO NOTHING", (stockid, rowid, quantity, price, type, date,))
             connection.commit()
         logger.info("upsertTransactions(): Transaction added for stock %s", symbol)
+
+    @classmethod
+    def updateHistoricalStocksPortfolio(cls, start_date: str, end_date: str) -> None:
+        """
+        Updates the historicalstocks table with data fetched from the StockAPI.
+
+        :param start_date: Start date for the historical data (YYYY-MM-DD).
+        :param end_date: End date for the historical data (YYYY-MM-DD).
+        """
+        symbols = [p.stock.symbol for p in cls.positions.values()]
+        historical_data = StockAPI.get_historical_data(symbols, start_date, end_date)
+
+        with sqlite3.connect(DB_PATH) as connection:
+            cursor = connection.cursor()
+            for stock_data in historical_data:
+                for _, row in stock_data.iterrows():
+                    stockid = cls.symbol_map.get(row['Ticker'])
+                    if stockid is None:
+                        logger.warning("updateHistoricalStocks(): Stock %s not found in symbol_map. Skipping.", row['Ticker'])
+                        continue
+                    cursor.execute('''
+                    INSERT INTO historicalstocks (closeprice, stockid, datestamp)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(stockid, datestamp) DO UPDATE SET
+                        closeprice = excluded.closeprice
+                    ''', (row['Close'], stockid, row['Date'].strftime('%Y-%m-%d')))
+            connection.commit()
+        logger.info("updateHistoricalStocks(): Historical data updated for %d symbol(s)", len(symbols))

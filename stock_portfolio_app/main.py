@@ -15,6 +15,7 @@ if __name__ == '__main__':
     DatabaseService.getStocks()
     DatabaseService.getPositions()
     DatabaseService.updatePortfolioPositionsPrice()
+    DatabaseService.updateHistoricalStocksPortfolio("","")
     #FileUtils.importNumbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
     #FileUtils.upsertTransactionsNumbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
     print(PortfolioService().calculatePortfolioValue())
