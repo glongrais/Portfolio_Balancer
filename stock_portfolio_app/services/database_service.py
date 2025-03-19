@@ -1,3 +1,4 @@
+import datetime
 from typing import Dict
 import sqlite3
 import logging
@@ -5,7 +6,7 @@ from models.Stock import Stock
 from models.Position import Position
 from services.data_processing import DataProcessing
 
-DB_PATH = 'data/portfolio.db'
+DB_PATH = '../data/portfolio.db'
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +27,32 @@ class DatabaseService:
         if symbol in cls.symbol_map:
             logger.warning("addStock(): Stock %s already in the database", symbol)
             return cls.symbol_map[symbol]
-        price = DataProcessing.fetch_real_time_price(symbol)
+        
+        ticker_info = DataProcessing.fetch_ticker_info(symbol)
         with sqlite3.connect(DB_PATH) as connection:
-            connection.execute('INSERT INTO stocks (symbol, price) VALUES (?, ?)', (symbol,price,))
+            connection.execute('''
+            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(symbol) DO UPDATE SET
+                name=excluded.name,
+                price=excluded.price,
+                currency=excluded.currency,
+                market_cap=excluded.market_cap,
+                sector=excluded.sector,
+                industry=excluded.industry,
+                country=excluded.country
+            ''', (
+                ticker_info["symbol"],
+                ticker_info.get("longName", ""),
+                ticker_info.get("currentPrice", None),
+                ticker_info.get("currency", ""),
+                ticker_info.get("marketCap", None),
+                ticker_info.get("sector", ""),
+                ticker_info.get("industry", ""),
+                ticker_info.get("country", "")
+            ))
             connection.commit()
+        
         stockid = cls.getStock(symbol=symbol)
         logger.info("addStock(): %s added in the database", symbol)
         return stockid
@@ -48,7 +71,7 @@ class DatabaseService:
                 connection.execute('UPDATE stocks SET price = ? WHERE stockid = ?', (price, stockid,))
                 log_count += 1
             connection.commit()
-        logger.info("addStock(): Price updated for %d stock(s)", log_count)
+        logger.info("updateStocksPrice(): Price updated for %d stock(s)", log_count)
     
     @classmethod
     def getStocks(cls) -> None:
@@ -57,7 +80,7 @@ class DatabaseService:
         """
         with sqlite3.connect(DB_PATH) as connection:
             connection.row_factory = Stock.dataclass_factory
-            answers = connection.execute("SELECT * FROM stocks")
+            answers = connection.execute("SELECT * FROM mar__stocks")
         log_count = 0
         for answer in answers:
             cls.stocks[answer.stockid] = answer
@@ -82,9 +105,9 @@ class DatabaseService:
         with sqlite3.connect(DB_PATH) as connection:
             connection.row_factory = Stock.dataclass_factory
             if stockid is not None:
-                answers = connection.execute("SELECT * FROM stocks WHERE stockid = ?", (stockid,))
+                answers = connection.execute("SELECT * FROM mar__stocks WHERE stockid = ?", (stockid,))
             else:
-                answers = connection.execute("SELECT * FROM stocks WHERE symbol = ?", (symbol,))
+                answers = connection.execute("SELECT * FROM mar__stocks WHERE symbol = ?", (symbol,))
         log_count = 0
         for answer in answers:
             cls.stocks[answer.stockid] = answer
@@ -112,10 +135,10 @@ class DatabaseService:
             if position.stock is None:
                 logger.warning("updatePortfolioPositionsPrice(): Position %d has no stock set. Skipping price update for this position", stockid)
                 continue
-            new_price = DataProcessing.fetch_real_time_price(position.stock.symbol)
-            position.stock.price = new_price
+            info = DataProcessing.fetch_real_time_price(position.stock.symbol)
+            position.stock.price = info["currentPrice"]
             with sqlite3.connect(DB_PATH) as connection:
-                connection.execute("UPDATE stocks SET price=? WHERE stockid=?", (new_price,stockid,))
+                connection.execute("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=? WHERE stockid=?", (info["currentPrice"],info["longName"],info["currency"],info["marketCap"],info["sector"],info["industry"],info["country"],stockid,))
                 connection.commit()
     
     @classmethod
@@ -208,3 +231,24 @@ class DatabaseService:
             "updatePosition(): Position %s updated. Quantity: %s, Distribution target: %s, Distribution real: %s",
             symbol, position.quantity, position.distribution_target, position.distribution_real
         )
+    
+    @classmethod
+    def upsertTransactions(cls, date: datetime, rowid: int, type: str, symbol: str, quantity: int, price: float) -> None:
+        """
+        Add or update a transaction in the database.
+
+        :param date: The date of the transaction.
+        :param type: The type of the transaction (buy or sell).
+        :param symbol: The symbol of the stock in the transaction.
+        :param quantity: The quantity of the stock in the transaction.
+        :param price: The price of the stock in the transaction.
+        """
+        stockid = cls.getStock(symbol=symbol)
+        if stockid == -1:
+            stockid = cls.addStock(symbol)
+            #logger.error("upsertTransactions(): Stock %s not in the database", symbol)
+            #return
+        with sqlite3.connect(DB_PATH) as connection:
+            connection.execute("INSERT INTO transactions (stockid, portfolioid, rowid, quantity, price, type, datestamp) VALUES (?, 1, ?, ?, ?, ?, ?) ON CONFLICT(portfolioid, rowid) DO NOTHING", (stockid, rowid, quantity, price, type, date,))
+            connection.commit()
+        logger.info("upsertTransactions(): Transaction added for stock %s", symbol)

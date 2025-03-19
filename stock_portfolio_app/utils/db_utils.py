@@ -13,8 +13,13 @@ def initialize_database(db_path: str):
     CREATE TABLE IF NOT EXISTS stocks (
                     stockid INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT,
-                    symbol TEXT NOT NULL,
-                    price REAL
+                    symbol TEXT NOT NULL UNIQUE,
+                    price REAL,
+                    currency TEXT,
+                    market_cap REAL,
+                    sector TEXT,
+                    industry TEXT,
+                    country TEXT
     )
     ''')
     cursor.execute('''
@@ -37,6 +42,8 @@ def initialize_database(db_path: str):
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS transactions (
                     transactionid INTEGER PRIMARY KEY AUTOINCREMENT,
+                    portfolioid   INTEGER NOT NULL,
+                    rowid         INTEGER NOT NULL,
                     stockid       INTEGER NOT NULL,
                     quantity      INTEGER NULL    ,
                     price         REAL    NOT NULL,

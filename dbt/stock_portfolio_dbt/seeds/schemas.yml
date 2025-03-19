@@ -1,0 +1,51 @@
+# schema.yml
+version: 2
+
+seeds:
+  - name: untracked_transactions
+    description: "A list of untracked transactions."
+    columns:
+      - name: portfolioid
+        description: "The ID of the portfolio"
+        type: integer
+        data_tests:
+          - not_null
+      - name: stockid
+        description: "Foreign key to the stocks table"
+        type: integer
+        data_tests:
+          - not_null
+      - name: quantity
+        description: "The quantity of stocks transacted"
+        type: integer
+        data_tests:
+          - not_null
+      - name: price
+        description: "The price at which the transaction occurred"
+        type: float
+        data_tests:
+          - not_null
+      - name: type
+        description: "The type of transaction (e.g., buy, sell, dividend)"
+        type: string
+        data_tests:
+          - accepted_values:
+              values: ["BUY", "SELL", "DIVIDEND"]
+      - name: datestamp
+        description: "The date and time when the transaction occurred"
+        type: string
+
+  - name: unlisted_companies
+    description: "A list of companies that are not listed on the stock exchange."
+    columns:
+      - name: symbol
+        description: "The stock symbol"
+        type: string
+        data_tests:
+          - not_null
+          - unique
+      - name: name
+        description: "The name of the company"
+        type: string
+        data_tests:
+          - not_null

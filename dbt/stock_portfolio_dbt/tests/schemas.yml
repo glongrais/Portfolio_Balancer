@@ -1,0 +1,20 @@
+version: 2
+
+tests:
+  - name: assert_sum_yearly_per_company_dividends_consistancy
+    description: "Test to ensure the sum of yearly dividends per company is consistent"
+
+  - name: assert_sum_per_company_dividends_consistancy
+    description: "Test to ensure the sum of dividends per company is consistent"
+
+  - name: assert_sum_monthly_per_company_dividends_consistancy
+    description: "Test to ensure the sum of monthly dividends per company is consistent"
+
+  - name: assert_sum_monthly_dividends_consistancy
+    description: "Test to ensure the sum of monthly dividends is consistent"
+
+  - name: assert_sum_yearly_dividends_consistancy
+    description: "Test to ensure the sum of yearly dividends is consistent"
+
+  - name: assert_quantity_consistency
+    description: "Test to ensure the quantity of each position is the same between the core__positions and core__transactions tables"

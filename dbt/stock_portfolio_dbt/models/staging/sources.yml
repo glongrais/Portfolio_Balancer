@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: sqlite
+    database: database
+    schema: main
+    tables:
+      - name: positions
+      - name: stocks
+      - name: transactions
+      - name: deposits

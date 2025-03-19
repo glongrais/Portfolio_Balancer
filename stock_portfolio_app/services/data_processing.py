@@ -58,6 +58,11 @@ class DataProcessing:
         """
         dividends = StockAPI.get_historical_dividends(symbols)
         for d in dividends:
-            print(d)
-            print(list(dividends[d])[0].year)
-        return 
+            print(dividends[d])
+        return
+
+    @classmethod
+    def fetch_current_year_dividends(cls, symbols: list):
+        dividends = StockAPI.get_current_year_dividends(symbols)
+        print(dividends)
+        return

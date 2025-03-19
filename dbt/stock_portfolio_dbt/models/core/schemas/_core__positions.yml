@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: core__positions
+    description: "Portfolio positions table from Numbers file"
+    columns:
+      - name: stock_id
+        description: "The primary key for this table, Also foreign key to the stocks table"
+        type: integer
+        data_tests:
+          - unique
+          - not_null
+      - name: quantity
+        description: "The quantity of the stock"
+        type: integer
+      - name: distribution_real
+        description: "The real distribution of the stock in the portfolio"
+        type: float
+      - name: distribution_target
+        description: "The target distribution of the stock in the portfolio"
+        type: float

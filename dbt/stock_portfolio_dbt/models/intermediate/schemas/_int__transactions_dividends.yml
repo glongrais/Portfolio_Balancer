@@ -1,0 +1,23 @@
+version: 2
+
+models:
+  - name: int__transactions_dividends
+    description: "Intermediate table for portfolio dividends"
+    columns:
+      - name: stockid
+        description: "The ID of the stock"
+        type: integer
+        data_tests:
+          - not_null
+      - name: name
+        description: "The name of the company"
+        type: string
+      - name: symbol
+        description: "The symbol of the stock"
+        type: string
+      - name: total_dividends
+        description: "The total dividends for the stock"
+        type: float
+      - name: datestamp
+        description: "The date and time when the dividends were recorded"
+        type: string

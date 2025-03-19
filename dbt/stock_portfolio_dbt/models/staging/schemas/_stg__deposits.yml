@@ -1,0 +1,31 @@
+
+version: 2
+
+models:
+  - name: stg__deposits
+    description: "Portfolio deposits table from Numbers file"
+    columns:
+      - name: depositid
+        description: "The primary key for this table"
+        type: integer
+        data_tests:
+          - unique
+          - not_null
+      - name: datestamp
+        description: "The date and time when the deposit was recorded"
+        type: string
+        data_tests:
+          - not_null
+      - name: amount
+        description: "The amount of the deposit"
+        type: float
+        data_tests:
+          - not_null
+      - name: portfolioid
+        description: "The ID of the portfolio"
+        type: integer
+        data_tests:
+          - not_null
+      - name: currency
+        description: "The currency of the deposit"
+        type: string
