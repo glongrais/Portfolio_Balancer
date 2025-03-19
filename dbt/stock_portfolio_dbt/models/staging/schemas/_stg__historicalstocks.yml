@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: stg__historicalstocks
+    description: "Historical stock data"
+    columns:
+      - name: stockid
+        description: "The foreign key to the stocks table"
+        type: integer
+        data_tests:
+          - not_null
+      - name: closeprice
+        description: "The price of the stock"
+        type: decimal
+        data_tests:
+          - not_null
+      - name: datestamp
+        description: "The date of the stock price"
+        type: date
+        data_tests:
+          - not_null
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - datestamp
+            - stockid

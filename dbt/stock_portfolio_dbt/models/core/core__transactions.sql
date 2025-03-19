@@ -13,7 +13,10 @@ transactions_all AS(
         t.datestamp,
         t.rowid,
         t.portfolioid,
-        'TRACKED' AS status
+        CASE
+            WHEN t.stockid > 0 THEN 'TRACKED'
+            ELSE 'UNTRACKED'
+        END AS status
     FROM transactions AS t
     UNION
     SELECT
