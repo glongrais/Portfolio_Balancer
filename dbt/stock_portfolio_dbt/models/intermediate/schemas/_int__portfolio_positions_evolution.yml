@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: int__portfolio_positions_evolution
+    description: "Tracks the evolution of portfolio positions over time"
+    columns:
+      - name: datestamp
+        description: "The date of the transaction in YYYY-MM-DD format"
+        type: string
+        data_tests:
+          - not_null
+      - name: stockid
+        description: "The unique identifier for the stock"
+        type: integer
+        data_tests:
+          - not_null
+      - name: stock_name
+        description: "The name of the stock"
+        type: string
+      - name: stock_symbol
+        description: "The stock symbol"
+        type: string
+        data_tests:
+          - not_null
+      - name: cumulative_quantity
+        description: "The cumulative quantity of the stock in the portfolio"
+        type: integer
+        data_tests:
+          - not_null
