@@ -7,6 +7,11 @@ class Stock:
     symbol: str
     name: str = field(default="")
     price: float = field(default=0.0)
+    currency: str = field(default="")
+    market_cap: float = field(default=0.0)
+    sector: str = field(default="")
+    industry: str = field(default="")
+    country: str = field(default="")
     dividend: float = field(default=0.0)
     dividend_yield: float = field(default=0.0)
 

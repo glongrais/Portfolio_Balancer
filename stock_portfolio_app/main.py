@@ -16,7 +16,7 @@ if __name__ == '__main__':
     DatabaseService.getPositions()
     DatabaseService.updatePortfolioPositionsPrice()
     #FileUtils.importNumbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
-    FileUtils.upsertTransactionsNumbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
+    #FileUtils.upsertTransactionsNumbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
     print(PortfolioService().calculatePortfolioValue())
     DataProcessing.fetch_current_year_dividends(["TTE.PA", "AAPL", "MC.PA"])
     PortfolioService.balancePortfolio(1000)

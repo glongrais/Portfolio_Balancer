@@ -9,23 +9,42 @@ class StockAPI:
         return yf.Ticker(symbol)
 
     @classmethod
-    def get_current_price(cls, symbol: str) -> float:
+    def get_current_price(cls, symbol: str) -> dict:
         """
-        Fetches the current price of the given stock symbol.
+        Fetches the current price and additional information of the given stock symbol.
         
         Parameters:
         - symbol: str
 
         Returns:
-        - float: Current price
+        - dict: Current price and additional information
         """
         ticker = cls._get_ticker(symbol)
         info = ticker.info
-        if "currentPrice" in info.keys():
-            return info["currentPrice"]
-        else:
-            return info["previousClose"]
-        #stock.name = info.get("longName", "")
+        return {
+            "currentPrice": info.get("currentPrice", info.get("previousClose")),
+            "longName": info.get("longName", ""),
+            "symbol": symbol,
+            "currency": info.get("currency", ""),
+            "marketCap": info.get("marketCap", None),
+            "sector": info.get("sector", ""),
+            "industry": info.get("industry", ""),
+            "country": info.get("country", "")
+        }
+
+    @classmethod
+    def get_ticker_info(cls, symbol: str) -> dict:
+        """
+        Fetches all available information for the given stock symbol.
+
+        Parameters:
+        - symbol: str
+
+        Returns:
+        - dict: All available information
+        """
+        ticker = cls._get_ticker(symbol)
+        return ticker.info
 
     @classmethod
     def get_historical_data(cls, symbols: list, start_date: str, end_date: str) -> list:
@@ -61,5 +80,4 @@ class StockAPI:
         data = {}
         for symbol in symbols:
             data[symbol] = cls._get_ticker(symbol).get_info()["dividendRate"]
-        return data 
- 
+        return data

@@ -11,5 +11,10 @@ SELECT
     stockid,
     name,
     symbol,
-    NULL AS price
+    NULL AS price,
+    NULL AS currency,
+    NULL AS market_cap,
+    NULL AS sector,
+    NULL AS industry,
+    NULL AS country
 FROM unlisted_stocks
