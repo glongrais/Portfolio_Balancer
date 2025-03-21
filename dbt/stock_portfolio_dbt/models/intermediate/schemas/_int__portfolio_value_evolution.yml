@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: int__portfolio_value_evolution
+    description: "Calculates the portfolio value evolution over time based on stock prices and cumulative quantities"
+    columns:
+      - name: datestamp
+        description: "The date of the portfolio value calculation in YYYY-MM-DD format"
+        type: string
+        data_tests:
+          - unique
+          - not_null
+      - name: portfolio_value
+        description: "The total value of the portfolio on the given date"
+        type: numeric
+        data_tests:
+          - not_null
