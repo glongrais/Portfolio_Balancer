@@ -47,7 +47,7 @@ class StockAPI:
         return ticker.info
 
     @classmethod
-    def get_historical_data(cls, symbols: list, start_date: str, end_date: str) -> list:
+    def get_historical_data(cls, symbols: list, start_date: str, end_date: str=None) -> list:
         """
         Fetches historical data for the given stock symbol between start_date and end_date.
         
@@ -61,7 +61,7 @@ class StockAPI:
         """
         data = []
         for symbol in symbols:
-            hist = cls._get_ticker(symbol).history(period="max")  # Fetches max historical data
+            hist = cls._get_ticker(symbol).history(start=start_date, end=end_date)  # Fetches max historical data
             hist.reset_index(inplace=True)
             hist['Ticker'] = symbol  # Add ticker column for reference
             data.append(hist)

@@ -263,7 +263,13 @@ class DatabaseService:
         :param end_date: End date for the historical data (YYYY-MM-DD).
         """
         symbols = [p.stock.symbol for p in cls.positions.values()]
-        historical_data = StockAPI.get_historical_data(symbols, start_date, end_date)
+
+        # Fetch the last timestamp from the table
+        with sqlite3.connect(DB_PATH) as connection:
+            answers = connection.execute('SELECT MAX(datestamp) FROM historicalstocks')
+            last_timestamp = answers.fetchone()[0]
+
+        historical_data = StockAPI.get_historical_data(symbols, last_timestamp)
 
         with sqlite3.connect(DB_PATH) as connection:
             cursor = connection.cursor()

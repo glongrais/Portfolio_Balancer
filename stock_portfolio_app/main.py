@@ -20,5 +20,5 @@ if __name__ == '__main__':
     #FileUtils.upsertTransactionsNumbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
     print(PortfolioService().calculatePortfolioValue())
     DataProcessing.fetch_current_year_dividends(["TTE.PA", "AAPL", "MC.PA"])
-    PortfolioService.balancePortfolio(1000)
+    PortfolioService.balancePortfolio(1050)
     # print(DatabaseService.portfolio)
