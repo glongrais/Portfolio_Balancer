@@ -287,3 +287,31 @@ class DatabaseService:
                     ''', (row['Close'], stockid, row['Date'].strftime('%Y-%m-%d')))
             connection.commit()
         logger.info("updateHistoricalStocks(): Historical data updated for %d symbol(s)", len(symbols))
+    
+    @classmethod
+    def updateHistoricalDividendsPortfolio(cls) -> None:
+        """
+        Updates the historicaldividends table with data fetched from the StockAPI.
+
+        :param symbols: List of stock symbols to fetch historical dividends for.
+        """
+
+        symbols = [p.stock.symbol for p in cls.positions.values()]
+        historical_dividends = DataProcessing.fetch_historical_dividends(symbols)
+
+        with sqlite3.connect(DB_PATH) as connection:
+            cursor = connection.cursor()
+            for symbol, dividends in historical_dividends.items():
+                stockid = cls.symbol_map.get(symbol)
+                if stockid is None:
+                    logger.warning("updateHistoricalDividends(): Stock %s not found in symbol_map. Skipping.", symbol)
+                    continue
+                for date, dividend in dividends.items():
+                    cursor.execute('''
+                    INSERT INTO historicaldividends (dividendvalue, stockid, datestamp)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(stockid, datestamp) DO UPDATE SET
+                        dividendvalue = excluded.dividendvalue
+                    ''', (dividend, stockid, date))
+            connection.commit()
+        logger.info("updateHistoricalDividends(): Historical dividends updated for %d symbol(s)", len(symbols))
