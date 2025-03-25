@@ -1,3 +1,4 @@
+from datetime import datetime
 from external.stock_api import StockAPI
 
 class DataProcessing:
@@ -56,10 +57,14 @@ class DataProcessing:
         Returns:
         - dict: Historical dividend data points
         """
-        dividends = StockAPI.get_historical_dividends(symbols)
-        for d in dividends:
-            print(dividends[d])
-        return
+        dividends_api = StockAPI.get_historical_dividends(symbols)
+        dividends = {}
+        for d in dividends_api:
+            tmp = {}
+            for t in dividends_api[d]:
+                tmp[t.strftime('%Y-%m-%d')] = dividends_api[d][t]
+            dividends[d] = tmp
+        return dividends
 
     @classmethod
     def fetch_current_year_dividends(cls, symbols: list):

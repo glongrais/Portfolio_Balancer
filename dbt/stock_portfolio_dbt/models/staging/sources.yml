@@ -9,3 +9,5 @@ sources:
       - name: stocks
       - name: transactions
       - name: deposits
+      - name: historicalstocks
+      - name: historicaldividends
