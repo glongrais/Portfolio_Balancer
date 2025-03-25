@@ -1,0 +1,25 @@
+version: 2
+
+models:
+  - name: int__stocks_dividends_yearly
+    description: Aggregates yearly dividend data for each stock from historical dividends.
+    columns:
+      - name: stockid
+        description: Unique identifier for the stock.
+        tests:
+          - not_null
+      - name: date
+        description: Date of the dividend record.
+        tests:
+          - not_null
+      - name: dividend
+        description: Total dividend value for the stock on the given date.
+        tests:
+          - not_null
+    data_tests:
+      - dbt_utils.expression_is_true:
+          expression: "dividend >= 0"
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - date
+            - stockid
