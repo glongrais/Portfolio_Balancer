@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: int__total_portfolio_deposits
+  - name: int__portfolio_deposits_total
     description: "Total sum of portfolio deposits"
     columns:
       - name: total_deposits

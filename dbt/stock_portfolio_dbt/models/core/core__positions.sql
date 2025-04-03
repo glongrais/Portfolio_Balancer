@@ -2,7 +2,7 @@
 WITH
 positions AS (SELECT * FROM {{ ref('stg__positions') }}),
 stocks AS (SELECT * FROM {{ ref('stg__stocks') }}),
-total_portfolio_value AS (SELECT * FROM {{ ref('int__total_portfolio_value') }})
+total_portfolio_value AS (SELECT * FROM {{ ref('int__portfolio_value_total') }})
 
 select 
     positions.stockid as stock_id,

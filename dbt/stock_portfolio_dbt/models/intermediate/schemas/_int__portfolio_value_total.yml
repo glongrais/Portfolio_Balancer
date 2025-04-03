@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: int__total_portfolio_value
+  - name: int__portfolio_value_total
     description: "Total portfolio value"
     columns:
       - name: total_portfolio_value

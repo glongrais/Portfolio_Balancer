@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: int__total_portfolio_dividends
+  - name: int__portfolio_dividends_total
     description: "Total sum of portfolio dividends"
     columns:
       - name: total_portfolio_dividends

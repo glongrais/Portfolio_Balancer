@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.WARN, format='%(levelname)s - %(name)s - %(message)s')
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(name)s - %(message)s')
     initialize_database('../data/portfolio.db')
     DatabaseService.getStocks()
     DatabaseService.getPositions()
@@ -18,9 +18,9 @@ if __name__ == '__main__':
     DatabaseService.updateHistoricalStocksPortfolio("","")
     #DatabaseService.updateHistoricalDividendsPortfolio()
     FileUtils.refreshNumbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
-    #FileUtils.upsertTransactionsNumbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
+    FileUtils.upsertTransactionsNumbers("/Users/guillaumelongrais/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
     print(PortfolioService().calculatePortfolioValue())
     DataProcessing.fetch_current_year_dividends(["TTE.PA", "AAPL", "MC.PA"])
     DataProcessing.fetch_historical_dividends(["TTE.PA", "AAPL", "MC.PA"])
-    PortfolioService.balancePortfolio(1050)
+    PortfolioService.balancePortfolio(1700)
     # print(DatabaseService.portfolio)

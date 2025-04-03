@@ -1,5 +1,4 @@
-{{ config(materialized='table') }}
-
+-- stock_portfolio_dbt/models/intermediate/int__transactions_dividends.sql
 WITH
 transactions AS (SELECT * FROM {{ ref('stg__transactions') }}),
 stocks AS (SELECT * FROM {{ ref('stg__stocks') }}),
