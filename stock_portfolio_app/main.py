@@ -1,4 +1,5 @@
 import logging
+import argparse
 from services.portfolio_service import PortfolioService
 from services.data_processing import DataProcessing
 from models.Stock import Stock
@@ -10,7 +11,13 @@ from unittest.mock import MagicMock
 logger = logging.getLogger(__name__)
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(name)s - %(message)s')
+    parser = argparse.ArgumentParser(description="Stock Portfolio Application")
+    parser.add_argument('--log-level', default='WARN', choices=['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'],
+                        help='Set the logging level (default: WARN)')
+    args = parser.parse_args()
+
+    logging.basicConfig(level=getattr(logging, args.log_level.upper()), 
+                        format='%(levelname)s - %(name)s - %(message)s')
     initialize_database('../data/portfolio.db')
     DatabaseService.getStocks()
     DatabaseService.getPositions()
