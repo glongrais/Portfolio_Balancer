@@ -14,6 +14,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Stock Portfolio Application")
     parser.add_argument('--log-level', default='WARN', choices=['DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'],
                         help='Set the logging level (default: WARN)')
+    parser.add_argument('--amount', default=1000,
+                        help='Set the amount in EUR to buy (default: 1000)')
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()), 
@@ -29,5 +31,5 @@ if __name__ == '__main__':
     print(PortfolioService().calculatePortfolioValue())
     DataProcessing.fetch_current_year_dividends(["TTE.PA", "AAPL", "MC.PA"])
     DataProcessing.fetch_historical_dividends(["TTE.PA", "AAPL", "MC.PA"])
-    PortfolioService.balancePortfolio(1700)
+    PortfolioService.balancePortfolio(int(args.amount))
     # print(DatabaseService.portfolio)
