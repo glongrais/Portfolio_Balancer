@@ -4,7 +4,7 @@ from external.stock_api import StockAPI
 class DataProcessing:
 
     @classmethod
-    def fetch_real_time_price(cls, symbol: str) -> float:
+    def fetch_real_time_price(cls, symbol: str) -> dict:
         """
         Fetches the real-time price of the given stock symbol.
 

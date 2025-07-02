@@ -29,7 +29,7 @@ class DatabaseService:
             logger.warning("addStock(): Stock %s already in the database", symbol)
             return cls.symbol_map[symbol]
         
-        ticker_info = DataProcessing.fetch_ticker_info(symbol)
+        ticker_info = DataProcessing.fetch_real_time_price(symbol)
         with sqlite3.connect(DB_PATH) as connection:
             connection.execute('''
             INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country)
@@ -67,9 +67,9 @@ class DatabaseService:
             log_count = 0
             for stockid in cls.stocks:
                 stock = cls.stocks[stockid]
-                price = DataProcessing.fetch_real_time_price(stock.symbol)
-                stock.price = price
-                connection.execute('UPDATE stocks SET price = ? WHERE stockid = ?', (price, stockid,))
+                info = DataProcessing.fetch_real_time_price(stock.symbol)
+                stock.price = info["currentPrice"]
+                connection.execute('UPDATE stocks SET price = ? WHERE stockid = ?', (info["currentPrice"], stockid,))
                 log_count += 1
             connection.commit()
         logger.info("updateStocksPrice(): Price updated for %d stock(s)", log_count)
@@ -110,6 +110,7 @@ class DatabaseService:
             else:
                 answers = connection.execute("SELECT * FROM mar__stocks WHERE symbol = ?", (symbol,))
         log_count = 0
+        result = -1
         for answer in answers:
             cls.stocks[answer.stockid] = answer
             cls.symbol_map[answer.symbol] = answer.stockid
