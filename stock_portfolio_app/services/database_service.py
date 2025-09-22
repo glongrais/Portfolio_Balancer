@@ -6,6 +6,7 @@ from models.Stock import Stock
 from models.Position import Position
 from services.data_processing import DataProcessing
 from external.stock_api import StockAPI
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 DB_PATH = '../data/portfolio.db'
 
@@ -127,20 +128,40 @@ class DatabaseService:
     @classmethod
     def updatePortfolioPositionsPrice(cls) -> None:
         """
-        Updates the price of all the positions in the portfolio, both in the database and in the in-memory cahce
+        Updates the price of all the positions in the portfolio in parallel.
         """
         if not cls.positions:
             logger.warning("updatePortfolioPositionsPrice(): No position in the portfolio")
             return
-        for stockid in cls.positions:
-            position = cls.positions[stockid]
+
+
+        def update_single_position(position_data):
+            stockid, position = position_data
             if position.stock is None:
                 logger.warning("updatePortfolioPositionsPrice(): Position %d has no stock set. Skipping price update for this position", stockid)
-                continue
+                return None
+            
             info = DataProcessing.fetch_real_time_price(position.stock.symbol)
             position.stock.price = info["currentPrice"]
+            
+            return (stockid, info)
+
+        # Run price updates in parallel
+        with ThreadPoolExecutor() as executor:
+            future_to_position = {executor.submit(update_single_position, (stockid, position)): 
+                                (stockid, position) for stockid, position in cls.positions.items()}
+            
+            # Update database with results
             with sqlite3.connect(DB_PATH) as connection:
-                connection.execute("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=? WHERE stockid=?", (info["currentPrice"],info["longName"],info["currency"],info["marketCap"],info["sector"],info["industry"],info["country"],stockid,))
+                for future in as_completed(future_to_position):
+                    result = future.result()
+                    if result:
+                        stockid, info = result
+                        connection.execute(
+                            "UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=? WHERE stockid=?",
+                            (info["currentPrice"], info["longName"], info["currency"], info["marketCap"],
+                             info["sector"], info["industry"], info["country"], stockid,)
+                        )
                 connection.commit()
     
     @classmethod

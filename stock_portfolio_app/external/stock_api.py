@@ -1,11 +1,16 @@
 import yfinance as yf
 from cachetools import cached, TTLCache
+import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 class StockAPI:
+
+    logger = logging.getLogger(__name__)
 
     @classmethod
     @cached(cache=TTLCache(maxsize=1024, ttl=60))
     def _get_ticker(cls, symbol: str):
+        cls.logger.info(f"Fetching data for {symbol} from yfinance")
         return yf.Ticker(symbol)
 
     @classmethod
@@ -60,11 +65,15 @@ class StockAPI:
         - list: Historical data points
         """
         data = []
-        for symbol in symbols:
-            hist = cls._get_ticker(symbol).history(start=start_date, end=end_date)  # Fetches max historical data
-            hist.reset_index(inplace=True)
-            hist['Ticker'] = symbol  # Add ticker column for reference
-            data.append(hist)
+        with ThreadPoolExecutor() as executor:
+            def fetch_history(symbol):
+                hist = cls._get_ticker(symbol).history(start=start_date, end=end_date)
+                hist.reset_index(inplace=True)
+                hist['Ticker'] = symbol
+                return hist
+
+            futures = [executor.submit(fetch_history, symbol) for symbol in symbols]
+            data = [future.result() for future in as_completed(futures)]
 
         return data
     
