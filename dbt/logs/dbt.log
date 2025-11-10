@@ -207,3 +207,19 @@ Runtime Error
 [0m08:17:31.871392 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10909d0d0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10909e150>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10903a450>]}
 [0m08:17:31.871608 [debug] [MainThread]: Flushing usage events
 [0m08:17:32.363485 [debug] [MainThread]: An error was encountered while trying to flush usage events
+[0m15:31:11.962560 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'start', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10a902880>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10b97a8e0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10b97a460>]}
+
+
+============================== 15:31:11.964319 | 491c1efb-892e-4b9e-80ee-6120b508a4ef ==============================
+[0m15:31:11.964319 [info ] [MainThread]: Running with dbt=1.10.13
+[0m15:31:11.964551 [debug] [MainThread]: running dbt with arguments {'send_anonymous_usage_stats': 'True', 'partial_parse': 'True', 'printer_width': '80', 'static_parser': 'True', 'use_colors': 'True', 'no_print': 'None', 'use_experimental_parser': 'False', 'cache_selected_only': 'False', 'version_check': 'True', 'fail_fast': 'False', 'warn_error': 'None', 'warn_error_options': 'WarnErrorOptionsV2(error=[], warn=[], silence=[])', 'log_format': 'default', 'invocation_command': 'dbt deps', 'empty': 'None', 'indirect_selection': 'eager', 'profiles_dir': '/Users/guillaumel/.dbt', 'quiet': 'False', 'debug': 'False', 'introspect': 'True', 'target_path': 'None', 'log_cache_events': 'False', 'write_json': 'True', 'log_path': 'logs'}
+[0m15:31:11.964966 [error] [MainThread]: Encountered an error:
+Runtime Error
+  No dbt_project.yml found at expected path /Users/guillaumel/Personal/GitHub/Portfolio_Balancer/dbt/dbt_project.yml
+  Verify that each entry within packages.yml (and their transitive dependencies) contains a file named dbt_project.yml
+  
+[0m15:31:11.966068 [debug] [MainThread]: Resource report: {"command_name": "deps", "command_success": false, "command_wall_clock_time": 0.042391624, "process_in_blocks": "0", "process_kernel_time": 0.079431, "process_mem_max_rss": "97026048", "process_out_blocks": "0", "process_user_time": 0.544967}
+[0m15:31:11.966253 [debug] [MainThread]: Command `dbt deps` failed at 15:31:11.966215 after 0.04 seconds
+[0m15:31:11.966398 [debug] [MainThread]: Sending event: {'category': 'dbt', 'action': 'invocation', 'label': 'end', 'context': [<snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10a902880>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10b9658e0>, <snowplow_tracker.self_describing_json.SelfDescribingJson object at 0x10b965ee0>]}
+[0m15:31:11.966544 [debug] [MainThread]: Flushing usage events
+[0m15:31:12.573241 [debug] [MainThread]: An error was encountered while trying to flush usage events

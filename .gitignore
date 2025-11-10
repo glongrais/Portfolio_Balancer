@@ -16,3 +16,4 @@ data.db
 .$stock_portfolio_app.drawio.bkp
 create/*
 stock_portfolio_app/data/portfolio.db
+.idea/*
