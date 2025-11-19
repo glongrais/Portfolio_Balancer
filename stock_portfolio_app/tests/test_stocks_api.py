@@ -1,11 +1,6 @@
 import pytest
-import sys
-import os
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-# Ensure project package directories are on sys.path so imports like `from models.Stock import Stock` work
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from models.Stock import Stock
 from models.Position import Position
