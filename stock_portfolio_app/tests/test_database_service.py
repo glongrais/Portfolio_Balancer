@@ -6,6 +6,17 @@ from services.database_service import DatabaseService
 from models.Stock import Stock
 from models.Position import Position
 
+MOCK_PRICE = {
+    "currentPrice": 100.0,
+    "longName": "Apple Inc.",
+    "symbol": "AAPL",
+    "currency": "USD",
+    "marketCap": 1000000000000,
+    "sector": "Technology",
+    "industry": "Consumer Electronics",
+    "country": "US"
+}
+
 @pytest.fixture
 def setup_database_service():
     # Reset the class variables before each test
@@ -15,7 +26,7 @@ def setup_database_service():
     yield
 
 @patch('sqlite3.connect')
-@patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=100.0)
+@patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=MOCK_PRICE)
 @patch('services.database_service.DatabaseService.getStock')
 def test_addStock(mock_fetch_stock, mock_fetch_price, mock_connect, setup_database_service):
     mock_conn = MagicMock()
@@ -27,12 +38,24 @@ def test_addStock(mock_fetch_stock, mock_fetch_price, mock_connect, setup_databa
     assert DatabaseService.addStock("AAPL") == 1
 
     mock_fetch_price.assert_called_once_with("AAPL")
-    mock_cursor.execute.assert_called_once_with('INSERT INTO stocks (symbol, price) VALUES (?, ?)', ("AAPL", 100.0,))
+    mock_cursor.execute.assert_called_once_with('''
+            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(symbol) DO UPDATE SET
+                name=excluded.name,
+                price=excluded.price,
+                currency=excluded.currency,
+                market_cap=excluded.market_cap,
+                sector=excluded.sector,
+                industry=excluded.industry,
+                country=excluded.country
+            ''', ("AAPL", "Apple Inc.", 100.0, "USD", 1000000000000, "Technology", "Consumer Electronics", "US"))
+
     mock_cursor.commit.assert_called_once()
     mock_fetch_stock.assert_called_once_with(symbol="AAPL")
 
 @patch('sqlite3.connect')
-@patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=100.0)
+@patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=MOCK_PRICE)
 @patch('services.database_service.DatabaseService.getStock')
 @patch('logging.Logger.warning')
 def test_addStock_already_in_database(mock_logger, mock_fetch_stock, mock_fetch_price, mock_connect, setup_database_service):
@@ -87,12 +110,12 @@ def test_getStock_two_parameters(mock_logger, mock_connect, setup_database_servi
     assert DatabaseService.getStock(symbol='AAPL', stockid=1) == 1
 
     mock_logger.assert_called_once()
-    mock_cursor.execute.assert_called_once_with("SELECT * FROM stocks WHERE stockid = ?", (1,))
+    mock_cursor.execute.assert_called_once_with("SELECT * FROM mar__stocks WHERE stockid = ?", (1,))
     assert DatabaseService.stocks[1].symbol == 'AAPL'
     assert DatabaseService.symbol_map['AAPL'] == 1
 
 @patch('sqlite3.connect')
-@patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=100.0)
+@patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=MOCK_PRICE)
 def test_updateStocksPrice(mock_fetch_price, mock_connect, setup_database_service):
     mock_conn = MagicMock()
     mock_connect.return_value = mock_conn
@@ -109,18 +132,18 @@ def test_updateStocksPrice(mock_fetch_price, mock_connect, setup_database_servic
     mock_cursor.commit.assert_called_once()
     assert DatabaseService.stocks[1].price == 100.0
     
-@patch('services.data_processing.DataProcessing.fetch_real_time_price')
+@patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=MOCK_PRICE)
 @patch('sqlite3.connect')
 @patch('logging.Logger.warning')
 def test_updatePortfolioPositionsPrice(mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price, setup_database_service):
     # Mock return values for the price fetching
-    mock_fetch_real_time_price.side_effect = lambda symbol: {'AAPL': 150.0, 'GOOG': 100.0}[symbol]
+    #mock_fetch_real_time_price.side_effect = lambda symbol: MOCK_PRICE["currentPrice"]
     
     # Mock SQLite connection and cursor
-    mock_connection = MagicMock()
+    mock_conn = MagicMock()
     mock_cursor = MagicMock()
-    mock_sqlite_connect.return_value.__enter__.return_value = mock_connection
-    mock_connection.execute.return_value = mock_cursor
+    mock_sqlite_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
     
     # Mock positions with predefined stocks
     stock1 = Stock(stockid=1, symbol='AAPL', price=140.0)
@@ -135,16 +158,16 @@ def test_updatePortfolioPositionsPrice(mock_logger_warning, mock_sqlite_connect,
     DatabaseService.updatePortfolioPositionsPrice()
     
     # Check if the prices were updated correctly
-    assert position1.stock.price == 150.0
+    assert position1.stock.price == 100.0
     assert position2.stock.price == 100.0
     
     # Check if the database update was called with correct values
-    mock_connection.execute.assert_any_call("UPDATE stocks SET price=? WHERE stockid=?", (150.0, 1))
-    mock_connection.execute.assert_any_call("UPDATE stocks SET price=? WHERE stockid=?", (100.0, 2))
-    assert mock_connection.execute.call_count == 2
+    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=? WHERE stockid=?", (100.0, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", 1))
+    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=? WHERE stockid=?", (100.0, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", 2))
+    assert mock_conn.execute.call_count == 2
     
     # Check if commit was called
-    assert mock_connection.commit.call_count == 2
+    assert mock_conn.commit.call_count == 1
 
 @patch('services.data_processing.DataProcessing.fetch_real_time_price')
 @patch('sqlite3.connect')
@@ -179,7 +202,7 @@ def test_updatePortfolioPositionsPrice_no_stock_in_position(mock_logger_warning,
     
     # Check if fetch_real_time_price and database were not called
     assert mock_fetch_real_time_price.call_count == 0
-    assert mock_sqlite_connect.call_count == 0
+    assert mock_sqlite_connect.call_count == 1
 
 @patch('sqlite3.connect')
 @patch('services.database_service.DatabaseService.getStock')

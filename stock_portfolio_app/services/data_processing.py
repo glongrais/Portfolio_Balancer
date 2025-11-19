@@ -12,7 +12,7 @@ class DataProcessing:
         - symbol: str
 
         Returns:
-        - float: Real-time price
+        - dict: Real-time price
         """
         return StockAPI.get_current_price(symbol)
 
