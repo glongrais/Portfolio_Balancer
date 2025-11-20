@@ -1,7 +1,7 @@
 """
 Pydantic schemas for API request and response models
 """
-from pydantic import BaseModel, Field
+from pydantic import ConfigDict, BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -20,9 +20,7 @@ class StockBase(BaseModel):
 
 class StockResponse(StockBase):
     stockid: int = Field(..., description="Unique stock identifier")
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class StockCreate(BaseModel):
     symbol: str = Field(..., description="Stock ticker symbol to add")
@@ -37,9 +35,7 @@ class PositionResponse(PositionBase):
     stockid: int = Field(..., description="Stock identifier")
     stock: Optional[StockResponse] = Field(None, description="Associated stock information")
     delta: float = Field(..., description="Difference between target and real distribution")
-
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PositionCreate(BaseModel):
     symbol: str = Field(..., description="Stock symbol")
@@ -94,9 +90,7 @@ class TransactionBase(BaseModel):
 class TransactionResponse(TransactionBase):
     transactionid: int = Field(..., description="Transaction ID")
     stockid: int = Field(..., description="Stock ID")
-    
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TransactionCreate(BaseModel):
     symbol: str = Field(..., description="Stock symbol")
