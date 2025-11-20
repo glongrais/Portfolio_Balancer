@@ -153,3 +153,202 @@ def test_update_position_changes_values(monkeypatch):
     assert data['quantity'] == 4
     assert data['distribution_target'] == 0.15
     assert data['stock']['symbol'] == 'AMZN'
+
+
+def test_get_all_stocks_empty_database():
+    """Test getting all stocks when database is empty."""
+    client = create_test_client()
+    resp = client.get('/api/stocks/')
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) == 0
+
+
+def test_get_stock_case_insensitive():
+    """Test that stock lookup is case insensitive."""
+    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    DatabaseService.stocks = {1: s}
+    DatabaseService.symbol_map = {'AAPL': 1}
+    
+    client = create_test_client()
+    # Use lowercase symbol
+    resp = client.get('/api/stocks/aapl')
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['symbol'] == 'AAPL'
+
+
+def test_add_position_already_exists():
+    """Test adding a position that already exists returns 400."""
+    stock = Stock(stockid=1, symbol='TSLA', name='Tesla Inc.', price=700.0)
+    position = Position(stockid=1, quantity=10, stock=stock)
+    DatabaseService.stocks = {1: stock}
+    DatabaseService.symbol_map = {'TSLA': 1}
+    DatabaseService.positions = {1: position}
+    
+    client = create_test_client()
+    payload = {'symbol': 'TSLA', 'quantity': 5, 'distribution_target': 0.2}
+    resp = client.post('/api/stocks/positions', json=payload)
+    assert resp.status_code == 400
+    assert 'already exists' in resp.json()['detail']
+
+
+def test_update_position_not_found():
+    """Test updating a position that doesn't exist returns 404."""
+    client = create_test_client()
+    payload = {'quantity': 10, 'distribution_target': 0.2}
+    resp = client.put('/api/stocks/positions/UNKNOWN', json=payload)
+    assert resp.status_code == 404
+    assert 'not found' in resp.json()['detail']
+
+
+def test_update_position_stock_exists_but_no_position():
+    """Test updating when stock exists but position doesn't."""
+    stock = Stock(stockid=1, symbol='NFLX', name='Netflix', price=500.0)
+    DatabaseService.stocks = {1: stock}
+    DatabaseService.symbol_map = {'NFLX': 1}
+    # No position created
+    
+    client = create_test_client()
+    payload = {'quantity': 10}
+    resp = client.put('/api/stocks/positions/NFLX', json=payload)
+    assert resp.status_code == 404
+    assert 'Position for NFLX not found' in resp.json()['detail']
+
+
+def test_get_stock_returns_all_fields():
+    """Test that stock response includes all expected fields."""
+    s = Stock(
+        stockid=1,
+        symbol='AAPL',
+        name='Apple Inc.',
+        price=150.0,
+        currency='USD',
+        market_cap=2500000000000,
+        sector='Technology',
+        industry='Consumer Electronics',
+        country='USA',
+        dividend=0.92,
+        dividend_yield=0.0061
+    )
+    DatabaseService.stocks = {1: s}
+    DatabaseService.symbol_map = {'AAPL': 1}
+    
+    client = create_test_client()
+    resp = client.get('/api/stocks/AAPL')
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['stockid'] == 1
+    assert data['symbol'] == 'AAPL'
+    assert data['name'] == 'Apple Inc.'
+    assert data['price'] == 150.0
+    assert data['currency'] == 'USD'
+    assert data['market_cap'] == 2500000000000
+    assert data['sector'] == 'Technology'
+    assert data['industry'] == 'Consumer Electronics'
+    assert data['country'] == 'USA'
+    assert data['dividend'] == 0.92
+    assert data['dividend_yield'] == 0.0061
+
+
+def test_add_position_includes_all_stock_fields():
+    """Test that adding a position returns all stock fields."""
+    def fake_add_position(symbol, quantity, distribution_target=None):
+        stockid = 1
+        stock = Stock(
+            stockid=stockid,
+            symbol=symbol,
+            name='Test Company',
+            price=100.0,
+            currency='USD',
+            market_cap=1000000000,
+            sector='Tech',
+            industry='Software',
+            country='USA',
+            dividend=1.0,
+            dividend_yield=0.01
+        )
+        DatabaseService.stocks[stockid] = stock
+        DatabaseService.symbol_map[symbol] = stockid
+        pos = Position(
+            stockid=stockid,
+            quantity=quantity,
+            distribution_target=distribution_target,
+            stock=stock
+        )
+        DatabaseService.positions[stockid] = pos
+    
+    # Use monkeypatch fixture properly
+    import unittest.mock
+    with unittest.mock.patch.object(DatabaseService, 'addPosition', classmethod(lambda cls, symbol, quantity, distribution_target=None: fake_add_position(symbol, quantity, distribution_target))):
+        client = create_test_client()
+        payload = {'symbol': 'TEST', 'quantity': 10, 'distribution_target': 0.25}
+        resp = client.post('/api/stocks/positions', json=payload)
+        assert resp.status_code == 201
+        data = resp.json()
+        assert 'stock' in data
+        assert data['stock']['symbol'] == 'TEST'
+        assert data['stock']['sector'] == 'Tech'
+        assert data['stock']['dividend'] == 1.0
+
+
+def test_position_response_includes_delta():
+    """Test that position response includes calculated delta."""
+    stock = Stock(stockid=1, symbol='AAPL', name='Apple', price=150.0)
+    position = Position(
+        stockid=1,
+        quantity=10,
+        distribution_target=30.0,
+        distribution_real=20.0,
+        stock=stock
+    )
+    
+    def fake_add_position(symbol, quantity, distribution_target=None):
+        DatabaseService.stocks[1] = stock
+        DatabaseService.symbol_map[symbol] = 1
+        DatabaseService.positions[1] = position
+    
+    import unittest.mock
+    with unittest.mock.patch.object(DatabaseService, 'addPosition', classmethod(lambda cls, symbol, quantity, distribution_target=None: fake_add_position(symbol, quantity, distribution_target))):
+        client = create_test_client()
+        payload = {'symbol': 'AAPL', 'quantity': 10, 'distribution_target': 30.0}
+        resp = client.post('/api/stocks/positions', json=payload)
+        assert resp.status_code == 201
+        data = resp.json()
+        assert 'delta' in data
+        assert data['delta'] == 10.0  # 30 - 20
+
+
+def test_update_position_partial_update():
+    """Test updating only quantity without changing target."""
+    stock = Stock(stockid=1, symbol='MSFT', name='Microsoft', price=300.0)
+    pos = Position(
+        stockid=1,
+        quantity=5,
+        distribution_target=0.2,
+        distribution_real=0.15,
+        stock=stock
+    )
+    DatabaseService.stocks = {1: stock}
+    DatabaseService.symbol_map = {'MSFT': 1}
+    DatabaseService.positions = {1: pos}
+    
+    def fake_update_position(symbol, quantity=None, distribution_target=None, distribution_real=None):
+        sid = DatabaseService.symbol_map[symbol]
+        p = DatabaseService.positions[sid]
+        if quantity is not None:
+            p.quantity = quantity
+        if distribution_target is not None:
+            p.distribution_target = distribution_target
+    
+    import unittest.mock
+    with unittest.mock.patch.object(DatabaseService, 'updatePosition', classmethod(lambda cls, symbol, quantity=None, distribution_target=None, distribution_real=None: fake_update_position(symbol, quantity, distribution_target, distribution_real))):
+        client = create_test_client()
+        # Only update quantity
+        payload = {'quantity': 10}
+        resp = client.put('/api/stocks/positions/MSFT', json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data['quantity'] == 10
+        assert data['distribution_target'] == 0.2  # Unchanged
