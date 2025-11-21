@@ -11,7 +11,7 @@ class StockBase(BaseModel):
     name: str = Field(default="", description="Company name")
     price: float = Field(default=0.0, description="Current stock price")
     currency: str = Field(default="", description="Currency of the stock")
-    market_cap: float = Field(default=0.0, description="Market capitalization")
+    market_cap: Optional[float] = Field(default=None, description="Market capitalization")
     sector: str = Field(default="", description="Company sector")
     industry: str = Field(default="", description="Company industry")
     country: str = Field(default="", description="Company country")

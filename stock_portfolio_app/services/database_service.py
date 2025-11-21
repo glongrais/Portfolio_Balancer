@@ -250,7 +250,7 @@ class DatabaseService:
             connection.execute(query, params)
             connection.commit()
 
-        logger.info(
+        logger.debug(
             "updatePosition(): Position %s updated. Quantity: %s, Distribution target: %s, Distribution real: %s",
             symbol, position.quantity, position.distribution_target, position.distribution_real
         )

@@ -3,11 +3,9 @@ import argparse
 import time
 from services.portfolio_service import PortfolioService
 from services.data_processing import DataProcessing
-from models.Stock import Stock
 from utils.file_utils import FileUtils
 from utils.db_utils import initialize_database
 from services.database_service import DatabaseService
-from unittest.mock import MagicMock
 
 logger = logging.getLogger(__name__)
 

@@ -62,6 +62,7 @@ class PortfolioService:
 
         for position in DatabaseService.positions.values():
             position.distribution_real = round((position.stock.price * position.quantity)/total_value*100, 2)
+            DatabaseService.updatePosition(symbol=position.stock.symbol, distribution_real=position.distribution_real)
 
     @classmethod
     def getDividendCalendar(cls):

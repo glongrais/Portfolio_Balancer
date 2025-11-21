@@ -63,6 +63,7 @@ async def get_positions():
             # Convert Stock dataclass to dict for Pydantic
             stock_dict = None
             if position.stock:
+                logger.debug(f"Position: {position.stock}")
                 stock_dict = {
                     "stockid": position.stock.stockid,
                     "symbol": position.stock.symbol,
@@ -75,8 +76,7 @@ async def get_positions():
                     "country": position.stock.country,
                     "dividend": position.stock.dividend,
                     "dividend_yield": position.stock.dividend_yield
-                }
-            
+                }    
             positions.append(PositionResponse(
                 stockid=position.stockid,
                 quantity=position.quantity,

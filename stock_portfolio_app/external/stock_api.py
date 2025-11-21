@@ -10,7 +10,7 @@ class StockAPI:
     @classmethod
     @cached(cache=TTLCache(maxsize=1024, ttl=60))
     def _get_ticker(cls, symbol: str):
-        cls.logger.info(f"Fetching data for {symbol} from yfinance")
+        cls.logger.debug(f"Fetching data for {symbol} from yfinance")
         return yf.Ticker(symbol)
 
     @classmethod
