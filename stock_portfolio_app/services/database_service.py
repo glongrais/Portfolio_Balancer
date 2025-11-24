@@ -204,7 +204,7 @@ class DatabaseService:
         logger.info("addPosition(): Added position %s to the portfolio", symbol)
 
     @classmethod
-    def updatePosition(cls, symbol, quantity: int=None, distribution_target: float=None, distribution_real: float=None) -> None:
+    def updatePosition(cls, symbol, quantity: int=None, average_cost_basis: float=None, distribution_target: float=None, distribution_real: float=None) -> None:
         """
         Update an existing position in the portfolio database and in-memory cache.
         
@@ -238,7 +238,10 @@ class DatabaseService:
             position.distribution_real = distribution_real
             fields_to_update.append("distribution_real = ?")
             params.append(distribution_real)
-
+        if average_cost_basis is not None:
+            position.average_cost_basis = average_cost_basis
+            fields_to_update.append("average_cost_basis = ?")
+            params.append(average_cost_basis)
         if not fields_to_update:
             logger.warning("updatePosition(): No fields to update for position %s", symbol)
             return
@@ -251,8 +254,8 @@ class DatabaseService:
             connection.commit()
 
         logger.debug(
-            "updatePosition(): Position %s updated. Quantity: %s, Distribution target: %s, Distribution real: %s",
-            symbol, position.quantity, position.distribution_target, position.distribution_real
+            "updatePosition(): Position %s updated. Quantity: %s, Average cost basis: %s, Distribution target: %s, Distribution real: %s",
+            symbol, position.quantity, position.average_cost_basis, position.distribution_target, position.distribution_real
         )
     
     @classmethod
@@ -337,3 +340,15 @@ class DatabaseService:
                     ''', (dividend, stockid, date))
             connection.commit()
         logger.info("updateHistoricalDividends(): Historical dividends updated for %d symbol(s)", len(symbols))
+
+    @classmethod
+    def getPortfolioValueHistory(cls) -> list:
+        """
+        Retrieves the portfolio value history.
+
+        Returns:
+        - list: Portfolio value history
+        """
+        with sqlite3.connect(DB_PATH) as connection:
+            answers = connection.execute("SELECT * FROM int__portfolio_value_evolution")
+        return answers

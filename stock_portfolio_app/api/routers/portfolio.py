@@ -23,7 +23,9 @@ from api.schemas import (
     DividendBreakdownResponse,
     DividendByStockItem,
     PositionResponse,
-    UpdatePricesResponse
+    UpdatePricesResponse,
+    PortfolioValueHistoryResponse,
+    PortfolioValueHistoryItem
 )
 from services.portfolio_service import PortfolioService
 from services.database_service import DatabaseService
@@ -80,6 +82,7 @@ async def get_positions():
             positions.append(PositionResponse(
                 stockid=position.stockid,
                 quantity=position.quantity,
+                average_cost_basis=position.average_cost_basis,
                 distribution_target=position.distribution_target,
                 distribution_real=position.distribution_real,
                 stock=stock_dict,
@@ -258,5 +261,28 @@ async def update_positions_prices():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update position prices: {str(e)}"
+        )
+
+@router.get("/value/history", response_model=PortfolioValueHistoryResponse)
+async def get_portfolio_value_history():
+    """
+    Get portfolio value history
+    """
+    try:
+        portfolio_value_history = PortfolioService.getPortfolioValueHistory()
+        portfolio_value_history_items = []
+        for item in portfolio_value_history:
+            portfolio_value_history_items.append(PortfolioValueHistoryItem(
+                date=item[0],
+                value=item[1]
+            ))
+        return PortfolioValueHistoryResponse(
+            portfolio_value_history=portfolio_value_history_items
+        )
+    except Exception as e:
+        logger.error(f"Error getting portfolio value history: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get portfolio value history: {str(e)}"
         )
 

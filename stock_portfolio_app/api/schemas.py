@@ -33,6 +33,7 @@ class PositionBase(BaseModel):
 
 class PositionResponse(PositionBase):
     stockid: int = Field(..., description="Stock identifier")
+    average_cost_basis: Optional[float] = Field(None, description="Average cost basis")
     stock: Optional[StockResponse] = Field(None, description="Associated stock information")
     delta: float = Field(..., description="Difference between target and real distribution")
     model_config = ConfigDict(from_attributes=True)
@@ -78,6 +79,13 @@ class DistributionItem(BaseModel):
 class DistributionResponse(BaseModel):
     distributions: List[DistributionItem] = Field(..., description="Distribution breakdown")
     total_value: float = Field(..., description="Total portfolio value")
+
+class PortfolioValueHistoryItem(BaseModel):
+    date: datetime = Field(..., description="Date")
+    value: float = Field(..., description="Portfolio value")
+
+class PortfolioValueHistoryResponse(BaseModel):
+    portfolio_value_history: List[PortfolioValueHistoryItem] = Field(..., description="Portfolio value history")
 
 # Transaction Schemas
 class TransactionBase(BaseModel):

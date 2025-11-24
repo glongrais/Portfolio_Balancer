@@ -34,6 +34,7 @@ class FileUtils:
         TABLE = 'Repartition'
         SYMBOL = 0
         QUANTITY = 2
+        AVERAGE_COST_BASIS = 8
         DISTRIBUTION_TARGET = -1
         
         try:
@@ -47,7 +48,7 @@ class FileUtils:
         for row in table.rows(values_only=True):
             if row[0] is None:
                 continue
-            DatabaseService.updatePosition(symbol=row[SYMBOL], quantity=int(row[QUANTITY]), distribution_target=row[DISTRIBUTION_TARGET]*100)
+            DatabaseService.updatePosition(symbol=row[SYMBOL], quantity=int(row[QUANTITY]), average_cost_basis=row[AVERAGE_COST_BASIS], distribution_target=row[DISTRIBUTION_TARGET]*100)
     
     @classmethod
     def upsertTransactionsNumbers(cls, filename) -> None:

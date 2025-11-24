@@ -8,6 +8,7 @@ from typing import Optional
 class Position:
     stockid: int
     quantity: int
+    average_cost_basis: Optional[float] = field(default=None)
     distribution_target: Optional[float] = field(default=None)
     distribution_real: float = field(default=0.0)
     stock: Optional['Stock'] = field(default=None)

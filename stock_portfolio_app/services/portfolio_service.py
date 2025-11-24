@@ -86,3 +86,13 @@ class PortfolioService:
         """
         transaction = Transaction()
         return transaction.fetchall('SELECT * FROM transactions')
+    
+    @classmethod
+    def getPortfolioValueHistory(cls) -> list:
+        """
+        Retrieves the portfolio value history.
+
+        Returns:
+        - list: Portfolio value history
+        """
+        return DatabaseService.getPortfolioValueHistory()
