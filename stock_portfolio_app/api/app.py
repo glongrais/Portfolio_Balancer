@@ -45,6 +45,7 @@ async def lifespan(app: FastAPI):
         # Load stocks and positions into memory
         DatabaseService.getStocks()
         DatabaseService.getPositions()
+        DatabaseService.updatePortfolioPositionsPrice()
         DatabaseService.updateHistoricalStocksPortfolio("", "")
         
         logger.info("Portfolio Balancer API started successfully")
