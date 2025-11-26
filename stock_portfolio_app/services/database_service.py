@@ -352,3 +352,17 @@ class DatabaseService:
         with sqlite3.connect(DB_PATH) as connection:
             answers = connection.execute("SELECT * FROM int__portfolio_value_evolution")
         return answers
+    
+    @classmethod
+    def getDividendTotal(cls) -> float:
+        """
+        Calculates the total yearly dividend for the portfolio.
+
+        Returns:
+        - float: Total yearly dividend
+        """
+        total_dividend = 0.0
+        with sqlite3.connect(DB_PATH) as connection:
+            answers = connection.execute('''SELECT * FROM int__portfolio_dividends_total''')
+            total_dividend = float(answers.fetchone()[0])
+        return round(total_dividend, 2)

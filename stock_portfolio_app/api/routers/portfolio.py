@@ -194,9 +194,9 @@ async def get_total_dividends():
     Get total expected yearly dividends
     """
     try:
-        total_dividend = PortfolioService.getTotalYearlyDividend()
+        total_dividend = PortfolioService.getDividendTotal()
         return DividendResponse(
-            total_yearly_dividend=round(total_dividend, 2),
+            total_dividend=round(total_dividend, 2),
             currency="EUR"
         )
     except Exception as e:
@@ -285,4 +285,3 @@ async def get_portfolio_value_history():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get portfolio value history: {str(e)}"
         )
-

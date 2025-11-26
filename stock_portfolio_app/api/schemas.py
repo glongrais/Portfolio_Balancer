@@ -110,7 +110,7 @@ class TransactionCreate(BaseModel):
 
 # Dividend Schemas
 class DividendResponse(BaseModel):
-    total_yearly_dividend: float = Field(..., description="Total expected yearly dividend")
+    total_dividend: float = Field(..., description="Total earned dividend")
     currency: str = Field(default="EUR", description="Currency")
 
 class DividendByStockItem(BaseModel):

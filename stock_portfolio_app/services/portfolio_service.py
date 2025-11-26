@@ -96,3 +96,13 @@ class PortfolioService:
         - list: Portfolio value history
         """
         return DatabaseService.getPortfolioValueHistory()
+    
+    @classmethod
+    def getDividendTotal(cls) -> float:
+        """
+        Retrieves the total dividends received.
+
+        Returns:
+        - float: Total dividends
+        """
+        return DatabaseService.getDividendTotal()
