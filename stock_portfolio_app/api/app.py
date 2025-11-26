@@ -86,9 +86,9 @@ app.add_exception_handler(Exception, general_exception_handler)
 # Import and include routers
 from api.routers import portfolio, stocks, transactions
 
-app.include_router(portfolio.router, prefix="/api/portfolio", tags=["portfolio"])
-app.include_router(stocks.router, prefix="/api/stocks", tags=["stocks"])
-app.include_router(transactions.router, prefix="/api/transactions", tags=["transactions"])
+app.include_router(portfolio.router, prefix="/api/v1/portfolio", tags=["portfolio"])
+app.include_router(stocks.router, prefix="/api/v1/stocks", tags=["stocks"])
+app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
 
 @app.get("/")
 async def root():

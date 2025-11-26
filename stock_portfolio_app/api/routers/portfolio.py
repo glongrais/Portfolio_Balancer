@@ -55,7 +55,7 @@ async def get_portfolio_value():
         )
 
 @router.get("/positions", response_model=List[PositionResponse])
-async def get_positions():
+async def get_portfolio_positions():
     """
     Get all positions in the portfolio
     """
@@ -246,7 +246,7 @@ async def get_dividends_breakdown():
         )
 
 @router.post("/positions/update-prices", response_model=UpdatePricesResponse)
-async def update_positions_prices():
+async def update_portfolio_prices():
     """
     Update current prices for all positions in the portfolio
     """
