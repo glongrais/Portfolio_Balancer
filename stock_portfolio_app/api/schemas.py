@@ -129,4 +129,3 @@ class DividendBreakdownResponse(BaseModel):
 class UpdatePricesResponse(BaseModel):
     message: str = Field(..., description="Status message")
     updated_count: int = Field(..., description="Number of stocks updated")
-

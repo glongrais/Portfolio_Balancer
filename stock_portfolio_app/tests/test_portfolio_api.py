@@ -226,13 +226,13 @@ def test_get_total_dividends(monkeypatch):
     def fake_get_total_dividend():
         return 100.50
     
-    monkeypatch.setattr(PortfolioService, 'getTotalYearlyDividend', fake_get_total_dividend)
+    monkeypatch.setattr(PortfolioService, 'getDividendTotal', fake_get_total_dividend)
     
     client = create_test_client()
     resp = client.get('/api/portfolio/dividends/total')
     assert resp.status_code == 200
     data = resp.json()
-    assert data['total_yearly_dividend'] == 100.50
+    assert data['total_dividend'] == 100.50
     assert data['currency'] == 'EUR'
 
 
