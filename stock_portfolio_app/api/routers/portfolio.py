@@ -13,6 +13,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from api.schemas import (
+    AmountResponse,
     PortfolioValueResponse,
     BalanceRequest,
     BalanceResponse,
@@ -22,6 +23,7 @@ from api.schemas import (
     DividendResponse,
     DividendBreakdownResponse,
     DividendByStockItem,
+    DividendSummaryResponse,
     PositionResponse,
     UpdatePricesResponse,
     PortfolioValueHistoryResponse,
@@ -195,8 +197,39 @@ async def get_total_dividends():
     """
     try:
         total_dividend = PortfolioService.getDividendTotal()
-        return DividendResponse(
+        return AmountResponse(
             total_dividend=round(total_dividend, 2),
+            currency="EUR"
+        )
+    except Exception as e:
+        logger.error(f"Error calculating dividends: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to calculate dividends: {str(e)}"
+        )
+
+@router.get("/dividends/summary", response_model=DividendSummaryResponse)
+async def get_dividends_summary():
+    """
+    Get dividend summary
+    """
+    total_dividend = PortfolioService.getDividendTotal()
+    year_to_date_dividend = PortfolioService.getDividendYearToDate()
+    yearly_forecast_dividend = PortfolioService.getDividendYearlyForecast()
+    next_dividend = PortfolioService.getNextDividend()
+    position = PortfolioService.getPositionById(1)
+    try:
+        return DividendSummaryResponse(
+            total_dividend=round(total_dividend, 2),
+            year_to_date_dividend=round(year_to_date_dividend, 2),
+            yearly_forecast_dividend=round(yearly_forecast_dividend, 2),
+            next_dividend=DividendByStockItem(
+                symbol=position.stock.symbol,
+                name=position.stock.name,
+                quantity=position.quantity,
+                dividend_rate=round(dividend_rate, 2),
+                total_dividend=round(position.quantity*dividend_rate, 2)
+            ),
             currency="EUR"
         )
     except Exception as e:

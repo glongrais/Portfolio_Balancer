@@ -5,6 +5,11 @@ from pydantic import ConfigDict, BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
 
+# General Schemas
+class AmountResponse(BaseModel):
+    amount: float = Field(..., description="Amount")
+    currency: str = Field(default="EUR", description="Currency")
+
 # Stock Schemas
 class StockBase(BaseModel):
     symbol: str = Field(..., description="Stock ticker symbol")
@@ -123,6 +128,13 @@ class DividendByStockItem(BaseModel):
 class DividendBreakdownResponse(BaseModel):
     dividends: List[DividendByStockItem] = Field(..., description="Dividend breakdown by stock")
     total_yearly_dividend: float = Field(..., description="Total expected yearly dividend")
+    currency: str = Field(default="EUR", description="Currency")
+
+class DividendSummaryResponse(BaseModel):
+    total_dividend: float = Field(..., description="Total expected yearly dividend")
+    year_to_date_dividend: float = Field(..., description="Year to date dividend")
+    yearly_forecast_dividend: float = Field(..., description="Yearly forecast dividend")
+    next_dividend: DividendByStockItem = Field(..., description="Next dividend")
     currency: str = Field(default="EUR", description="Currency")
 
 # Update Stock Prices Request
