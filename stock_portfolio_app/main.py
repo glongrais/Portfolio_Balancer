@@ -33,7 +33,7 @@ if __name__ == '__main__':
     log_step("Get positions", DatabaseService.getPositions)
     log_step("Update portfolio positions price", DatabaseService.updatePortfolioPositionsPrice)
     log_step("Update historical stocks portfolio", DatabaseService.updateHistoricalStocksPortfolio, "", "")
-    # log_step("Update historical dividends portfolio", DatabaseService.updateHistoricalDividendsPortfolio)
+    log_step("Update historical dividends portfolio", DatabaseService.updateHistoricalDividendsPortfolio)
     log_step("Refresh Numbers", FileUtils.refreshNumbers, "/Users/guillaumel/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
     log_step("Upsert transactions Numbers", FileUtils.upsertTransactionsNumbers,
              "/Users/guillaumel/Library/Mobile "

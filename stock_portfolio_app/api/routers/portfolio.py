@@ -213,23 +213,32 @@ async def get_dividends_summary():
     """
     Get dividend summary
     """
-    total_dividend = PortfolioService.getDividendTotal()
-    year_to_date_dividend = PortfolioService.getDividendYearToDate()
-    yearly_forecast_dividend = PortfolioService.getDividendYearlyForecast()
-    next_dividend = PortfolioService.getNextDividend()
-    position = PortfolioService.getPositionById(1)
     try:
+        total_dividend = PortfolioService.getDividendTotal()
+        year_to_date_dividend = PortfolioService.getDividendYearToDate()
+        yearly_forecast_dividend = PortfolioService.getDividendYearlyForecast()
+        next_dividend_info = PortfolioService.getNextDividend()
+        
+        next_dividend_item = None
+        if next_dividend_info and next_dividend_info.get('stockid'):
+            # Get the position for the next dividend
+            position = PortfolioService.getPositionById(next_dividend_info['stockid'])
+            dividend_rate = next_dividend_info.get('dividend_rate', 0.0)
+            
+            if position and position.stock:
+                next_dividend_item = DividendByStockItem(
+                    symbol=position.stock.symbol,
+                    name=position.stock.name,
+                    quantity=position.quantity,
+                    dividend_rate=round(dividend_rate, 2),
+                    total_dividend=round(position.quantity * dividend_rate, 2)
+                )
+        
         return DividendSummaryResponse(
             total_dividend=round(total_dividend, 2),
             year_to_date_dividend=round(year_to_date_dividend, 2),
             yearly_forecast_dividend=round(yearly_forecast_dividend, 2),
-            next_dividend=DividendByStockItem(
-                symbol=position.stock.symbol,
-                name=position.stock.name,
-                quantity=position.quantity,
-                dividend_rate=round(dividend_rate, 2),
-                total_dividend=round(position.quantity*dividend_rate, 2)
-            ),
+            next_dividend=next_dividend_item,
             currency="EUR"
         )
     except Exception as e:

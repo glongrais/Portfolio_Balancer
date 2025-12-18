@@ -366,3 +366,52 @@ class DatabaseService:
             answers = connection.execute('''SELECT * FROM int__portfolio_dividends_total''')
             total_dividend = float(answers.fetchone()[0])
         return round(total_dividend, 2)
+
+    @classmethod
+    def getDividendYearToDate(cls, year: str) -> float:
+        """
+        Calculates the total dividends received for a given year.
+
+        Args:
+        - year: The year to calculate dividends for (e.g., '2024')
+
+        Returns:
+        - float: Total dividends for the year
+        """
+        with sqlite3.connect(DB_PATH) as connection:
+            result = connection.execute(
+                '''SELECT SUM(total_dividends) 
+                   FROM int__transactions_dividends 
+                   WHERE strftime('%Y', datestamp) = ?''',
+                (year,)
+            )
+            row = result.fetchone()
+            return round(row[0], 2) if row[0] else 0.0
+
+    @classmethod
+    def getNextDividendInfo(cls) -> dict:
+        """
+        Retrieves information about the most recent dividend to estimate next payment.
+
+        Returns:
+        - dict: Contains stockid and dividend_rate (never returns None)
+        """
+        default_result = {'stockid': None, 'dividend_rate': 0.0}
+        try:
+            with sqlite3.connect(DB_PATH) as connection:
+                result = connection.execute(
+                    '''SELECT stockid, MAX(datestamp) as last_date, dividendvalue
+                       FROM historicaldividends
+                       GROUP BY stockid
+                       ORDER BY last_date DESC
+                       LIMIT 1'''
+                )
+                row = result.fetchone()
+                if row and row[0] is not None:
+                    return {
+                        'stockid': row[0],
+                        'dividend_rate': row[2] if row[2] else 0.0
+                    }
+        except Exception as e:
+            logger.error(f"getNextDividendInfo(): Error fetching next dividend info: {e}")
+        return default_result

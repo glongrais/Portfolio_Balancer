@@ -134,7 +134,7 @@ class DividendSummaryResponse(BaseModel):
     total_dividend: float = Field(..., description="Total expected yearly dividend")
     year_to_date_dividend: float = Field(..., description="Year to date dividend")
     yearly_forecast_dividend: float = Field(..., description="Yearly forecast dividend")
-    next_dividend: DividendByStockItem = Field(..., description="Next dividend")
+    next_dividend: Optional[DividendByStockItem] = Field(None, description="Next dividend")
     currency: str = Field(default="EUR", description="Currency")
 
 # Update Stock Prices Request

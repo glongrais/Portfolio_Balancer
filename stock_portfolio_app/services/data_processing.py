@@ -68,6 +68,14 @@ class DataProcessing:
 
     @classmethod
     def fetch_current_year_dividends(cls, symbols: list):
+        """
+        Fetches the current year dividend data for a set of stock symbols.
+
+        Parameters:
+        - symbols: list
+
+        Returns:
+        - dict: Current year dividend data by symbol
+        """
         dividends = StockAPI.get_current_year_dividends(symbols)
-        print(dividends)
-        return
+        return dividends

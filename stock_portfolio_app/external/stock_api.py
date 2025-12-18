@@ -88,5 +88,6 @@ class StockAPI:
     def get_current_year_dividends(cls, symbols: list):
         data = {}
         for symbol in symbols:
-            data[symbol] = cls._get_ticker(symbol).get_info()["dividendRate"]
+            info = cls._get_ticker(symbol).get_info()
+            data[symbol] = info.get("dividendRate", 0.0) or 0.0
         return data
