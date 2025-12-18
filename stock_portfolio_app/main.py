@@ -35,9 +35,7 @@ if __name__ == '__main__':
     log_step("Update historical stocks portfolio", DatabaseService.updateHistoricalStocksPortfolio, "", "")
     log_step("Update historical dividends portfolio", DatabaseService.updateHistoricalDividendsPortfolio)
     log_step("Refresh Numbers", FileUtils.refreshNumbers, "/Users/guillaumel/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
-    log_step("Upsert transactions Numbers", FileUtils.upsertTransactionsNumbers,
-             "/Users/guillaumel/Library/Mobile "
-             "Documents/com~apple~Numbers/Documents/Investissement.numbers")
+    log_step("Upsert transactions Numbers", FileUtils.upsertTransactionsNumbers, "/Users/guillaumel/Library/Mobile Documents/com~apple~Numbers/Documents/Investissement.numbers")
     log_step("Calculate portfolio value", lambda: print(PortfolioService().calculatePortfolioValue()))
     log_step("Fetch current year dividends", DataProcessing.fetch_current_year_dividends, ["TTE.PA", "AAPL", "MC.PA"])
     log_step("Fetch historical dividends", DataProcessing.fetch_historical_dividends, ["TTE.PA", "AAPL", "MC.PA"])
