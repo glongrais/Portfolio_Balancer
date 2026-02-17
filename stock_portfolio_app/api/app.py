@@ -21,6 +21,8 @@ from api.middleware import (
     http_exception_handler,
     general_exception_handler
 )
+from api.routers import portfolio, stocks, transactions, dev
+from utils.file_utils import FileUtils
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +49,12 @@ async def lifespan(app: FastAPI):
         DatabaseService.getPositions()
         DatabaseService.updatePortfolioPositionsPrice()
         DatabaseService.updateHistoricalStocksPortfolio("", "")
+        
+        # Refresh data from Numbers file
+        try:
+            FileUtils.refresh_from_numbers()
+        except Exception as e:
+            logger.warning(f"Numbers refresh failed on startup (non-blocking): {e}")
         
         logger.info("Portfolio Balancer API started successfully")
     except Exception as e:
@@ -83,12 +91,11 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
-# Import and include routers
-from api.routers import portfolio, stocks, transactions
-
+# Include routers
 app.include_router(portfolio.router, prefix="/api/v1/portfolio", tags=["portfolio"])
 app.include_router(stocks.router, prefix="/api/v1/stocks", tags=["stocks"])
 app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
+app.include_router(dev.router, prefix="/api/v1/dev", tags=["dev"])
 
 @app.get("/")
 async def root():

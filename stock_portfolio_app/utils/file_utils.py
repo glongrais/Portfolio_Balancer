@@ -1,5 +1,16 @@
+import logging
+import os
+import time
+
 from numbers_parser import Document
 from services.database_service import DatabaseService
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_NUMBERS_FILE = (
+    "/Users/guillaumel/Library/Mobile Documents/"
+    "com~apple~Numbers/Documents/Investissement.numbers"
+)
 
 class FileUtils:
 
@@ -74,3 +85,24 @@ class FileUtils:
             if row[0] is None:
                 continue
             DatabaseService.upsertTransactions(rowid=row[0].row, symbol=row[SYMBOL].value, quantity=int(row[QUANTITY].value), price=row[PRICE].value, type=row[TYPE].value, date=row[DATE].value)
+
+    @classmethod
+    def get_numbers_file_path(cls) -> str:
+        return os.environ.get("NUMBERS_FILE_PATH", DEFAULT_NUMBERS_FILE)
+
+    @classmethod
+    def refresh_from_numbers(cls) -> float:
+        """
+        Run refreshNumbers and upsertTransactionsNumbers from the configured Numbers file.
+        Returns the total duration in seconds.
+        """
+        numbers_file = cls.get_numbers_file_path()
+        logger.info(f"Refreshing data from Numbers file: {numbers_file}")
+
+        start = time.perf_counter()
+        cls.refreshNumbers(numbers_file)
+        cls.upsertTransactionsNumbers(numbers_file)
+        duration = time.perf_counter() - start
+
+        logger.info(f"Numbers refresh completed in {duration:.2f}s")
+        return duration

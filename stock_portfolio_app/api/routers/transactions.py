@@ -29,7 +29,7 @@ async def get_transactions(
     Get transaction history with optional filtering
     """
     try:
-        query = "SELECT t.transactionid, t.stockid, s.symbol, t.quantity, t.price, t.type, t.datestamp FROM transactions t JOIN stocks s ON t.stockid = s.stockid"
+        query = "SELECT t.transactionid, t.stockid, s.symbol, t.quantity, t.price, t.type, t.datestamp, s.name FROM transactions t JOIN stocks s ON t.stockid = s.stockid"
         params = []
         conditions = []
         
@@ -60,7 +60,8 @@ async def get_transactions(
                 "quantity": row[3],
                 "price": row[4],
                 "type": row[5],
-                "datestamp": row[6]
+                "datestamp": row[6],
+                "name": row[7]
             })
         
         return transactions
