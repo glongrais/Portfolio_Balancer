@@ -3,17 +3,13 @@ Transactions API Router
 Endpoints for transaction management and history
 """
 import logging
+import sqlite3
 from fastapi import APIRouter, HTTPException, status, Query
 from typing import List, Optional
-import sys
-import os
-import sqlite3
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from api.schemas import TransactionCreate
-from services.database_service import DatabaseService, DB_PATH
+from config import DB_PATH
+from services.database_service import DatabaseService
 
 logger = logging.getLogger(__name__)
 

@@ -5,11 +5,6 @@ Endpoints for stock management and information
 import logging
 from fastapi import APIRouter, HTTPException, status, Path
 from typing import List
-import sys
-import os
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from api.schemas import (
     StockResponse,

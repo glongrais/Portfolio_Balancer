@@ -3,7 +3,7 @@ from models.Position import Position
 from models.Stock import Stock
 from models.Transaction import Transaction
 from services.database_service import DatabaseService
-from services.data_processing import DataProcessing
+from services.stock_api import StockAPI
 import math
 from datetime import datetime
 from cachetools import cached, TTLCache
@@ -73,7 +73,7 @@ class PortfolioService:
     def getTotalYearlyDividend(cls):
         total_dividend = 0
         for position in DatabaseService.positions.values():
-            dividend_rate = DataProcessing.fetch_current_year_dividends([position.stock.symbol])[position.stock.symbol]
+            dividend_rate = StockAPI.get_current_year_dividends([position.stock.symbol])[position.stock.symbol]
             total_dividend += dividend_rate * position.quantity
         return total_dividend
 
@@ -130,7 +130,7 @@ class PortfolioService:
         """
         total_forecast = 0.0
         for position in DatabaseService.positions.values():
-            dividend_rate = DataProcessing.fetch_current_year_dividends(
+            dividend_rate = StockAPI.get_current_year_dividends(
                 [position.stock.symbol]
             )[position.stock.symbol]
             total_forecast += dividend_rate * position.quantity

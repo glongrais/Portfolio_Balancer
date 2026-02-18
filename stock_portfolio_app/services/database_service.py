@@ -4,11 +4,9 @@ import sqlite3
 import logging
 from models.Stock import Stock
 from models.Position import Position
-from services.data_processing import DataProcessing
-from external.stock_api import StockAPI
+from services.stock_api import StockAPI
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
-DB_PATH = '../data/portfolio.db'
+from config import DB_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +28,7 @@ class DatabaseService:
             logger.warning("addStock(): Stock %s already in the database", symbol)
             return cls.symbol_map[symbol]
         
-        ticker_info = DataProcessing.fetch_real_time_price(symbol)
+        ticker_info = StockAPI.get_current_price(symbol)
         with sqlite3.connect(DB_PATH) as connection:
             connection.execute('''
             INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country)
@@ -68,7 +66,7 @@ class DatabaseService:
             log_count = 0
             for stockid in cls.stocks:
                 stock = cls.stocks[stockid]
-                info = DataProcessing.fetch_real_time_price(stock.symbol)
+                info = StockAPI.get_current_price(stock.symbol)
                 stock.price = info["currentPrice"]
                 connection.execute('UPDATE stocks SET price = ? WHERE stockid = ?', (info["currentPrice"], stockid,))
                 log_count += 1
@@ -141,7 +139,7 @@ class DatabaseService:
                 logger.warning("updatePortfolioPositionsPrice(): Position %d has no stock set. Skipping price update for this position", stockid)
                 return None
             
-            info = DataProcessing.fetch_real_time_price(position.stock.symbol)
+            info = StockAPI.get_current_price(position.stock.symbol)
             position.stock.price = info["currentPrice"]
             
             return (stockid, info)
@@ -322,7 +320,7 @@ class DatabaseService:
         """
 
         symbols = [p.stock.symbol for p in cls.positions.values()]
-        historical_dividends = DataProcessing.fetch_historical_dividends(symbols)
+        historical_dividends = StockAPI.get_historical_dividends(symbols)
 
         with sqlite3.connect(DB_PATH) as connection:
             cursor = connection.cursor()

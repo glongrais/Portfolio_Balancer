@@ -2,17 +2,13 @@
 FastAPI application for Portfolio Balancer API
 """
 import logging
-import sys
-import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+from config import DB_PATH
 from utils.db_utils import initialize_database
 from services.database_service import DatabaseService
 from api.middleware import (
@@ -41,8 +37,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting up Portfolio Balancer API...")
     try:
         # Initialize database
-        db_path = os.path.join(os.path.dirname(__file__), '../../data/portfolio.db')
-        initialize_database(db_path)
+        initialize_database(DB_PATH)
         
         # Load stocks and positions into memory
         DatabaseService.getStocks()

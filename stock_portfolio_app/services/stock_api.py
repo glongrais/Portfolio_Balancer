@@ -81,7 +81,8 @@ class StockAPI:
     def get_historical_dividends(cls, symbols: list):
         data = {}
         for symbol in symbols:
-            data[symbol] = cls._get_ticker(symbol).get_dividends().to_dict()
+            raw = cls._get_ticker(symbol).get_dividends().to_dict()
+            data[symbol] = {t.strftime('%Y-%m-%d'): v for t, v in raw.items()}
         return data
     
     @classmethod

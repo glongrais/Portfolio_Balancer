@@ -1,5 +1,3 @@
-from models.Base import BaseModel
-from enum import Enum
 from dataclasses import dataclass, field
 from models.Stock import Stock
 from typing import Optional

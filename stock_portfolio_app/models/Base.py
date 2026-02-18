@@ -1,8 +1,9 @@
 import sqlite3
+from config import DB_PATH as _DEFAULT_DB_PATH
 
 class BaseModel:
-    def __init__(self, table_name: str, db_path='data/portfolio.db'):
-        self.db_path = db_path
+    def __init__(self, table_name: str, db_path=None):
+        self.db_path = db_path or _DEFAULT_DB_PATH
         self.table_name = table_name
 
     def execute_query(self, query, params=()):

@@ -247,7 +247,7 @@ def test_get_dividends_breakdown(monkeypatch):
     def fake_fetch_dividends(symbols):
         return {'AAPL': 0.92, 'MSFT': 2.72}
     
-    monkeypatch.setattr('services.data_processing.DataProcessing.fetch_current_year_dividends', fake_fetch_dividends)
+    monkeypatch.setattr('services.stock_api.StockAPI.get_current_year_dividends', fake_fetch_dividends)
     
     client = create_test_client()
     resp = client.get('/api/portfolio/dividends/breakdown')

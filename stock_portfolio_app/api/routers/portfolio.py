@@ -6,11 +6,6 @@ import logging
 import math
 from fastapi import APIRouter, HTTPException, status
 from typing import List
-import sys
-import os
-
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from api.schemas import (
     AmountResponse,
@@ -32,7 +27,7 @@ from api.schemas import (
 )
 from services.portfolio_service import PortfolioService
 from services.database_service import DatabaseService
-from services.data_processing import DataProcessing
+from services.stock_api import StockAPI
 
 logger = logging.getLogger(__name__)
 
@@ -308,7 +303,7 @@ async def get_dividends_breakdown():
         total_dividend = 0.0
         
         for position in DatabaseService.positions.values():
-            dividend_rate = DataProcessing.fetch_current_year_dividends(
+            dividend_rate = StockAPI.get_current_year_dividends(
                 [position.stock.symbol]
             )[position.stock.symbol]
             stock_dividend = dividend_rate * position.quantity

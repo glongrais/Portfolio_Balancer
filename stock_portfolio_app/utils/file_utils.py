@@ -3,14 +3,10 @@ import os
 import time
 
 from numbers_parser import Document
+from config import DEFAULT_NUMBERS_FILE
 from services.database_service import DatabaseService
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_NUMBERS_FILE = (
-    "/Users/guillaumel/Library/Mobile Documents/"
-    "com~apple~Numbers/Documents/Investissement.numbers"
-)
 
 class FileUtils:
 

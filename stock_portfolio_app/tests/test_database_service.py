@@ -26,7 +26,7 @@ def setup_database_service():
     yield
 
 @patch('sqlite3.connect')
-@patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=MOCK_PRICE)
+@patch('services.stock_api.StockAPI.get_current_price', return_value=MOCK_PRICE)
 @patch('services.database_service.DatabaseService.getStock')
 def test_addStock(mock_fetch_stock, mock_fetch_price, mock_connect, setup_database_service):
     mock_conn = MagicMock()
@@ -55,7 +55,7 @@ def test_addStock(mock_fetch_stock, mock_fetch_price, mock_connect, setup_databa
     mock_fetch_stock.assert_called_once_with(symbol="AAPL")
 
 @patch('sqlite3.connect')
-@patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=MOCK_PRICE)
+@patch('services.stock_api.StockAPI.get_current_price', return_value=MOCK_PRICE)
 @patch('services.database_service.DatabaseService.getStock')
 @patch('logging.Logger.warning')
 def test_addStock_already_in_database(mock_logger, mock_fetch_stock, mock_fetch_price, mock_connect, setup_database_service):
@@ -115,7 +115,7 @@ def test_getStock_two_parameters(mock_logger, mock_connect, setup_database_servi
     assert DatabaseService.symbol_map['AAPL'] == 1
 
 @patch('sqlite3.connect')
-@patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=MOCK_PRICE)
+@patch('services.stock_api.StockAPI.get_current_price', return_value=MOCK_PRICE)
 def test_updateStocksPrice(mock_fetch_price, mock_connect, setup_database_service):
     mock_conn = MagicMock()
     mock_connect.return_value = mock_conn
@@ -132,7 +132,7 @@ def test_updateStocksPrice(mock_fetch_price, mock_connect, setup_database_servic
     mock_cursor.commit.assert_called_once()
     assert DatabaseService.stocks[1].price == 100.0
     
-@patch('services.data_processing.DataProcessing.fetch_real_time_price', return_value=MOCK_PRICE)
+@patch('services.stock_api.StockAPI.get_current_price', return_value=MOCK_PRICE)
 @patch('sqlite3.connect')
 @patch('logging.Logger.warning')
 def test_updatePortfolioPositionsPrice(mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price, setup_database_service):
@@ -169,7 +169,7 @@ def test_updatePortfolioPositionsPrice(mock_logger_warning, mock_sqlite_connect,
     # Check if commit was called
     assert mock_conn.commit.call_count == 1
 
-@patch('services.data_processing.DataProcessing.fetch_real_time_price')
+@patch('services.stock_api.StockAPI.get_current_price')
 @patch('sqlite3.connect')
 @patch('logging.Logger.warning')
 def test_updatePortfolioPositionsPrice_no_positions(mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price, setup_database_service):
@@ -186,7 +186,7 @@ def test_updatePortfolioPositionsPrice_no_positions(mock_logger_warning, mock_sq
     assert mock_fetch_real_time_price.call_count == 0
     assert mock_sqlite_connect.call_count == 0
 
-@patch('services.data_processing.DataProcessing.fetch_real_time_price')
+@patch('services.stock_api.StockAPI.get_current_price')
 @patch('sqlite3.connect')
 @patch('logging.Logger.warning')
 def test_updatePortfolioPositionsPrice_no_stock_in_position(mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price, setup_database_service):
