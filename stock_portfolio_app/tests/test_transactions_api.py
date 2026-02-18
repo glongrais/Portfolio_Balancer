@@ -37,10 +37,10 @@ def test_get_transactions_all(mock_connect):
     mock_connect.return_value.__enter__.return_value = mock_conn
     mock_conn.execute.return_value = mock_cursor
     
-    # Mock transaction data
+    # Mock transaction data (8 columns: transactionid, stockid, symbol, quantity, price, type, datestamp, name)
     mock_cursor.fetchall.return_value = [
-        (1, 1, 'AAPL', 10, 150.0, 'buy', '2024-01-15'),
-        (2, 2, 'GOOGL', 5, 2000.0, 'buy', '2024-01-16'),
+        (1, 1, 'AAPL', 10, 150.0, 'buy', '2024-01-15', 'Apple Inc.'),
+        (2, 2, 'GOOGL', 5, 2000.0, 'buy', '2024-01-16', 'Alphabet Inc.'),
     ]
     
     client = create_test_client()
@@ -64,9 +64,9 @@ def test_get_transactions_filter_by_symbol(mock_connect):
     mock_conn.execute.return_value = mock_cursor
     
     mock_cursor.fetchall.return_value = [
-        (1, 1, 'AAPL', 10, 150.0, 'buy', '2024-01-15'),
+        (1, 1, 'AAPL', 10, 150.0, 'buy', '2024-01-15', 'Apple Inc.'),
     ]
-    
+
     client = create_test_client()
     resp = client.get('/api/transactions/?symbol=AAPL')
     
@@ -90,9 +90,9 @@ def test_get_transactions_filter_by_type(mock_connect):
     mock_conn.execute.return_value = mock_cursor
     
     mock_cursor.fetchall.return_value = [
-        (2, 1, 'AAPL', 5, 155.0, 'sell', '2024-01-20'),
+        (2, 1, 'AAPL', 5, 155.0, 'sell', '2024-01-20', 'Apple Inc.'),
     ]
-    
+
     client = create_test_client()
     resp = client.get('/api/transactions/?transaction_type=sell')
     
@@ -111,9 +111,9 @@ def test_get_transactions_filter_by_both(mock_connect):
     mock_conn.execute.return_value = mock_cursor
     
     mock_cursor.fetchall.return_value = [
-        (2, 1, 'AAPL', 5, 155.0, 'sell', '2024-01-20'),
+        (2, 1, 'AAPL', 5, 155.0, 'sell', '2024-01-20', 'Apple Inc.'),
     ]
-    
+
     client = create_test_client()
     resp = client.get('/api/transactions/?symbol=AAPL&transaction_type=sell')
     
@@ -136,7 +136,7 @@ def test_get_transactions_with_limit(mock_connect):
     mock_connect.return_value.__enter__.return_value = mock_conn
     mock_conn.execute.return_value = mock_cursor
     
-    mock_cursor.fetchall.return_value = [(i, 1, 'AAPL', 1, 150.0, 'buy', f'2024-01-{i:02d}') for i in range(1, 11)]
+    mock_cursor.fetchall.return_value = [(i, 1, 'AAPL', 1, 150.0, 'buy', f'2024-01-{i:02d}', 'Apple Inc.') for i in range(1, 11)]
     
     client = create_test_client()
     resp = client.get('/api/transactions/?limit=10')

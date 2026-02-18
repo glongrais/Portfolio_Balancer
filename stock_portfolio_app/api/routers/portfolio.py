@@ -8,7 +8,6 @@ from fastapi import APIRouter, HTTPException, status
 from typing import List
 
 from api.schemas import (
-    AmountResponse,
     PortfolioValueResponse,
     BalanceRequest,
     BalanceStrategy,
@@ -242,7 +241,7 @@ async def get_total_dividends():
     """
     try:
         total_dividend = PortfolioService.getDividendTotal()
-        return AmountResponse(
+        return DividendResponse(
             total_dividend=round(total_dividend, 2),
             currency="EUR"
         )

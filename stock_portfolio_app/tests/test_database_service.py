@@ -291,7 +291,7 @@ def test_addPosition_already_in_database(mock_logger, mock_addStock, mock_connec
 
 @patch('sqlite3.connect')
 @patch('logging.Logger.warning')
-@patch('logging.Logger.info')
+@patch('logging.Logger.debug')
 def test_update_position(mock_logger_info, mock_logger_warning, mock_sqlite_connect, setup_database_service):
     # Mock DatabaseService.positions and symbol_map
     stock = Stock(stockid=1, symbol='AAPL', price=140.0)
@@ -317,10 +317,10 @@ def test_update_position(mock_logger_info, mock_logger_warning, mock_sqlite_conn
     assert position.quantity == 15
     assert position.distribution_target == 25.0
     
-    # Check if the info log was called
+    # Check if the debug log was called
     mock_logger_info.assert_called_once_with(
-        "updatePosition(): Position %s updated. Quantity: %s, Distribution target: %s, Distribution real: %s",
-        'AAPL', 15, 25.0, 15.0
+        "updatePosition(): Position %s updated. Quantity: %s, Average cost basis: %s, Distribution target: %s, Distribution real: %s",
+        'AAPL', 15, None, 25.0, 15.0
     )
 
 @patch('sqlite3.connect')
