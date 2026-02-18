@@ -1,9 +1,15 @@
 """
 Pydantic schemas for API request and response models
 """
+from enum import Enum
 from pydantic import ConfigDict, BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
+
+
+class BalanceStrategy(str, Enum):
+    REBALANCE = "rebalance"
+    PROPORTIONAL = "proportional"
 
 # General Schemas
 class AmountResponse(BaseModel):
@@ -61,6 +67,7 @@ class PortfolioValueResponse(BaseModel):
 class BalanceRequest(BaseModel):
     amount_to_buy: float = Field(..., description="Amount of money to invest", gt=0)
     min_amount_to_buy: float = Field(default=100, description="Minimum amount per purchase", gt=0)
+    strategy: BalanceStrategy = Field(default=BalanceStrategy.PROPORTIONAL, description="Allocation strategy: 'proportional' allocates strictly by target percentages, 'rebalance' fixes current imbalances")
 
 class BalanceRecommendation(BaseModel):
     symbol: str = Field(..., description="Stock symbol")

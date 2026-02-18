@@ -16,6 +16,7 @@ from api.schemas import (
     AmountResponse,
     PortfolioValueResponse,
     BalanceRequest,
+    BalanceStrategy,
     BalanceResponse,
     BalanceRecommendation,
     DistributionResponse,
@@ -106,46 +107,95 @@ async def balance_portfolio(balance_request: BalanceRequest):
     try:
         amount_to_buy = balance_request.amount_to_buy
         min_amount_to_buy = balance_request.min_amount_to_buy
-        
-        total_value = PortfolioService.calculatePortfolioValue() + amount_to_buy
+        strategy = balance_request.strategy
+
         PortfolioService.updateRealDistribution()
-        
-        sorted_positions = dict(sorted(
-            DatabaseService.positions.items(),
-            key=lambda item: item[1].delta(),
-            reverse=True
-        ))
-        
+
         recommendations = []
         total_invested = 0.0
-        
-        for position in sorted_positions.values():
-            if position.stock.price > amount_to_buy:
-                continue
-                
-            target = position.distribution_target/100 - round(
-                (position.stock.price * position.quantity) / total_value, 4
-            )
-            money_to_buy = target * total_value
-            shares_to_buy = math.floor(min(amount_to_buy, money_to_buy) / position.stock.price)
-            
-            if (shares_to_buy * position.stock.price) < min_amount_to_buy:
-                continue
-                
-            invest_amount = shares_to_buy * position.stock.price
-            amount_to_buy -= invest_amount
-            total_invested += invest_amount
-            
-            recommendations.append(BalanceRecommendation(
-                symbol=position.stock.symbol,
-                shares=shares_to_buy,
-                amount=round(invest_amount, 2),
-                stock_price=position.stock.price
+
+        if strategy == BalanceStrategy.PROPORTIONAL:
+            # Select positions sorted by delta (most underweight first)
+            eligible = [
+                p for p in DatabaseService.positions.values()
+                if p.distribution_target and p.distribution_target > 0
+            ]
+            eligible.sort(key=lambda p: p.delta(), reverse=True)
+
+            # Iteratively prune positions whose proportional allocation
+            # falls below min_amount_to_buy, then renormalize until stable
+            changed = True
+            while changed:
+                changed = False
+                target_sum = sum(p.distribution_target for p in eligible)
+                if target_sum == 0:
+                    break
+                next_eligible = []
+                for p in eligible:
+                    allocation = amount_to_buy * (p.distribution_target / target_sum)
+                    shares = math.floor(allocation / p.stock.price)
+                    if shares * p.stock.price >= min_amount_to_buy:
+                        next_eligible.append(p)
+                    else:
+                        changed = True
+                eligible = next_eligible
+
+            # Allocate proportionally among eligible positions
+            target_sum = sum(p.distribution_target for p in eligible)
+            for position in eligible:
+                allocation = amount_to_buy * (position.distribution_target / target_sum)
+                shares_to_buy = math.floor(allocation / position.stock.price)
+                invest_amount = shares_to_buy * position.stock.price
+                total_invested += invest_amount
+
+                recommendations.append(BalanceRecommendation(
+                    symbol=position.stock.symbol,
+                    shares=shares_to_buy,
+                    amount=round(invest_amount, 2),
+                    stock_price=position.stock.price
+                ))
+
+            leftover = amount_to_buy - total_invested
+        else:
+            # Rebalance: allocate new money to fix current imbalances
+            total_value = PortfolioService.calculatePortfolioValue() + amount_to_buy
+            remaining = amount_to_buy
+
+            sorted_positions = dict(sorted(
+                DatabaseService.positions.items(),
+                key=lambda item: item[1].delta(),
+                reverse=True
             ))
-        
+
+            for position in sorted_positions.values():
+                if position.stock.price > remaining:
+                    continue
+
+                target = position.distribution_target/100 - round(
+                    (position.stock.price * position.quantity) / total_value, 4
+                )
+                money_to_buy = target * total_value
+                shares_to_buy = math.floor(min(remaining, money_to_buy) / position.stock.price)
+
+                if (shares_to_buy * position.stock.price) < min_amount_to_buy:
+                    continue
+
+                invest_amount = shares_to_buy * position.stock.price
+                remaining -= invest_amount
+                total_invested += invest_amount
+
+                recommendations.append(BalanceRecommendation(
+                    symbol=position.stock.symbol,
+                    shares=shares_to_buy,
+                    amount=round(invest_amount, 2),
+                    stock_price=position.stock.price
+                ))
+
+            leftover = remaining
+
         return BalanceResponse(
             recommendations=recommendations,
-            leftover=math.floor(amount_to_buy),
+            leftover=math.floor(leftover),
             total_invested=round(total_invested, 2)
         )
     except Exception as e:

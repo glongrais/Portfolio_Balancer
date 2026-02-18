@@ -346,3 +346,120 @@ def test_balance_portfolio_multiple_recommendations():
     # Verify total invested doesn't exceed amount to buy
     assert data['total_invested'] <= 2000
 
+
+def test_balance_portfolio_proportional_strategy():
+    """Test proportional strategy allocates money by target percentages."""
+    stock1 = Stock(stockid=1, symbol='AAPL', name='Apple', price=10.0)
+    stock2 = Stock(stockid=2, symbol='MSFT', name='Microsoft', price=10.0)
+
+    # Both stocks same price, different targets — real distribution doesn't matter
+    position1 = Position(
+        stockid=1, quantity=100, distribution_target=70.0,
+        distribution_real=50.0, stock=stock1
+    )
+    position2 = Position(
+        stockid=2, quantity=100, distribution_target=30.0,
+        distribution_real=50.0, stock=stock2
+    )
+    DatabaseService.positions = {1: position1, 2: position2}
+
+    client = create_test_client()
+    resp = client.post('/api/portfolio/balance', json={
+        'amount_to_buy': 1000,
+        'min_amount_to_buy': 50,
+        'strategy': 'proportional'
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    recs = {r['symbol']: r for r in data['recommendations']}
+    # With equal stock prices of 10, AAPL should get 70% = 70 shares, MSFT 30% = 30 shares
+    assert recs['AAPL']['shares'] == 70
+    assert recs['MSFT']['shares'] == 30
+    assert data['total_invested'] == 1000
+
+
+def test_balance_portfolio_proportional_skips_below_minimum():
+    """Test proportional strategy prunes positions below min_amount_to_buy
+    and redistributes their share to remaining positions."""
+    stock1 = Stock(stockid=1, symbol='AAPL', name='Apple', price=10.0)
+    stock2 = Stock(stockid=2, symbol='MSFT', name='Microsoft', price=10.0)
+
+    position1 = Position(
+        stockid=1, quantity=10, distribution_target=90.0,
+        distribution_real=50.0, stock=stock1
+    )
+    position2 = Position(
+        stockid=2, quantity=10, distribution_target=10.0,
+        distribution_real=50.0, stock=stock2
+    )
+    DatabaseService.positions = {1: position1, 2: position2}
+
+    client = create_test_client()
+    resp = client.post('/api/portfolio/balance', json={
+        'amount_to_buy': 500,
+        'min_amount_to_buy': 100,
+        'strategy': 'proportional'
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    # MSFT would get 10% of 500 = 50, which is below min 100 → pruned
+    # AAPL gets all the budget instead
+    assert len(data['recommendations']) == 1
+    assert data['recommendations'][0]['symbol'] == 'AAPL'
+    assert data['recommendations'][0]['shares'] == 50  # 500 / 10
+
+
+def test_balance_portfolio_proportional_excludes_no_target():
+    """Test that proportional strategy skips positions with no target."""
+    stock1 = Stock(stockid=1, symbol='AAPL', name='Apple', price=10.0)
+    stock2 = Stock(stockid=2, symbol='MSFT', name='Microsoft', price=10.0)
+
+    position1 = Position(
+        stockid=1, quantity=10, distribution_target=100.0,
+        distribution_real=50.0, stock=stock1
+    )
+    position2 = Position(
+        stockid=2, quantity=10, distribution_target=None,
+        distribution_real=50.0, stock=stock2  # no target set
+    )
+    DatabaseService.positions = {1: position1, 2: position2}
+
+    client = create_test_client()
+    resp = client.post('/api/portfolio/balance', json={
+        'amount_to_buy': 500,
+        'min_amount_to_buy': 50,
+        'strategy': 'proportional'
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data['recommendations']) == 1
+    assert data['recommendations'][0]['symbol'] == 'AAPL'
+
+
+def test_balance_portfolio_default_strategy_is_proportional():
+    """Test that omitting strategy defaults to proportional behavior."""
+    stock1 = Stock(stockid=1, symbol='AAPL', name='Apple', price=10.0)
+    stock2 = Stock(stockid=2, symbol='MSFT', name='Microsoft', price=10.0)
+
+    position1 = Position(
+        stockid=1, quantity=10, distribution_target=60.0,
+        distribution_real=50.0, stock=stock1
+    )
+    position2 = Position(
+        stockid=2, quantity=10, distribution_target=40.0,
+        distribution_real=50.0, stock=stock2
+    )
+    DatabaseService.positions = {1: position1, 2: position2}
+
+    client = create_test_client()
+    resp = client.post('/api/portfolio/balance', json={
+        'amount_to_buy': 1000,
+        'min_amount_to_buy': 50
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    recs = {r['symbol']: r for r in data['recommendations']}
+    # Proportional: AAPL gets 60% = 60 shares, MSFT gets 40% = 40 shares
+    assert recs['AAPL']['shares'] == 60
+    assert recs['MSFT']['shares'] == 40
+
