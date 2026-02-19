@@ -1,9 +1,8 @@
 from models.Base import BaseModel
-from services.data_processing import DataProcessing
 
 class Transaction(BaseModel):
 
-    def __init__(self, db_path='data/portfolio.db'):
+    def __init__(self, db_path=None):
         super().__init__('transactions', db_path)
         self.create_table()
 

@@ -26,6 +26,7 @@ def initialize_database(db_path: str):
     CREATE TABLE IF NOT EXISTS positions (
                     stockid INTEGER PRIMARY KEY,
                     quantity INTEGER,
+                    average_cost_basis REAL,
                     distribution_target REAL,
                     distribution_real REAL,
                     FOREIGN KEY (stockid) REFERENCES stocks (stockid)
