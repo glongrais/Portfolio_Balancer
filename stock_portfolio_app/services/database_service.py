@@ -7,6 +7,7 @@ from models.Position import Position
 from services.stock_api import StockAPI
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from config import DB_PATH
+from utils.db_utils import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class DatabaseService:
             return cls.symbol_map[symbol]
         
         ticker_info = StockAPI.get_current_price(symbol)
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             connection.execute('''
             INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -62,7 +63,7 @@ class DatabaseService:
         """
         Updates all stocks price in the database and in the in-memory cache
         """
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             log_count = 0
             for stockid in cls.stocks:
                 stock = cls.stocks[stockid]
@@ -78,7 +79,7 @@ class DatabaseService:
         """
         Fetches all stocks from the database and updates the in-memory cache.
         """
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             connection.row_factory = Stock.dataclass_factory
             answers = connection.execute("SELECT * FROM mar__stocks")
         log_count = 0
@@ -102,7 +103,7 @@ class DatabaseService:
             return -1
         if stockid is not None and symbol is not None:
             logger.warning("getStock(): Both stockid and symbol are set; the search will be done using stockid.")
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             connection.row_factory = Stock.dataclass_factory
             if stockid is not None:
                 answers = connection.execute("SELECT * FROM mar__stocks WHERE stockid = ?", (stockid,))
@@ -150,7 +151,7 @@ class DatabaseService:
                                 (stockid, position) for stockid, position in cls.positions.items()}
             
             # Update database with results
-            with sqlite3.connect(DB_PATH) as connection:
+            with get_connection(DB_PATH) as connection:
                 for future in as_completed(future_to_position):
                     result = future.result()
                     if result:
@@ -167,7 +168,7 @@ class DatabaseService:
         """
         Fetches all portfolio positions from the database and updates the in-memory cache.
         """
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             connection.row_factory = Position.dataclass_factory
             answers = connection.execute("SELECT * FROM positions")
         log_count = 0  
@@ -195,7 +196,7 @@ class DatabaseService:
         if stockid in cls.positions:
             logger.warning("addPosition(): Position %s already in the portfolio", symbol)
             return
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             connection.execute("INSERT INTO positions (stockid, quantity, distribution_target) VALUES (?, ?, ?)", (stockid, quantity, distribution_target))
             connection.commit()
         cls.positions[stockid] = Position(stockid=stockid, quantity=quantity, distribution_target=distribution_target, stock=cls.stocks[stockid])
@@ -247,7 +248,7 @@ class DatabaseService:
         params.append(stockid)
         query = "UPDATE positions SET " + ", ".join(fields_to_update) + " WHERE stockid = ?"
 
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             connection.execute(query, params)
             connection.commit()
 
@@ -272,7 +273,7 @@ class DatabaseService:
             stockid = cls.addStock(symbol)
             #logger.error("upsertTransactions(): Stock %s not in the database", symbol)
             #return
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             connection.execute("INSERT INTO transactions (stockid, portfolioid, rowid, quantity, price, type, datestamp) VALUES (?, 1, ?, ?, ?, ?, ?) ON CONFLICT(portfolioid, rowid) DO NOTHING", (stockid, rowid, quantity, price, type, date,))
             connection.commit()
         logger.info("upsertTransactions(): Transaction added for stock %s", symbol)
@@ -306,7 +307,7 @@ class DatabaseService:
         query += " ORDER BY t.datestamp DESC LIMIT ?"
         params.append(limit)
 
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             cursor = connection.execute(query, params)
             rows = cursor.fetchall()
 
@@ -352,7 +353,7 @@ class DatabaseService:
 
         query += " GROUP BY s.symbol, s.name ORDER BY total_invested DESC"
 
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             cursor = connection.execute(query, params)
             rows = cursor.fetchall()
 
@@ -379,7 +380,7 @@ class DatabaseService:
         :param limit: Maximum number of deposits to return.
         :return: List of deposit dicts.
         """
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "SELECT depositid, datestamp, amount, portfolioid, currency FROM deposits ORDER BY datestamp DESC LIMIT ?",
                 (limit,)
@@ -403,7 +404,7 @@ class DatabaseService:
 
         :return: Total deposit amount.
         """
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             cursor = connection.execute("SELECT COALESCE(SUM(amount), 0) FROM deposits")
             total = cursor.fetchone()[0]
         return round(total, 2)
@@ -417,7 +418,7 @@ class DatabaseService:
         :param amount: The deposit amount.
         :return: Dict with the created deposit data.
         """
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "INSERT INTO deposits (datestamp, amount, portfolioid, currency) VALUES (?, ?, 1, 'EUR')",
                 (datestamp, amount)
@@ -443,13 +444,13 @@ class DatabaseService:
         symbols = [p.stock.symbol for p in cls.positions.values()]
 
         # Fetch the last timestamp from the table
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             answers = connection.execute('SELECT MAX(datestamp) FROM historicalstocks')
             last_timestamp = answers.fetchone()[0]
 
         historical_data = StockAPI.get_historical_data(symbols, last_timestamp)
 
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             cursor = connection.cursor()
             for stock_data in historical_data:
                 for _, row in stock_data.iterrows():
@@ -477,7 +478,7 @@ class DatabaseService:
         symbols = [p.stock.symbol for p in cls.positions.values()]
         historical_dividends = StockAPI.get_historical_dividends(symbols)
 
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             cursor = connection.cursor()
             for symbol, dividends in historical_dividends.items():
                 stockid = cls.symbol_map.get(symbol)
@@ -502,7 +503,7 @@ class DatabaseService:
         Returns:
         - list: Portfolio value history
         """
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             answers = connection.execute("SELECT * FROM int__portfolio_value_evolution")
         return answers
     
@@ -515,7 +516,7 @@ class DatabaseService:
         - float: Total yearly dividend
         """
         total_dividend = 0.0
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             answers = connection.execute('''SELECT * FROM int__portfolio_dividends_total''')
             total_dividend = float(answers.fetchone()[0])
         return round(total_dividend, 2)
@@ -531,7 +532,7 @@ class DatabaseService:
         Returns:
         - float: Total dividends for the year
         """
-        with sqlite3.connect(DB_PATH) as connection:
+        with get_connection(DB_PATH) as connection:
             result = connection.execute(
                 '''SELECT SUM(total_dividends) 
                    FROM int__transactions_dividends 
@@ -551,7 +552,7 @@ class DatabaseService:
         """
         default_result = {'stockid': None, 'dividend_rate': 0.0}
         try:
-            with sqlite3.connect(DB_PATH) as connection:
+            with get_connection(DB_PATH) as connection:
                 result = connection.execute(
                     '''SELECT stockid, MAX(datestamp) as last_date, dividendvalue
                        FROM historicaldividends
