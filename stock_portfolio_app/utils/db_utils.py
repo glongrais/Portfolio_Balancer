@@ -61,5 +61,14 @@ def initialize_database(db_path: str):
                     FOREIGN KEY (stockid) REFERENCES stocks (stockid)
     )
     ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS deposits (
+                    depositid   INTEGER PRIMARY KEY AUTOINCREMENT,
+                    datestamp   TEXT    NULL    ,
+                    amount      REAL   NOT NULL,
+                    portfolioid INTEGER NOT NULL,
+                    currency    TEXT    DEFAULT 'EUR'
+    )
+    ''')
     connection.commit()
     connection.close()

@@ -3,18 +3,18 @@ Deposits API Router
 Endpoints for tracking cash deposits into the portfolio
 """
 import logging
-import sqlite3
+from typing import List
 from fastapi import APIRouter, HTTPException, status, Query
 
 from api.schemas import DepositCreate, DepositResponse, DepositsTotalResponse
-from config import DB_PATH
+from services.database_service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("/", response_model=List[DepositResponse])
 async def get_deposits(
     limit: int = Query(100, description="Maximum number of deposits to return", ge=1, le=1000)
 ):
@@ -22,22 +22,7 @@ async def get_deposits(
     Get deposit history
     """
     try:
-        query = "SELECT depositid, datestamp, amount, portfolioid, currency FROM deposits ORDER BY datestamp DESC LIMIT ?"
-        with sqlite3.connect(DB_PATH) as connection:
-            cursor = connection.execute(query, [limit])
-            rows = cursor.fetchall()
-
-        deposits = []
-        for row in rows:
-            deposits.append({
-                "depositid": row[0],
-                "datestamp": row[1],
-                "amount": row[2],
-                "portfolioid": row[3],
-                "currency": row[4] or "EUR",
-            })
-
-        return deposits
+        return DatabaseService.getDeposits(limit)
     except Exception as e:
         logger.error(f"Error fetching deposits: {e}")
         raise HTTPException(
@@ -52,13 +37,9 @@ async def get_total_deposits():
     Get total amount deposited
     """
     try:
-        query = "SELECT COALESCE(SUM(amount), 0) FROM deposits"
-        with sqlite3.connect(DB_PATH) as connection:
-            cursor = connection.execute(query)
-            total = cursor.fetchone()[0]
-
+        total = DatabaseService.getTotalDeposits()
         return DepositsTotalResponse(
-            total_deposits=round(total, 2),
+            total_deposits=total,
             currency="EUR"
         )
     except Exception as e:
@@ -75,21 +56,9 @@ async def add_deposit(deposit: DepositCreate):
     Add a new deposit
     """
     try:
-        query = "INSERT INTO deposits (datestamp, amount, portfolioid, currency) VALUES (?, ?, 1, 'EUR')"
         datestamp = deposit.datestamp.strftime("%Y-%m-%d")
-
-        with sqlite3.connect(DB_PATH) as connection:
-            cursor = connection.execute(query, [datestamp, deposit.amount])
-            connection.commit()
-            deposit_id = cursor.lastrowid
-
-        return DepositResponse(
-            depositid=deposit_id,
-            datestamp=datestamp,
-            amount=deposit.amount,
-            portfolioid=1,
-            currency="EUR"
-        )
+        result = DatabaseService.addDeposit(datestamp, deposit.amount)
+        return DepositResponse(**result)
     except Exception as e:
         logger.error(f"Error adding deposit: {e}")
         raise HTTPException(

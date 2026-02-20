@@ -349,9 +349,275 @@ def test_update_position_no_fields_to_update(mock_logger_warning, mock_sqlite_co
     
     # Call the method under test with no fields to update
     DatabaseService.updatePosition('AAPL')
-    
+
     # Check if the correct warning message was logged
     mock_logger_warning.assert_called_once_with("updatePosition(): No fields to update for position %s", 'AAPL')
-    
+
     # Check if the database update was not called
     mock_sqlite_connect.assert_not_called()
+
+
+# --- getTransactions tests ---
+
+@patch('sqlite3.connect')
+def test_getTransactions_all(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = [
+        (1, 1, 'AAPL', 10, 150.0, 'buy', '2024-01-15', 'Apple Inc.'),
+        (2, 2, 'GOOGL', 5, 2000.0, 'buy', '2024-01-16', 'Alphabet Inc.'),
+    ]
+
+    result = DatabaseService.getTransactions()
+
+    assert len(result) == 2
+    assert result[0]['transactionid'] == 1
+    assert result[0]['symbol'] == 'AAPL'
+    assert result[1]['symbol'] == 'GOOGL'
+
+    query = mock_conn.execute.call_args[0][0]
+    assert 'WHERE' not in query
+    assert 'LIMIT' in query
+
+
+@patch('sqlite3.connect')
+def test_getTransactions_filter_by_symbol(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = [
+        (1, 1, 'AAPL', 10, 150.0, 'buy', '2024-01-15', 'Apple Inc.'),
+    ]
+
+    result = DatabaseService.getTransactions(symbol='aapl')
+
+    assert len(result) == 1
+    query = mock_conn.execute.call_args[0][0]
+    params = mock_conn.execute.call_args[0][1]
+    assert 'WHERE' in query
+    assert 'AAPL' in params
+
+
+@patch('sqlite3.connect')
+def test_getTransactions_filter_by_type(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = []
+
+    result = DatabaseService.getTransactions(transaction_type='SELL')
+
+    query = mock_conn.execute.call_args[0][0]
+    params = mock_conn.execute.call_args[0][1]
+    assert 't.type = ?' in query
+    assert 'sell' in params
+
+
+@patch('sqlite3.connect')
+def test_getTransactions_filter_both(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = []
+
+    DatabaseService.getTransactions(symbol='AAPL', transaction_type='buy', limit=10)
+
+    query = mock_conn.execute.call_args[0][0]
+    params = mock_conn.execute.call_args[0][1]
+    assert query.count('AND') == 1
+    assert params == ['AAPL', 'buy', 10]
+
+
+@patch('sqlite3.connect')
+def test_getTransactions_empty(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = []
+
+    result = DatabaseService.getTransactions()
+    assert result == []
+
+
+# --- getTransactionSummary tests ---
+
+@patch('sqlite3.connect')
+def test_getTransactionSummary_all(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = [
+        ('AAPL', 'Apple Inc.', 5, 100, 10, 15000.0, 1500.0),
+    ]
+
+    result = DatabaseService.getTransactionSummary()
+
+    assert len(result) == 1
+    assert result[0]['symbol'] == 'AAPL'
+    assert result[0]['transaction_count'] == 5
+    assert result[0]['total_bought'] == 100
+    assert result[0]['total_sold'] == 10
+    assert result[0]['total_invested'] == 15000.0
+    assert result[0]['total_divested'] == 1500.0
+    assert result[0]['net_shares'] == 90
+    assert result[0]['net_investment'] == 13500.0
+
+    query = mock_conn.execute.call_args[0][0]
+    assert 'WHERE' not in query
+
+
+@patch('sqlite3.connect')
+def test_getTransactionSummary_by_symbol(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = [
+        ('AAPL', 'Apple Inc.', 5, 100, 10, 15000.0, 1500.0),
+    ]
+
+    result = DatabaseService.getTransactionSummary(symbol='aapl')
+
+    query = mock_conn.execute.call_args[0][0]
+    params = mock_conn.execute.call_args[0][1]
+    assert 'WHERE' in query
+    assert 'AAPL' in params
+
+
+@patch('sqlite3.connect')
+def test_getTransactionSummary_empty(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = []
+
+    result = DatabaseService.getTransactionSummary()
+    assert result == []
+
+
+# --- getDeposits tests ---
+
+@patch('sqlite3.connect')
+def test_getDeposits(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = [
+        (1, '2024-01-15', 1000.0, 1, 'EUR'),
+        (2, '2024-02-15', 500.0, 1, 'EUR'),
+    ]
+
+    result = DatabaseService.getDeposits()
+
+    assert len(result) == 2
+    assert result[0]['depositid'] == 1
+    assert result[0]['amount'] == 1000.0
+    assert result[0]['currency'] == 'EUR'
+    assert result[1]['depositid'] == 2
+
+    params = mock_conn.execute.call_args[0][1]
+    assert params == (100,)
+
+
+@patch('sqlite3.connect')
+def test_getDeposits_with_limit(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = []
+
+    DatabaseService.getDeposits(limit=5)
+
+    params = mock_conn.execute.call_args[0][1]
+    assert params == (5,)
+
+
+@patch('sqlite3.connect')
+def test_getDeposits_null_currency_defaults_to_EUR(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = [
+        (1, '2024-01-15', 1000.0, 1, None),
+    ]
+
+    result = DatabaseService.getDeposits()
+
+    assert result[0]['currency'] == 'EUR'
+
+
+@patch('sqlite3.connect')
+def test_getDeposits_empty(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = []
+
+    result = DatabaseService.getDeposits()
+    assert result == []
+
+
+# --- getTotalDeposits tests ---
+
+@patch('sqlite3.connect')
+def test_getTotalDeposits(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchone.return_value = (5000.555,)
+
+    result = DatabaseService.getTotalDeposits()
+
+    assert result == 5000.56
+
+
+@patch('sqlite3.connect')
+def test_getTotalDeposits_zero(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchone.return_value = (0,)
+
+    result = DatabaseService.getTotalDeposits()
+
+    assert result == 0.0
+
+
+# --- addDeposit tests ---
+
+@patch('sqlite3.connect')
+def test_addDeposit(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.lastrowid = 42
+
+    result = DatabaseService.addDeposit('2024-03-15', 2000.0)
+
+    assert result['depositid'] == 42
+    assert result['datestamp'] == '2024-03-15'
+    assert result['amount'] == 2000.0
+    assert result['portfolioid'] == 1
+    assert result['currency'] == 'EUR'
+
+    mock_conn.execute.assert_called_once()
+    query = mock_conn.execute.call_args[0][0]
+    assert 'INSERT INTO deposits' in query
+    params = mock_conn.execute.call_args[0][1]
+    assert params == ('2024-03-15', 2000.0)
+    mock_conn.commit.assert_called_once()

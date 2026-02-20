@@ -278,6 +278,161 @@ class DatabaseService:
         logger.info("upsertTransactions(): Transaction added for stock %s", symbol)
 
     @classmethod
+    def getTransactions(cls, symbol: str = None, transaction_type: str = None, limit: int = 100) -> list:
+        """
+        Fetches transaction history from the database with optional filtering.
+
+        :param symbol: Filter by stock symbol (optional).
+        :param transaction_type: Filter by transaction type - buy/sell (optional).
+        :param limit: Maximum number of transactions to return.
+        :return: List of transaction dicts.
+        """
+        query = ("SELECT t.transactionid, t.stockid, s.symbol, t.quantity, t.price, t.type, t.datestamp, s.name "
+                 "FROM transactions t JOIN stocks s ON t.stockid = s.stockid")
+        params = []
+        conditions = []
+
+        if symbol:
+            conditions.append("s.symbol = ?")
+            params.append(symbol.upper())
+
+        if transaction_type:
+            conditions.append("t.type = ?")
+            params.append(transaction_type.lower())
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY t.datestamp DESC LIMIT ?"
+        params.append(limit)
+
+        with sqlite3.connect(DB_PATH) as connection:
+            cursor = connection.execute(query, params)
+            rows = cursor.fetchall()
+
+        return [
+            {
+                "transactionid": row[0],
+                "stockid": row[1],
+                "symbol": row[2],
+                "quantity": row[3],
+                "price": row[4],
+                "type": row[5],
+                "datestamp": row[6],
+                "name": row[7],
+            }
+            for row in rows
+        ]
+
+    @classmethod
+    def getTransactionSummary(cls, symbol: str = None) -> list:
+        """
+        Gets transaction summary statistics, optionally filtered by symbol.
+
+        :param symbol: Filter by stock symbol (optional).
+        :return: List of summary dicts per stock.
+        """
+        query = """
+            SELECT
+                s.symbol,
+                s.name,
+                COUNT(*) as transaction_count,
+                SUM(CASE WHEN t.type = 'buy' THEN t.quantity ELSE 0 END) as total_bought,
+                SUM(CASE WHEN t.type = 'sell' THEN t.quantity ELSE 0 END) as total_sold,
+                SUM(CASE WHEN t.type = 'buy' THEN t.quantity * t.price ELSE 0 END) as total_invested,
+                SUM(CASE WHEN t.type = 'sell' THEN t.quantity * t.price ELSE 0 END) as total_divested
+            FROM transactions t
+            JOIN stocks s ON t.stockid = s.stockid
+        """
+        params = []
+
+        if symbol:
+            query += " WHERE s.symbol = ?"
+            params.append(symbol.upper())
+
+        query += " GROUP BY s.symbol, s.name ORDER BY total_invested DESC"
+
+        with sqlite3.connect(DB_PATH) as connection:
+            cursor = connection.execute(query, params)
+            rows = cursor.fetchall()
+
+        return [
+            {
+                "symbol": row[0],
+                "name": row[1],
+                "transaction_count": row[2],
+                "total_bought": row[3],
+                "total_sold": row[4],
+                "total_invested": round(row[5], 2),
+                "total_divested": round(row[6], 2),
+                "net_shares": row[3] - row[4],
+                "net_investment": round(row[5] - row[6], 2),
+            }
+            for row in rows
+        ]
+
+    @classmethod
+    def getDeposits(cls, limit: int = 100) -> list:
+        """
+        Fetches deposit history from the database.
+
+        :param limit: Maximum number of deposits to return.
+        :return: List of deposit dicts.
+        """
+        with sqlite3.connect(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT depositid, datestamp, amount, portfolioid, currency FROM deposits ORDER BY datestamp DESC LIMIT ?",
+                (limit,)
+            )
+            rows = cursor.fetchall()
+        return [
+            {
+                "depositid": row[0],
+                "datestamp": row[1],
+                "amount": row[2],
+                "portfolioid": row[3],
+                "currency": row[4] or "EUR",
+            }
+            for row in rows
+        ]
+
+    @classmethod
+    def getTotalDeposits(cls) -> float:
+        """
+        Calculates the total amount deposited.
+
+        :return: Total deposit amount.
+        """
+        with sqlite3.connect(DB_PATH) as connection:
+            cursor = connection.execute("SELECT COALESCE(SUM(amount), 0) FROM deposits")
+            total = cursor.fetchone()[0]
+        return round(total, 2)
+
+    @classmethod
+    def addDeposit(cls, datestamp: str, amount: float) -> dict:
+        """
+        Adds a new deposit to the database.
+
+        :param datestamp: The deposit date (YYYY-MM-DD string).
+        :param amount: The deposit amount.
+        :return: Dict with the created deposit data.
+        """
+        with sqlite3.connect(DB_PATH) as connection:
+            cursor = connection.execute(
+                "INSERT INTO deposits (datestamp, amount, portfolioid, currency) VALUES (?, ?, 1, 'EUR')",
+                (datestamp, amount)
+            )
+            connection.commit()
+            deposit_id = cursor.lastrowid
+        return {
+            "depositid": deposit_id,
+            "datestamp": datestamp,
+            "amount": amount,
+            "portfolioid": 1,
+            "currency": "EUR",
+        }
+
+    @classmethod
     def updateHistoricalStocksPortfolio(cls, start_date: str, end_date: str) -> None:
         """
         Updates the historicalstocks table with data fetched from the StockAPI.
