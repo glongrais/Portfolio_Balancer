@@ -17,7 +17,7 @@ from api.middleware import (
     http_exception_handler,
     general_exception_handler
 )
-from api.routers import portfolio, stocks, transactions, dev
+from api.routers import portfolio, stocks, transactions, deposits, dev
 from utils.file_utils import FileUtils
 
 logger = logging.getLogger(__name__)
@@ -90,6 +90,7 @@ app.add_exception_handler(Exception, general_exception_handler)
 app.include_router(portfolio.router, prefix="/api/v1/portfolio", tags=["portfolio"])
 app.include_router(stocks.router, prefix="/api/v1/stocks", tags=["stocks"])
 app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
+app.include_router(deposits.router, prefix="/api/v1/deposits", tags=["deposits"])
 app.include_router(dev.router, prefix="/api/v1/dev", tags=["dev"])
 
 @app.get("/")

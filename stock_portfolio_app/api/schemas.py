@@ -144,6 +144,22 @@ class DividendSummaryResponse(BaseModel):
     next_dividend: Optional[DividendByStockItem] = Field(None, description="Next dividend")
     currency: str = Field(default="EUR", description="Currency")
 
+# Deposit Schemas
+class DepositCreate(BaseModel):
+    datestamp: datetime = Field(..., description="Deposit date")
+    amount: float = Field(..., description="Deposit amount", gt=0)
+
+class DepositResponse(BaseModel):
+    depositid: int = Field(..., description="Deposit ID")
+    datestamp: str = Field(..., description="Deposit date")
+    amount: float = Field(..., description="Deposit amount")
+    portfolioid: int = Field(..., description="Portfolio ID")
+    currency: str = Field(default="EUR", description="Currency")
+
+class DepositsTotalResponse(BaseModel):
+    total_deposits: float = Field(..., description="Total deposits amount")
+    currency: str = Field(default="EUR", description="Currency")
+
 # Update Stock Prices Request
 class UpdatePricesResponse(BaseModel):
     message: str = Field(..., description="Status message")
