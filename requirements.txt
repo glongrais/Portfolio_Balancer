@@ -1,4 +1,4 @@
-#numbers-parser==4.14.2
+numbers-parser==4.14.2
 yfinance
 yfinance[nospam]
 cachetools==5.3.3
