@@ -142,7 +142,9 @@ class DatabaseService:
             
             info = StockAPI.get_current_price(position.stock.symbol)
             position.stock.price = info["currentPrice"]
-            
+            position.stock.logo_url = info.get("logo_url", "")
+            position.stock.quote_type = info.get("quoteType", "EQUITY")
+
             return (stockid, info)
 
         # Run price updates in parallel

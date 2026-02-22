@@ -1,7 +1,9 @@
 import yfinance as yf
 from cachetools import cached, TTLCache
 import logging
+import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse
 
 class StockAPI:
 
@@ -34,8 +36,24 @@ class StockAPI:
             "marketCap": info.get("marketCap", None),
             "sector": info.get("sector", ""),
             "industry": info.get("industry", ""),
-            "country": info.get("country", "")
+            "country": info.get("country", ""),
+            "logo_url": cls._build_logo_url(info.get("website", "")),
+            "quoteType": info.get("quoteType", "EQUITY"),
         }
+
+    @staticmethod
+    def _build_logo_url(website: str) -> str:
+        if not website:
+            return ""
+        domain = urlparse(website).netloc or website
+        url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128"
+        try:
+            resp = requests.head(url, timeout=3, allow_redirects=True)
+            if resp.status_code != 200:
+                return ""
+        except requests.RequestException:
+            return ""
+        return url
 
     @classmethod
     def get_ticker_info(cls, symbol: str) -> dict:

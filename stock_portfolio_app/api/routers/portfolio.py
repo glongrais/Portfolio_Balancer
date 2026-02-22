@@ -74,7 +74,9 @@ async def get_portfolio_positions():
                     "industry": position.stock.industry,
                     "country": position.stock.country,
                     "dividend": position.stock.dividend,
-                    "dividend_yield": position.stock.dividend_yield
+                    "dividend_yield": position.stock.dividend_yield,
+                    "logo_url": position.stock.logo_url,
+                    "quote_type": position.stock.quote_type,
                 }    
             positions.append(PositionResponse(
                 stockid=position.stockid,

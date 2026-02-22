@@ -13,6 +13,8 @@ class Stock:
     country: str = field(default="")
     dividend: float = field(default=0.0)
     dividend_yield: float = field(default=0.0)
+    logo_url: str = field(default="")
+    quote_type: str = field(default="EQUITY")
 
     @classmethod
     def dataclass_factory(cls, cursor, row):

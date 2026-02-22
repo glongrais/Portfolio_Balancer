@@ -28,6 +28,8 @@ class StockBase(BaseModel):
     country: str = Field(default="", description="Company country")
     dividend: float = Field(default=0.0, description="Dividend value")
     dividend_yield: float = Field(default=0.0, description="Dividend yield percentage")
+    logo_url: str = Field(default="", description="URL to company logo")
+    quote_type: str = Field(default="EQUITY", description="Quote type (EQUITY, ETF, etc.)")
 
 class StockResponse(StockBase):
     stockid: int = Field(..., description="Unique stock identifier")
