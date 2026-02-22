@@ -3,8 +3,8 @@ Stocks API Router
 Endpoints for stock management and information
 """
 import logging
-from fastapi import APIRouter, HTTPException, status, Path
-from typing import List
+from fastapi import APIRouter, HTTPException, status, Path, Query
+from typing import List, Optional
 
 from api.schemas import (
     StockResponse,
@@ -12,7 +12,9 @@ from api.schemas import (
     PositionCreate,
     PositionUpdate,
     PositionResponse,
-    UpdatePricesResponse
+    UpdatePricesResponse,
+    StockPriceHistoryResponse,
+    StockPriceHistoryItem,
 )
 from services.database_service import DatabaseService
 
@@ -136,6 +138,41 @@ async def add_stock(stock_create: StockCreate):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to add stock: {str(e)}"
+        )
+
+@router.get("/{symbol}/price-history", response_model=StockPriceHistoryResponse)
+async def get_stock_price_history(
+    symbol: str = Path(..., description="Stock ticker symbol"),
+    start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)")
+):
+    """
+    Get historical price data for a specific stock
+    """
+    try:
+        symbol = symbol.upper()
+        if symbol not in DatabaseService.symbol_map:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Stock with symbol '{symbol}' not found"
+            )
+
+        data = DatabaseService.getStockPriceHistory(symbol, start_date, end_date)
+        stock = DatabaseService.stocks[DatabaseService.symbol_map[symbol]]
+
+        return StockPriceHistoryResponse(
+            symbol=stock.symbol,
+            name=stock.name,
+            currency=stock.currency,
+            data=[StockPriceHistoryItem(**item) for item in data]
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching price history for {symbol}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch price history: {str(e)}"
         )
 
 @router.post("/update-prices", response_model=UpdatePricesResponse)

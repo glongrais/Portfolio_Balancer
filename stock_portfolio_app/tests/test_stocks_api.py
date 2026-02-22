@@ -1,6 +1,7 @@
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from unittest.mock import patch, MagicMock
 
 from models.Stock import Stock
 from models.Position import Position
@@ -352,3 +353,106 @@ def test_update_position_partial_update():
         data = resp.json()
         assert data['quantity'] == 10
         assert data['distribution_target'] == 0.2  # Unchanged
+
+
+# --- Price History Endpoint Tests ---
+
+@patch('services.database_service.DatabaseService.getStockPriceHistory')
+def test_get_stock_price_history(mock_get_history):
+    """Test getting price history for a stock."""
+    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    DatabaseService.stocks = {1: s}
+    DatabaseService.symbol_map = {'AAPL': 1}
+
+    mock_get_history.return_value = [
+        {"datestamp": "2024-01-15", "closeprice": 185.92},
+        {"datestamp": "2024-01-16", "closeprice": 187.44},
+    ]
+
+    client = create_test_client()
+    resp = client.get('/api/stocks/AAPL/price-history')
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['symbol'] == 'AAPL'
+    assert data['name'] == 'Apple Inc.'
+    assert data['currency'] == 'USD'
+    assert len(data['data']) == 2
+    assert data['data'][0]['datestamp'] == '2024-01-15'
+    assert data['data'][0]['closeprice'] == 185.92
+    mock_get_history.assert_called_once_with('AAPL', None, None)
+
+
+@patch('services.database_service.DatabaseService.getStockPriceHistory')
+def test_get_stock_price_history_with_date_range(mock_get_history):
+    """Test getting price history with date filters."""
+    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    DatabaseService.stocks = {1: s}
+    DatabaseService.symbol_map = {'AAPL': 1}
+
+    mock_get_history.return_value = [
+        {"datestamp": "2024-06-01", "closeprice": 190.0},
+    ]
+
+    client = create_test_client()
+    resp = client.get('/api/stocks/AAPL/price-history?start_date=2024-06-01&end_date=2024-06-30')
+
+    assert resp.status_code == 200
+    mock_get_history.assert_called_once_with('AAPL', '2024-06-01', '2024-06-30')
+
+
+def test_get_stock_price_history_not_found():
+    """Test price history for unknown stock returns 404."""
+    client = create_test_client()
+    resp = client.get('/api/stocks/UNKNOWN/price-history')
+    assert resp.status_code == 404
+
+
+@patch('services.database_service.DatabaseService.getStockPriceHistory')
+def test_get_stock_price_history_empty(mock_get_history):
+    """Test price history when no data exists."""
+    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    DatabaseService.stocks = {1: s}
+    DatabaseService.symbol_map = {'AAPL': 1}
+
+    mock_get_history.return_value = []
+
+    client = create_test_client()
+    resp = client.get('/api/stocks/AAPL/price-history')
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data['symbol'] == 'AAPL'
+    assert len(data['data']) == 0
+
+
+@patch('services.database_service.DatabaseService.getStockPriceHistory')
+def test_get_stock_price_history_case_insensitive(mock_get_history):
+    """Test that price history lookup is case insensitive."""
+    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    DatabaseService.stocks = {1: s}
+    DatabaseService.symbol_map = {'AAPL': 1}
+
+    mock_get_history.return_value = []
+
+    client = create_test_client()
+    resp = client.get('/api/stocks/aapl/price-history')
+
+    assert resp.status_code == 200
+    mock_get_history.assert_called_once_with('AAPL', None, None)
+
+
+@patch('services.database_service.DatabaseService.getStockPriceHistory')
+def test_get_stock_price_history_error(mock_get_history):
+    """Test error handling for price history."""
+    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    DatabaseService.stocks = {1: s}
+    DatabaseService.symbol_map = {'AAPL': 1}
+
+    mock_get_history.side_effect = Exception("Database error")
+
+    client = create_test_client()
+    resp = client.get('/api/stocks/AAPL/price-history')
+
+    assert resp.status_code == 500
+    assert 'Failed to fetch price history' in resp.json()['detail']

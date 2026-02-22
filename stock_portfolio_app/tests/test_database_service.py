@@ -621,3 +621,91 @@ def test_addDeposit(mock_connect, setup_database_service):
     params = mock_conn.execute.call_args[0][1]
     assert params == ('2024-03-15', 2000.0)
     mock_conn.commit.assert_called_once()
+
+
+# --- getStockPriceHistory tests ---
+
+@patch('sqlite3.connect')
+def test_getStockPriceHistory(mock_connect, setup_database_service):
+    DatabaseService.symbol_map = {'AAPL': 1}
+
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = [
+        ('2024-01-15', 185.92),
+        ('2024-01-16', 187.44),
+    ]
+
+    result = DatabaseService.getStockPriceHistory('AAPL')
+
+    assert len(result) == 2
+    assert result[0]['datestamp'] == '2024-01-15'
+    assert result[0]['closeprice'] == 185.92
+    assert result[1]['closeprice'] == 187.44
+
+    query = mock_conn.execute.call_args[0][0]
+    assert 'WHERE stockid = ?' in query
+    assert 'ORDER BY datestamp ASC' in query
+
+
+@patch('sqlite3.connect')
+def test_getStockPriceHistory_with_date_range(mock_connect, setup_database_service):
+    DatabaseService.symbol_map = {'AAPL': 1}
+
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = []
+
+    DatabaseService.getStockPriceHistory('AAPL', start_date='2024-06-01', end_date='2024-06-30')
+
+    query = mock_conn.execute.call_args[0][0]
+    params = mock_conn.execute.call_args[0][1]
+    assert 'datestamp >= ?' in query
+    assert 'datestamp <= ?' in query
+    assert params == [1, '2024-06-01', '2024-06-30']
+
+
+@patch('sqlite3.connect')
+def test_getStockPriceHistory_start_date_only(mock_connect, setup_database_service):
+    DatabaseService.symbol_map = {'AAPL': 1}
+
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = []
+
+    DatabaseService.getStockPriceHistory('AAPL', start_date='2024-06-01')
+
+    query = mock_conn.execute.call_args[0][0]
+    params = mock_conn.execute.call_args[0][1]
+    assert 'datestamp >= ?' in query
+    assert 'datestamp <= ?' not in query
+    assert params == [1, '2024-06-01']
+
+
+def test_getStockPriceHistory_unknown_symbol(setup_database_service):
+    DatabaseService.symbol_map = {}
+
+    result = DatabaseService.getStockPriceHistory('UNKNOWN')
+    assert result == []
+
+
+@patch('sqlite3.connect')
+def test_getStockPriceHistory_case_insensitive(mock_connect, setup_database_service):
+    DatabaseService.symbol_map = {'AAPL': 1}
+
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.return_value = []
+
+    DatabaseService.getStockPriceHistory('aapl')
+
+    params = mock_conn.execute.call_args[0][1]
+    assert params[0] == 1

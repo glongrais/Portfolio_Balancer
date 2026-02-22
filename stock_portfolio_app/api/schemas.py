@@ -162,6 +162,17 @@ class DepositsTotalResponse(BaseModel):
     total_deposits: float = Field(..., description="Total deposits amount")
     currency: str = Field(default="EUR", description="Currency")
 
+# Stock Price History Schemas
+class StockPriceHistoryItem(BaseModel):
+    datestamp: str = Field(..., description="Date (YYYY-MM-DD)")
+    closeprice: float = Field(..., description="Closing price")
+
+class StockPriceHistoryResponse(BaseModel):
+    symbol: str = Field(..., description="Stock symbol")
+    name: str = Field(default="", description="Company name")
+    currency: str = Field(default="", description="Currency")
+    data: List[StockPriceHistoryItem] = Field(..., description="Historical price data points")
+
 # Update Stock Prices Request
 class UpdatePricesResponse(BaseModel):
     message: str = Field(..., description="Status message")

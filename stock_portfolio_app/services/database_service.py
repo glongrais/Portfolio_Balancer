@@ -437,6 +437,43 @@ class DatabaseService:
         }
 
     @classmethod
+    def getStockPriceHistory(cls, symbol: str, start_date: str = None, end_date: str = None) -> list:
+        """
+        Fetches historical price data for a single stock.
+
+        :param symbol: The stock symbol.
+        :param start_date: Optional start date filter (YYYY-MM-DD).
+        :param end_date: Optional end date filter (YYYY-MM-DD).
+        :return: List of dicts with datestamp and closeprice, ordered by date ascending.
+        """
+        symbol = symbol.upper()
+        if symbol not in cls.symbol_map:
+            return []
+
+        stockid = cls.symbol_map[symbol]
+        query = "SELECT datestamp, closeprice FROM historicalstocks WHERE stockid = ?"
+        params = [stockid]
+
+        if start_date:
+            query += " AND datestamp >= ?"
+            params.append(start_date)
+
+        if end_date:
+            query += " AND datestamp <= ?"
+            params.append(end_date)
+
+        query += " ORDER BY datestamp ASC"
+
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(query, params)
+            rows = cursor.fetchall()
+
+        return [
+            {"datestamp": row[0], "closeprice": row[1]}
+            for row in rows
+        ]
+
+    @classmethod
     def updateHistoricalStocksPortfolio(cls, start_date: str, end_date: str) -> None:
         """
         Updates the historicalstocks table with data fetched from the StockAPI.
