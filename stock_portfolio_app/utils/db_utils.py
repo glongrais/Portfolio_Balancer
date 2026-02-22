@@ -143,7 +143,9 @@ def initialize_database(db_path: str):
                     market_cap REAL,
                     sector TEXT,
                     industry TEXT,
-                    country TEXT
+                    country TEXT,
+                    logo_url TEXT DEFAULT '',
+                    quote_type TEXT DEFAULT 'EQUITY'
     )
     ''')
     cursor.execute('''
@@ -195,4 +197,59 @@ def initialize_database(db_path: str):
     )
     ''')
     connection.commit()
+
+    # Migrate existing tables: add columns that may not exist yet
+    _add_column_if_missing(cursor, 'stocks', 'logo_url', "TEXT DEFAULT ''")
+    _add_column_if_missing(cursor, 'stocks', 'quote_type', "TEXT DEFAULT 'EQUITY'")
+
+    # Recreate dbt-managed views to reflect new columns in stocks table
+    _migrate_dbt_views(cursor)
+
+    connection.commit()
+
     connection.close()
+
+
+def _add_column_if_missing(cursor, table: str, column: str, column_def: str):
+    """Add a column to a table if it doesn't already exist."""
+    cursor.execute(f"PRAGMA table_info({table})")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+    if column not in existing_columns:
+        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_def}")
+        logger.info("Added column %s to table %s", column, table)
+
+
+def _migrate_dbt_views(cursor):
+    """
+    Recreate dbt-managed views so they reflect the current stocks table schema.
+    Only runs if the views exist (i.e. dbt has been run at least once).
+    """
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='view' AND name='core__stocks'")
+    if not cursor.fetchone():
+        return
+
+    cursor.execute("DROP VIEW IF EXISTS mar__stocks")
+    cursor.execute("DROP VIEW IF EXISTS core__stocks")
+
+    cursor.execute('''
+    CREATE VIEW IF NOT EXISTS core__stocks AS
+    WITH
+        stocks AS (SELECT * FROM stg__stocks),
+        unlisted_stocks AS (SELECT * FROM stg__unlisted_stocks)
+    SELECT * FROM stocks
+    UNION ALL
+    SELECT
+        stockid, name, symbol,
+        NULL AS price, NULL AS currency, NULL AS market_cap,
+        NULL AS sector, NULL AS industry, NULL AS country,
+        '' AS logo_url, 'EQUITY' AS quote_type
+    FROM unlisted_stocks
+    ''')
+
+    cursor.execute('''
+    CREATE VIEW IF NOT EXISTS mar__stocks AS
+    WITH stocks AS (SELECT * FROM core__stocks)
+    SELECT * FROM stocks
+    ''')
+
+    logger.info("Recreated core__stocks and mar__stocks views with updated schema")

@@ -162,8 +162,8 @@ def test_updatePortfolioPositionsPrice(mock_logger_warning, mock_sqlite_connect,
     assert position2.stock.price == 100.0
     
     # Check if the database update was called with correct values
-    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=? WHERE stockid=?", (100.0, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", 1))
-    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=? WHERE stockid=?", (100.0, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", 2))
+    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=? WHERE stockid=?", (100.0, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", "", "EQUITY", 1))
+    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=? WHERE stockid=?", (100.0, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", "", "EQUITY", 2))
     assert mock_conn.execute.call_count == 2
     
     # Check if commit was called

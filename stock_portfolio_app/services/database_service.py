@@ -159,9 +159,10 @@ class DatabaseService:
                     if result:
                         stockid, info = result
                         connection.execute(
-                            "UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=? WHERE stockid=?",
+                            "UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=? WHERE stockid=?",
                             (info["currentPrice"], info["longName"], info["currency"], info["marketCap"],
-                             info["sector"], info["industry"], info["country"], stockid,)
+                             info["sector"], info["industry"], info["country"],
+                             info.get("logo_url", ""), info.get("quoteType", "EQUITY"), stockid,)
                         )
                 connection.commit()
     
