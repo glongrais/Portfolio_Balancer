@@ -589,30 +589,36 @@ class DatabaseService:
     @classmethod
     def getNextDividendInfo(cls) -> dict:
         """
-        Retrieves information about the most recent dividend to estimate next payment.
+        Finds the next upcoming projected dividend across all portfolio positions.
+
+        Uses the projection algorithm to determine the earliest future dividend
+        based on historical payment patterns.
 
         Returns:
-        - dict: Contains stockid and dividend_rate (never returns None)
+        - dict: Contains stockid, dividend_rate, and date (never returns None)
         """
-        default_result = {'stockid': None, 'dividend_rate': 0.0}
+        from datetime import datetime as dt, timedelta
+
+        default_result = {'stockid': None, 'dividend_rate': 0.0, 'date': None}
+        today = dt.now().strftime('%Y-%m-%d')
+        end_date = (dt.now() + timedelta(days=365)).strftime('%Y-%m-%d')
+
+        earliest = None
         try:
-            with get_connection(DB_PATH) as connection:
-                result = connection.execute(
-                    '''SELECT stockid, MAX(datestamp) as last_date, dividendvalue
-                       FROM historicaldividends
-                       GROUP BY stockid
-                       ORDER BY last_date DESC
-                       LIMIT 1'''
-                )
-                row = result.fetchone()
-                if row and row[0] is not None:
-                    return {
-                        'stockid': row[0],
-                        'dividend_rate': row[2] if row[2] else 0.0
-                    }
+            for stockid in cls.positions:
+                projected = cls._projectDividends(stockid, today, end_date)
+                if projected:
+                    first = projected[0]
+                    if earliest is None or first["date"] < earliest["date"]:
+                        earliest = {
+                            'stockid': stockid,
+                            'dividend_rate': first["amount_per_share"],
+                            'date': first["date"],
+                        }
         except Exception as e:
-            logger.error(f"getNextDividendInfo(): Error fetching next dividend info: {e}")
-        return default_result
+            logger.error(f"getNextDividendInfo(): Error projecting next dividend: {e}")
+
+        return earliest if earliest else default_result
 
     @classmethod
     def getDividendCalendar(cls, start_date: str, end_date: str) -> list:

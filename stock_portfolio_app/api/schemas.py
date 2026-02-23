@@ -134,6 +134,7 @@ class DividendByStockItem(BaseModel):
     quantity: int = Field(..., description="Number of shares")
     dividend_rate: float = Field(..., description="Dividend per share")
     total_dividend: float = Field(..., description="Total dividend from this stock")
+    expected_date: Optional[str] = Field(None, description="Expected payment date (YYYY-MM-DD)")
 
 class DividendBreakdownResponse(BaseModel):
     dividends: List[DividendByStockItem] = Field(..., description="Dividend breakdown by stock")
