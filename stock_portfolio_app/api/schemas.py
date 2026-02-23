@@ -30,6 +30,7 @@ class StockBase(BaseModel):
     dividend_yield: float = Field(default=0.0, description="Dividend yield percentage")
     logo_url: str = Field(default="", description="URL to company logo")
     quote_type: str = Field(default="EQUITY", description="Quote type (EQUITY, ETF, etc.)")
+    ex_dividend_date: Optional[str] = Field(default=None, description="Ex-dividend date (YYYY-MM-DD)")
 
 class StockResponse(StockBase):
     stockid: int = Field(..., description="Unique stock identifier")
@@ -145,6 +146,22 @@ class DividendSummaryResponse(BaseModel):
     yearly_forecast_dividend: float = Field(..., description="Yearly forecast dividend")
     next_dividend: Optional[DividendByStockItem] = Field(None, description="Next dividend")
     currency: str = Field(default="EUR", description="Currency")
+
+# Dividend Calendar Schemas
+class DividendCalendarEvent(BaseModel):
+    date: str = Field(..., description="Dividend date (YYYY-MM-DD)")
+    symbol: str = Field(..., description="Stock symbol")
+    name: str = Field(..., description="Company name")
+    amount_per_share: float = Field(..., description="Dividend amount per share")
+    total_amount: float = Field(..., description="Total dividend amount (amount * quantity held)")
+    type: str = Field(..., description="Event type: 'historical' or 'projected'")
+
+class DividendCalendarResponse(BaseModel):
+    events: List[DividendCalendarEvent] = Field(..., description="Dividend calendar events")
+    start_date: str = Field(..., description="Calendar start date")
+    end_date: str = Field(..., description="Calendar end date")
+    total_historical: float = Field(..., description="Sum of historical dividend amounts in range")
+    total_projected: float = Field(..., description="Sum of projected dividend amounts in range")
 
 # Deposit Schemas
 class DepositCreate(BaseModel):

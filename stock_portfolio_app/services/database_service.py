@@ -32,8 +32,8 @@ class DatabaseService:
         ticker_info = StockAPI.get_current_price(symbol)
         with get_connection(DB_PATH) as connection:
             connection.execute('''
-            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country, ex_dividend_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(symbol) DO UPDATE SET
                 name=excluded.name,
                 price=excluded.price,
@@ -41,7 +41,8 @@ class DatabaseService:
                 market_cap=excluded.market_cap,
                 sector=excluded.sector,
                 industry=excluded.industry,
-                country=excluded.country
+                country=excluded.country,
+                ex_dividend_date=excluded.ex_dividend_date
             ''', (
                 ticker_info["symbol"],
                 ticker_info.get("longName", ""),
@@ -50,7 +51,8 @@ class DatabaseService:
                 ticker_info.get("marketCap", None),
                 ticker_info.get("sector", ""),
                 ticker_info.get("industry", ""),
-                ticker_info.get("country", "")
+                ticker_info.get("country", ""),
+                ticker_info.get("exDividendDate"),
             ))
             connection.commit()
         
@@ -144,6 +146,7 @@ class DatabaseService:
             position.stock.price = info["currentPrice"]
             position.stock.logo_url = info.get("logo_url", "")
             position.stock.quote_type = info.get("quoteType", "EQUITY")
+            position.stock.ex_dividend_date = info.get("exDividendDate")
 
             return (stockid, info)
 
@@ -159,10 +162,11 @@ class DatabaseService:
                     if result:
                         stockid, info = result
                         connection.execute(
-                            "UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=? WHERE stockid=?",
+                            "UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=?,ex_dividend_date=? WHERE stockid=?",
                             (info["currentPrice"], info["longName"], info["currency"], info["marketCap"],
                              info["sector"], info["industry"], info["country"],
-                             info.get("logo_url", ""), info.get("quoteType", "EQUITY"), stockid,)
+                             info.get("logo_url", ""), info.get("quoteType", "EQUITY"),
+                             info.get("exDividendDate"), stockid,)
                         )
                 connection.commit()
     
@@ -609,3 +613,136 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"getNextDividendInfo(): Error fetching next dividend info: {e}")
         return default_result
+
+    @classmethod
+    def getDividendCalendar(cls, start_date: str, end_date: str) -> list:
+        """
+        Returns dividend calendar events (historical + projected) for the given date range.
+
+        :param start_date: Start date in YYYY-MM-DD format.
+        :param end_date: End date in YYYY-MM-DD format.
+        :return: List of dividend calendar event dicts sorted by date.
+        """
+        events = []
+
+        # Fetch historical dividends within the date range for portfolio positions
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute('''
+                SELECT hd.datestamp, hd.dividendvalue, hd.stockid,
+                       s.symbol, s.name
+                FROM historicaldividends hd
+                JOIN stocks s ON hd.stockid = s.stockid
+                JOIN positions p ON hd.stockid = p.stockid
+                WHERE hd.datestamp >= ? AND hd.datestamp <= ?
+                ORDER BY hd.datestamp ASC
+            ''', (start_date, end_date))
+            rows = cursor.fetchall()
+
+        for row in rows:
+            stockid = row[2]
+            quantity = cls.positions[stockid].quantity if stockid in cls.positions else 0
+            events.append({
+                "date": row[0],
+                "symbol": row[3],
+                "name": row[4],
+                "amount_per_share": round(row[1], 4),
+                "total_amount": round(row[1] * quantity, 2),
+                "type": "historical",
+            })
+
+        # Generate projected dividends for each position
+        for stockid, position in cls.positions.items():
+            if position.stock is None:
+                continue
+            projected = cls._projectDividends(stockid, start_date, end_date)
+            for proj in projected:
+                events.append({
+                    "date": proj["date"],
+                    "symbol": position.stock.symbol,
+                    "name": position.stock.name,
+                    "amount_per_share": round(proj["amount_per_share"], 4),
+                    "total_amount": round(proj["amount_per_share"] * position.quantity, 2),
+                    "type": "projected",
+                })
+
+        events.sort(key=lambda e: e["date"])
+        return events
+
+    @classmethod
+    def _projectDividends(cls, stockid: int, start_date: str, end_date: str) -> list:
+        """
+        Projects future dividend dates for a single stock based on historical payment patterns.
+
+        Algorithm:
+        1. Fetch all historical dividend dates for this stock, sorted ascending.
+        2. If fewer than 2 records, return empty (cannot detect frequency).
+        3. Calculate intervals (in days) between consecutive payments.
+        4. Determine the median interval and classify frequency:
+           - 80-100 days  -> quarterly (91 days)
+           - 160-200 days -> semi-annual (182 days)
+           - 330-400 days -> annual (365 days)
+           - else         -> use the median interval directly
+        5. Step forward from the last known dividend date by the frequency interval.
+        6. Return projected dates within [start_date, end_date] that don't overlap historical dates.
+        7. Use the most recent dividend amount as the projected amount.
+        8. Cap projections at 12 months from the last known date.
+
+        :return: List of dicts with "date" and "amount_per_share" keys.
+        """
+        from datetime import datetime as dt, timedelta
+        from statistics import median
+
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                'SELECT datestamp, dividendvalue FROM historicaldividends '
+                'WHERE stockid = ? ORDER BY datestamp ASC',
+                (stockid,)
+            )
+            rows = cursor.fetchall()
+
+        if len(rows) < 2:
+            return []
+
+        dates = []
+        amounts = []
+        for row in rows:
+            dates.append(dt.strptime(row[0], '%Y-%m-%d'))
+            amounts.append(row[1])
+
+        intervals = [(dates[i + 1] - dates[i]).days for i in range(len(dates) - 1)]
+
+        if not intervals:
+            return []
+
+        median_interval = median(intervals)
+
+        if 80 <= median_interval <= 100:
+            frequency_days = 91
+        elif 160 <= median_interval <= 200:
+            frequency_days = 182
+        elif 330 <= median_interval <= 400:
+            frequency_days = 365
+        else:
+            frequency_days = int(round(median_interval))
+
+        last_date = dates[-1]
+        last_amount = amounts[-1]
+        historical_dates_set = {d.strftime('%Y-%m-%d') for d in dates}
+
+        start_dt = dt.strptime(start_date, '%Y-%m-%d')
+        end_dt = dt.strptime(end_date, '%Y-%m-%d')
+        max_projection = last_date + timedelta(days=365)
+
+        projected = []
+        current = last_date + timedelta(days=frequency_days)
+
+        while current <= min(end_dt, max_projection):
+            date_str = current.strftime('%Y-%m-%d')
+            if current >= start_dt and date_str not in historical_dates_set:
+                projected.append({
+                    "date": date_str,
+                    "amount_per_share": last_amount,
+                })
+            current += timedelta(days=frequency_days)
+
+        return projected

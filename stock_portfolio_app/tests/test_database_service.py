@@ -14,7 +14,8 @@ MOCK_PRICE = {
     "marketCap": 1000000000000,
     "sector": "Technology",
     "industry": "Consumer Electronics",
-    "country": "US"
+    "country": "US",
+    "exDividendDate": None
 }
 
 @pytest.fixture
@@ -39,8 +40,8 @@ def test_addStock(mock_fetch_stock, mock_fetch_price, mock_connect, setup_databa
 
     mock_fetch_price.assert_called_once_with("AAPL")
     mock_cursor.execute.assert_called_once_with('''
-            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country, ex_dividend_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(symbol) DO UPDATE SET
                 name=excluded.name,
                 price=excluded.price,
@@ -48,8 +49,9 @@ def test_addStock(mock_fetch_stock, mock_fetch_price, mock_connect, setup_databa
                 market_cap=excluded.market_cap,
                 sector=excluded.sector,
                 industry=excluded.industry,
-                country=excluded.country
-            ''', ("AAPL", "Apple Inc.", 100.0, "USD", 1000000000000, "Technology", "Consumer Electronics", "US"))
+                country=excluded.country,
+                ex_dividend_date=excluded.ex_dividend_date
+            ''', ("AAPL", "Apple Inc.", 100.0, "USD", 1000000000000, "Technology", "Consumer Electronics", "US", None))
 
     mock_cursor.commit.assert_called_once()
     mock_fetch_stock.assert_called_once_with(symbol="AAPL")
@@ -162,8 +164,8 @@ def test_updatePortfolioPositionsPrice(mock_logger_warning, mock_sqlite_connect,
     assert position2.stock.price == 100.0
     
     # Check if the database update was called with correct values
-    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=? WHERE stockid=?", (100.0, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", "", "EQUITY", 1))
-    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=? WHERE stockid=?", (100.0, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", "", "EQUITY", 2))
+    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=?,ex_dividend_date=? WHERE stockid=?", (100.0, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", "", "EQUITY", None, 1))
+    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=?,ex_dividend_date=? WHERE stockid=?", (100.0, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", "", "EQUITY", None, 2))
     assert mock_conn.execute.call_count == 2
     
     # Check if commit was called

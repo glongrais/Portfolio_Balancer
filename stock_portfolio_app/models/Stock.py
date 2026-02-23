@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Optional
 
 @dataclass
 class Stock:
@@ -15,6 +16,7 @@ class Stock:
     dividend_yield: float = field(default=0.0)
     logo_url: str = field(default="")
     quote_type: str = field(default="EQUITY")
+    ex_dividend_date: Optional[str] = field(default=None)
 
     @classmethod
     def dataclass_factory(cls, cursor, row):

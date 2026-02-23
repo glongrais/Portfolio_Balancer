@@ -19,7 +19,7 @@ class StockAPI:
     def get_current_price(cls, symbol: str) -> dict:
         """
         Fetches the current price and additional information of the given stock symbol.
-        
+
         Parameters:
         - symbol: str
 
@@ -28,6 +28,21 @@ class StockAPI:
         """
         ticker = cls._get_ticker(symbol)
         info = ticker.info
+
+        ex_div_raw = info.get("exDividendDate")
+        ex_dividend_date = None
+        if ex_div_raw is not None:
+            if isinstance(ex_div_raw, (int, float)):
+                from datetime import datetime
+                try:
+                    ex_dividend_date = datetime.fromtimestamp(ex_div_raw).strftime('%Y-%m-%d')
+                except (ValueError, TypeError, OSError):
+                    pass
+            elif hasattr(ex_div_raw, 'strftime'):
+                ex_dividend_date = ex_div_raw.strftime('%Y-%m-%d')
+            elif isinstance(ex_div_raw, str):
+                ex_dividend_date = ex_div_raw
+
         return {
             "currentPrice": info.get("currentPrice", info.get("previousClose")),
             "longName": info.get("longName", ""),
@@ -39,6 +54,7 @@ class StockAPI:
             "country": info.get("country", ""),
             "logo_url": cls._build_logo_url(info.get("website", "")),
             "quoteType": info.get("quoteType", "EQUITY"),
+            "exDividendDate": ex_dividend_date,
         }
 
     @staticmethod

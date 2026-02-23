@@ -4,7 +4,7 @@ Endpoints for portfolio management, balancing, and analysis
 """
 import logging
 import math
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Query
 from typing import List
 
 from api.schemas import (
@@ -22,7 +22,9 @@ from api.schemas import (
     PositionResponse,
     UpdatePricesResponse,
     PortfolioValueHistoryResponse,
-    PortfolioValueHistoryItem
+    PortfolioValueHistoryItem,
+    DividendCalendarEvent,
+    DividendCalendarResponse,
 )
 from services.portfolio_service import PortfolioService
 from services.database_service import DatabaseService
@@ -77,6 +79,7 @@ async def get_portfolio_positions():
                     "dividend_yield": position.stock.dividend_yield,
                     "logo_url": position.stock.logo_url,
                     "quote_type": position.stock.quote_type,
+                    "ex_dividend_date": position.stock.ex_dividend_date,
                 }    
             positions.append(PositionResponse(
                 stockid=position.stockid,
@@ -331,6 +334,52 @@ async def get_dividends_breakdown():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to calculate dividend breakdown: {str(e)}"
+        )
+
+@router.get("/dividends/calendar", response_model=DividendCalendarResponse)
+async def get_dividend_calendar(
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)")
+):
+    """
+    Get dividend calendar with historical and projected dividend events for a date range
+    """
+    try:
+        from datetime import datetime
+        try:
+            datetime.strptime(start_date, '%Y-%m-%d')
+            datetime.strptime(end_date, '%Y-%m-%d')
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid date format. Use YYYY-MM-DD."
+            )
+
+        if start_date > end_date:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="start_date must be before or equal to end_date."
+            )
+
+        events = DatabaseService.getDividendCalendar(start_date, end_date)
+
+        total_historical = sum(e["total_amount"] for e in events if e["type"] == "historical")
+        total_projected = sum(e["total_amount"] for e in events if e["type"] == "projected")
+
+        return DividendCalendarResponse(
+            events=[DividendCalendarEvent(**e) for e in events],
+            start_date=start_date,
+            end_date=end_date,
+            total_historical=round(total_historical, 2),
+            total_projected=round(total_projected, 2),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching dividend calendar: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch dividend calendar: {str(e)}"
         )
 
 @router.post("/positions/update-prices", response_model=UpdatePricesResponse)

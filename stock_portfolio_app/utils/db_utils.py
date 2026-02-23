@@ -145,7 +145,8 @@ def initialize_database(db_path: str):
                     industry TEXT,
                     country TEXT,
                     logo_url TEXT DEFAULT '',
-                    quote_type TEXT DEFAULT 'EQUITY'
+                    quote_type TEXT DEFAULT 'EQUITY',
+                    ex_dividend_date TEXT DEFAULT NULL
     )
     ''')
     cursor.execute('''
@@ -201,6 +202,7 @@ def initialize_database(db_path: str):
     # Migrate existing tables: add columns that may not exist yet
     _add_column_if_missing(cursor, 'stocks', 'logo_url', "TEXT DEFAULT ''")
     _add_column_if_missing(cursor, 'stocks', 'quote_type', "TEXT DEFAULT 'EQUITY'")
+    _add_column_if_missing(cursor, 'stocks', 'ex_dividend_date', "TEXT DEFAULT NULL")
 
     # Recreate dbt-managed views to reflect new columns in stocks table
     _migrate_dbt_views(cursor)
@@ -242,7 +244,8 @@ def _migrate_dbt_views(cursor):
         stockid, name, symbol,
         NULL AS price, NULL AS currency, NULL AS market_cap,
         NULL AS sector, NULL AS industry, NULL AS country,
-        '' AS logo_url, 'EQUITY' AS quote_type
+        '' AS logo_url, 'EQUITY' AS quote_type,
+        NULL AS ex_dividend_date
     FROM unlisted_stocks
     ''')
 

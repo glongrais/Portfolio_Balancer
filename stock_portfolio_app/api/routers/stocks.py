@@ -41,7 +41,8 @@ async def get_all_stocks():
                 industry=stock.industry,
                 country=stock.country,
                 dividend=stock.dividend,
-                dividend_yield=stock.dividend_yield
+                dividend_yield=stock.dividend_yield,
+                ex_dividend_date=stock.ex_dividend_date
             ))
         return stocks
     except Exception as e:
@@ -78,7 +79,8 @@ async def get_stock(symbol: str = Path(..., description="Stock ticker symbol")):
             industry=stock.industry,
             country=stock.country,
             dividend=stock.dividend,
-            dividend_yield=stock.dividend_yield
+            dividend_yield=stock.dividend_yield,
+            ex_dividend_date=stock.ex_dividend_date
         )
     except HTTPException:
         raise
@@ -131,7 +133,8 @@ async def add_stock(stock_create: StockCreate):
             industry=stock.industry,
             country=stock.country,
             dividend=stock.dividend,
-            dividend_yield=stock.dividend_yield
+            dividend_yield=stock.dividend_yield,
+            ex_dividend_date=stock.ex_dividend_date
         )
     except Exception as e:
         logger.error(f"Error adding stock {stock_create.symbol}: {e}")
@@ -234,7 +237,8 @@ async def add_position(position_create: PositionCreate):
                 "industry": position.stock.industry,
                 "country": position.stock.country,
                 "dividend": position.stock.dividend,
-                "dividend_yield": position.stock.dividend_yield
+                "dividend_yield": position.stock.dividend_yield,
+                "ex_dividend_date": position.stock.ex_dividend_date
             }
         
         return PositionResponse(
@@ -302,7 +306,8 @@ async def update_position(
                 "industry": position.stock.industry,
                 "country": position.stock.country,
                 "dividend": position.stock.dividend,
-                "dividend_yield": position.stock.dividend_yield
+                "dividend_yield": position.stock.dividend_yield,
+                "ex_dividend_date": position.stock.ex_dividend_date
             }
         
         return PositionResponse(
