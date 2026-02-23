@@ -623,9 +623,51 @@ class DatabaseService:
         :param end_date: End date in YYYY-MM-DD format.
         :return: List of dividend calendar event dicts sorted by date.
         """
-        events = []
+        from datetime import datetime as dt, timedelta
 
-        # Fetch historical dividends within the date range for portfolio positions
+        events = []
+        # Track transaction dates per stock for proximity-based deduplication.
+        # The ex-dividend date (yfinance) and payment date (transaction) for the
+        # same dividend event can differ by up to ~30 days.
+        tx_dates_by_stock = {}
+
+        # Fetch dividend transactions (actual payments received) within the date range
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute('''
+                SELECT DATE(t.datestamp) as d, t.price, t.stockid,
+                       s.symbol, s.name, t.quantity
+                FROM transactions t
+                JOIN stocks s ON t.stockid = s.stockid
+                WHERE t.type = 'DIVIDEND'
+                  AND DATE(t.datestamp) >= ? AND DATE(t.datestamp) <= ?
+                ORDER BY d ASC
+            ''', (start_date, end_date))
+            tx_rows = cursor.fetchall()
+
+        for row in tx_rows:
+            stockid = row[2]
+            tx_dates_by_stock.setdefault(stockid, []).append(
+                dt.strptime(row[0], '%Y-%m-%d')
+            )
+            events.append({
+                "date": row[0],
+                "symbol": row[3],
+                "name": row[4],
+                "amount_per_share": round(row[1], 4),
+                "total_amount": round(row[1] * row[5], 2),
+                "type": "historical",
+            })
+
+        # Fetch yfinance historical dividends only for stocks with NO dividend
+        # transaction records at all. Transactions are the source of truth for
+        # actual payments; yfinance historicaldividends includes all ex-dividend
+        # dates regardless of whether the user held the stock.
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT DISTINCT stockid FROM transactions WHERE type = 'DIVIDEND'"
+            )
+            stocks_with_transactions = {row[0] for row in cursor.fetchall()}
+
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute('''
                 SELECT hd.datestamp, hd.dividendvalue, hd.stockid,
@@ -636,10 +678,14 @@ class DatabaseService:
                 WHERE hd.datestamp >= ? AND hd.datestamp <= ?
                 ORDER BY hd.datestamp ASC
             ''', (start_date, end_date))
-            rows = cursor.fetchall()
+            hd_rows = cursor.fetchall()
 
-        for row in rows:
+        for row in hd_rows:
             stockid = row[2]
+            # Skip stocks that have any transaction records — transactions are
+            # the authoritative source for those stocks
+            if stockid in stocks_with_transactions:
+                continue
             quantity = cls.positions[stockid].quantity if stockid in cls.positions else 0
             events.append({
                 "date": row[0],

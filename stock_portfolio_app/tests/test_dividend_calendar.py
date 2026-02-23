@@ -180,15 +180,18 @@ def test_projectDividends_only_within_range(mock_connect):
 
 @patch('sqlite3.connect')
 def test_getDividendCalendar_historical_only(mock_connect):
-    """Past date range should return only historical events."""
+    """Past date range should return only historical events from transactions."""
     mock_conn = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
 
-    # First call: historical query returns rows; subsequent calls: projection queries return empty
     mock_conn.execute.return_value.fetchall.side_effect = [
-        # Historical dividends in range
+        # 1. Dividend transactions in range
+        [("2024-03-15", 0.50, 1, "AAPL", "Apple Inc.", 10)],
+        # 2. Stocks with any dividend transactions (for dedup)
+        [(1,)],
+        # 3. yfinance historicaldividends in range (skipped: stock has transactions)
         [("2024-03-15", 0.50, 1, "AAPL", "Apple Inc.")],
-        # _projectDividends query for stockid=1 (returns empty = insufficient data)
+        # 4. _projectDividends query for stockid=1 (returns empty = insufficient data)
         [],
     ]
 
@@ -205,15 +208,47 @@ def test_getDividendCalendar_historical_only(mock_connect):
 
 
 @patch('sqlite3.connect')
+def test_getDividendCalendar_skips_yfinance_when_transactions_exist(mock_connect):
+    """Stocks with transaction records should not use yfinance historicaldividends."""
+    mock_conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+
+    mock_conn.execute.return_value.fetchall.side_effect = [
+        # 1. Transaction: payment on 2026-02-18
+        [("2026-02-18", 1.36, 1, "ASML.AS", "ASML Holding N.V.", 4)],
+        # 2. Stocks with any dividend transactions
+        [(1,)],
+        # 3. yfinance: ex-div date 2026-02-09 (skipped: stock has transactions)
+        [("2026-02-09", 1.60, 1, "ASML.AS", "ASML Holding N.V.")],
+        # 4. _projectDividends
+        [],
+    ]
+
+    stock = Stock(stockid=1, symbol='ASML.AS', name='ASML Holding N.V.', price=700.0)
+    position = Position(stockid=1, quantity=4, stock=stock)
+    DatabaseService.positions = {1: position}
+
+    result = DatabaseService.getDividendCalendar("2026-01-01", "2026-12-31")
+
+    assert len(result) == 1
+    assert result[0]["date"] == "2026-02-18"
+    assert result[0]["amount_per_share"] == 1.36
+
+
+@patch('sqlite3.connect')
 def test_getDividendCalendar_projected_only(mock_connect):
     """Future date range should return only projected events."""
     mock_conn = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
 
     mock_conn.execute.return_value.fetchall.side_effect = [
-        # No historical dividends in range
+        # 1. No dividend transactions in range
         [],
-        # _projectDividends query returns quarterly history
+        # 2. No stocks with dividend transactions
+        [],
+        # 3. No yfinance historicaldividends in range
+        [],
+        # 4. _projectDividends query returns quarterly history
         [
             ("2024-01-15", 0.50),
             ("2024-04-15", 0.50),
@@ -241,9 +276,13 @@ def test_getDividendCalendar_mixed(mock_connect):
     mock_connect.return_value.__enter__.return_value = mock_conn
 
     mock_conn.execute.return_value.fetchall.side_effect = [
-        # Historical dividends in range
+        # 1. Dividend transactions in range
+        [("2025-01-15", 0.50, 1, "AAPL", "Apple Inc.", 5)],
+        # 2. Stocks with any dividend transactions
+        [(1,)],
+        # 3. yfinance historicaldividends in range (skipped: stock has transactions)
         [("2025-01-15", 0.50, 1, "AAPL", "Apple Inc.")],
-        # _projectDividends query: quarterly history
+        # 4. _projectDividends query: quarterly history
         [
             ("2024-01-15", 0.50),
             ("2024-04-15", 0.50),
@@ -269,17 +308,84 @@ def test_getDividendCalendar_mixed(mock_connect):
 
 
 @patch('sqlite3.connect')
+def test_getDividendCalendar_yfinance_fallback_no_transactions(mock_connect):
+    """Stocks with no dividend transactions should fall back to yfinance data."""
+    mock_conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+
+    mock_conn.execute.return_value.fetchall.side_effect = [
+        # 1. No dividend transactions in range
+        [],
+        # 2. No stocks with dividend transactions at all
+        [],
+        # 3. yfinance historicaldividends in range (used as fallback)
+        [("2025-06-15", 1.00, 1, "NEW.PA", "New Stock SA")],
+        # 4. _projectDividends
+        [],
+    ]
+
+    stock = Stock(stockid=1, symbol='NEW.PA', name='New Stock SA', price=50.0)
+    position = Position(stockid=1, quantity=20, stock=stock)
+    DatabaseService.positions = {1: position}
+
+    result = DatabaseService.getDividendCalendar("2025-01-01", "2025-12-31")
+
+    assert len(result) == 1
+    assert result[0]["symbol"] == "NEW.PA"
+    assert result[0]["amount_per_share"] == 1.00
+    assert result[0]["total_amount"] == 20.0
+
+
+@patch('sqlite3.connect')
 def test_getDividendCalendar_empty_portfolio(mock_connect):
     """Empty portfolio should return no events."""
     mock_conn = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
-    mock_conn.execute.return_value.fetchall.return_value = []
+    mock_conn.execute.return_value.fetchall.side_effect = [
+        # 1. No dividend transactions
+        [],
+        # 2. No stocks with dividend transactions
+        [],
+        # 3. No yfinance historicaldividends
+        [],
+    ]
 
     DatabaseService.positions = {}
 
     result = DatabaseService.getDividendCalendar("2025-01-01", "2025-12-31")
 
     assert result == []
+
+
+@patch('sqlite3.connect')
+def test_getDividendCalendar_transaction_not_in_yfinance(mock_connect):
+    """Dividends in transactions but not in yfinance historicaldividends should appear."""
+    mock_conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+
+    mock_conn.execute.return_value.fetchall.side_effect = [
+        # 1. Dividend transaction exists (received but not yet in yfinance)
+        [("2026-01-05", 0.85, 1, "TTE.PA", "TotalEnergies SE", 150)],
+        # 2. Stocks with dividend transactions
+        [(1,)],
+        # 3. yfinance has no record for this date
+        [],
+        # 4. _projectDividends: insufficient data
+        [],
+    ]
+
+    stock = Stock(stockid=1, symbol='TTE.PA', name='TotalEnergies SE', price=55.0)
+    position = Position(stockid=1, quantity=150, stock=stock)
+    DatabaseService.positions = {1: position}
+
+    result = DatabaseService.getDividendCalendar("2026-01-01", "2026-12-31")
+
+    assert len(result) == 1
+    assert result[0]["date"] == "2026-01-05"
+    assert result[0]["symbol"] == "TTE.PA"
+    assert result[0]["amount_per_share"] == 0.85
+    assert result[0]["total_amount"] == 127.5
+    assert result[0]["type"] == "historical"
 
 
 # ── API endpoint tests ───────────────────────────────────────────────
