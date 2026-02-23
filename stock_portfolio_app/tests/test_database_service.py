@@ -291,6 +291,59 @@ def test_addPosition_already_in_database(mock_logger, mock_addStock, mock_connec
     mock_logger.assert_called_once()
     mock_connect.assert_not_called()
 
+
+# --- removePosition tests ---
+
+@patch('sqlite3.connect')
+def test_removePosition_success(mock_connect, setup_database_service):
+    stock = Stock(stockid=1, symbol='AAPL', price=150.0)
+    position = Position(stockid=1, quantity=0, stock=stock)
+    DatabaseService.positions = {1: position}
+    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.stocks = {1: stock}
+
+    mock_conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+
+    DatabaseService.removePosition('AAPL')
+
+    mock_conn.execute.assert_called_once_with(
+        "DELETE FROM positions WHERE stockid = ?", (1,)
+    )
+    mock_conn.commit.assert_called_once()
+    assert 1 not in DatabaseService.positions
+    # Stock and symbol_map should be preserved
+    assert 'AAPL' in DatabaseService.symbol_map
+    assert 1 in DatabaseService.stocks
+
+
+def test_removePosition_symbol_not_found(setup_database_service):
+    with pytest.raises(KeyError, match="not found"):
+        DatabaseService.removePosition('UNKNOWN')
+
+
+def test_removePosition_position_not_found(setup_database_service):
+    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.stocks = {1: Stock(stockid=1, symbol='AAPL')}
+
+    with pytest.raises(KeyError, match="Position for 'AAPL' not found"):
+        DatabaseService.removePosition('AAPL')
+
+
+def test_removePosition_quantity_not_zero(setup_database_service):
+    stock = Stock(stockid=1, symbol='AAPL', price=150.0)
+    position = Position(stockid=1, quantity=10, stock=stock)
+    DatabaseService.positions = {1: position}
+    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.stocks = {1: stock}
+
+    with pytest.raises(ValueError, match="Cannot remove position"):
+        DatabaseService.removePosition('AAPL')
+
+    # Position should still exist
+    assert 1 in DatabaseService.positions
+
+
 @patch('sqlite3.connect')
 @patch('logging.Logger.warning')
 @patch('logging.Logger.debug')
@@ -503,6 +556,76 @@ def test_getTransactionSummary_empty(mock_connect, setup_database_service):
 
     result = DatabaseService.getTransactionSummary()
     assert result == []
+
+
+# --- upsertTransactions auto-update tests ---
+
+@patch('sqlite3.connect')
+@patch('services.database_service.DatabaseService.getStock')
+@patch('services.database_service.DatabaseService.updatePosition')
+def test_upsertTransactions_sell_updates_position(mock_update, mock_getStock, mock_connect, setup_database_service):
+    mock_getStock.return_value = 1
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_cursor.rowcount = 1
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+
+    stock = Stock(stockid=1, symbol='AAPL', price=150.0)
+    position = Position(stockid=1, quantity=10, stock=stock)
+    DatabaseService.positions = {1: position}
+    DatabaseService.symbol_map = {'AAPL': 1}
+
+    from datetime import datetime
+    DatabaseService.upsertTransactions(
+        date=datetime(2024, 1, 15), rowid=1, type='sell',
+        symbol='AAPL', quantity=3, price=155.0
+    )
+
+    mock_conn.execute.assert_called_once()
+    mock_update.assert_called_once_with('AAPL', quantity=7)
+
+
+@patch('services.database_service.DatabaseService.getStock')
+def test_upsertTransactions_sell_more_than_held_rejected(mock_getStock, setup_database_service):
+    mock_getStock.return_value = 1
+
+    stock = Stock(stockid=1, symbol='AAPL', price=150.0)
+    position = Position(stockid=1, quantity=5, stock=stock)
+    DatabaseService.positions = {1: position}
+    DatabaseService.symbol_map = {'AAPL': 1}
+
+    from datetime import datetime
+    with pytest.raises(ValueError, match="Cannot sell 10 shares of AAPL: only 5 shares held"):
+        DatabaseService.upsertTransactions(
+            date=datetime(2024, 1, 15), rowid=1, type='sell',
+            symbol='AAPL', quantity=10, price=155.0
+        )
+
+
+@patch('sqlite3.connect')
+@patch('services.database_service.DatabaseService.getStock')
+@patch('services.database_service.DatabaseService.updatePosition')
+def test_upsertTransactions_buy_updates_position(mock_update, mock_getStock, mock_connect, setup_database_service):
+    mock_getStock.return_value = 1
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_cursor.rowcount = 1
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+
+    stock = Stock(stockid=1, symbol='AAPL', price=150.0)
+    position = Position(stockid=1, quantity=10, stock=stock)
+    DatabaseService.positions = {1: position}
+    DatabaseService.symbol_map = {'AAPL': 1}
+
+    from datetime import datetime
+    DatabaseService.upsertTransactions(
+        date=datetime(2024, 1, 15), rowid=1, type='buy',
+        symbol='AAPL', quantity=5, price=145.0
+    )
+
+    mock_update.assert_called_once_with('AAPL', quantity=15)
 
 
 # --- getDeposits tests ---

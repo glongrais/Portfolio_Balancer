@@ -456,3 +456,85 @@ def test_get_stock_price_history_error(mock_get_history):
 
     assert resp.status_code == 500
     assert 'Failed to fetch price history' in resp.json()['detail']
+
+
+# --- DELETE position tests ---
+
+def test_delete_position_success(monkeypatch):
+    """Test deleting a position with 0 shares returns 204."""
+    stock = Stock(stockid=1, symbol='AAPL', name='Apple', price=150.0)
+    position = Position(stockid=1, quantity=0, stock=stock)
+    DatabaseService.stocks = {1: stock}
+    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.positions = {1: position}
+
+    def fake_remove_position(symbol):
+        stockid = DatabaseService.symbol_map[symbol]
+        del DatabaseService.positions[stockid]
+
+    monkeypatch.setattr(
+        DatabaseService, 'removePosition',
+        classmethod(lambda cls, symbol: fake_remove_position(symbol))
+    )
+
+    client = create_test_client()
+    resp = client.delete('/api/stocks/positions/AAPL')
+    assert resp.status_code == 204
+    assert resp.content == b''
+
+
+def test_delete_position_not_found(monkeypatch):
+    """Test deleting a non-existent position returns 404."""
+    def fake_remove_position(symbol):
+        raise KeyError(f"Stock with symbol '{symbol}' not found")
+
+    monkeypatch.setattr(
+        DatabaseService, 'removePosition',
+        classmethod(lambda cls, symbol: fake_remove_position(symbol))
+    )
+
+    client = create_test_client()
+    resp = client.delete('/api/stocks/positions/UNKNOWN')
+    assert resp.status_code == 404
+    assert 'not found' in resp.json()['detail']
+
+
+def test_delete_position_has_shares(monkeypatch):
+    """Test deleting a position with shares > 0 returns 400."""
+    def fake_remove_position(symbol):
+        raise ValueError(f"Cannot remove position '{symbol}': quantity is 10. Sell all shares first.")
+
+    monkeypatch.setattr(
+        DatabaseService, 'removePosition',
+        classmethod(lambda cls, symbol: fake_remove_position(symbol))
+    )
+
+    client = create_test_client()
+    resp = client.delete('/api/stocks/positions/AAPL')
+    assert resp.status_code == 400
+    assert 'Sell all shares first' in resp.json()['detail']
+
+
+def test_delete_position_case_insensitive(monkeypatch):
+    """Test that delete endpoint uppercases the symbol."""
+    stock = Stock(stockid=1, symbol='AAPL', name='Apple', price=150.0)
+    position = Position(stockid=1, quantity=0, stock=stock)
+    DatabaseService.stocks = {1: stock}
+    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.positions = {1: position}
+
+    called_with = {}
+    def fake_remove_position(symbol):
+        called_with['symbol'] = symbol
+        stockid = DatabaseService.symbol_map[symbol]
+        del DatabaseService.positions[stockid]
+
+    monkeypatch.setattr(
+        DatabaseService, 'removePosition',
+        classmethod(lambda cls, symbol: fake_remove_position(symbol))
+    )
+
+    client = create_test_client()
+    resp = client.delete('/api/stocks/positions/aapl')
+    assert resp.status_code == 204
+    assert called_with['symbol'] == 'AAPL'

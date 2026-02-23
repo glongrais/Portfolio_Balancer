@@ -263,27 +263,90 @@ class DatabaseService:
             "updatePosition(): Position %s updated. Quantity: %s, Average cost basis: %s, Distribution target: %s, Distribution real: %s",
             symbol, position.quantity, position.average_cost_basis, position.distribution_target, position.distribution_real
         )
-    
+
+    @classmethod
+    def removePosition(cls, symbol: str) -> None:
+        """
+        Remove a position from the portfolio. Requires quantity to be 0.
+        Stock record and transaction history are preserved.
+
+        :param symbol: The stock symbol of the position to remove.
+        :raises KeyError: If the stock or position is not found.
+        :raises ValueError: If the position still has shares.
+        """
+        if symbol not in cls.symbol_map:
+            raise KeyError(f"Stock with symbol '{symbol}' not found")
+
+        stockid = cls.symbol_map[symbol]
+        if stockid not in cls.positions:
+            raise KeyError(f"Position for '{symbol}' not found")
+
+        current_qty = cls.positions[stockid].quantity
+        if current_qty != 0:
+            raise ValueError(
+                f"Cannot remove position '{symbol}': quantity is {current_qty}. Sell all shares first."
+            )
+
+        with get_connection(DB_PATH) as connection:
+            connection.execute("DELETE FROM positions WHERE stockid = ?", (stockid,))
+            connection.commit()
+
+        del cls.positions[stockid]
+        logger.info("removePosition(): Removed position %s from the portfolio", symbol)
+
     @classmethod
     def upsertTransactions(cls, date: datetime, rowid: int, type: str, symbol: str, quantity: int, price: float) -> None:
         """
         Add or update a transaction in the database.
+        For buy/sell transactions, automatically updates position quantity if the position exists.
 
         :param date: The date of the transaction.
         :param type: The type of the transaction (buy or sell).
         :param symbol: The symbol of the stock in the transaction.
         :param quantity: The quantity of the stock in the transaction.
         :param price: The price of the stock in the transaction.
+        :raises ValueError: If selling more shares than currently held.
         """
         stockid = cls.getStock(symbol=symbol)
         if stockid == -1:
             stockid = cls.addStock(symbol)
-            #logger.error("upsertTransactions(): Stock %s not in the database", symbol)
-            #return
+
+        # Validate sell quantity before inserting the transaction
+        if type == 'sell' and stockid in cls.positions:
+            current_qty = cls.positions[stockid].quantity
+            if quantity > current_qty:
+                raise ValueError(
+                    f"Cannot sell {quantity} shares of {symbol}: only {current_qty} shares held"
+                )
+
         with get_connection(DB_PATH) as connection:
-            connection.execute("INSERT INTO transactions (stockid, portfolioid, rowid, quantity, price, type, datestamp) VALUES (?, 1, ?, ?, ?, ?, ?) ON CONFLICT(portfolioid, rowid) DO NOTHING", (stockid, rowid, quantity, price, type, date,))
+            cursor = connection.execute(
+                "INSERT INTO transactions (stockid, portfolioid, rowid, quantity, price, type, datestamp) "
+                "VALUES (?, 1, ?, ?, ?, ?, ?) ON CONFLICT(portfolioid, rowid) DO NOTHING",
+                (stockid, rowid, quantity, price, type, date,)
+            )
             connection.commit()
+            rows_inserted = cursor.rowcount
+
         logger.info("upsertTransactions(): Transaction added for stock %s", symbol)
+
+        # Auto-update position quantity if a row was actually inserted
+        if rows_inserted > 0 and stockid in cls.positions:
+            old_qty = cls.positions[stockid].quantity
+            if type == 'sell':
+                new_qty = old_qty - quantity
+                cls.updatePosition(symbol, quantity=new_qty)
+                logger.info(
+                    "upsertTransactions(): Sold %d shares of %s. Position quantity: %d -> %d",
+                    quantity, symbol, old_qty, new_qty
+                )
+            elif type == 'buy':
+                new_qty = old_qty + quantity
+                cls.updatePosition(symbol, quantity=new_qty)
+                logger.info(
+                    "upsertTransactions(): Bought %d shares of %s. Position quantity: %d -> %d",
+                    quantity, symbol, old_qty, new_qty
+                )
 
     @classmethod
     def getTransactions(cls, symbol: str = None, transaction_type: str = None, limit: int = 100) -> list:

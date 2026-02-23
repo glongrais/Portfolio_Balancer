@@ -103,11 +103,15 @@ class PortfolioValueHistoryResponse(BaseModel):
     portfolio_value_history: List[PortfolioValueHistoryItem] = Field(..., description="Portfolio value history")
 
 # Transaction Schemas
+class TransactionType(str, Enum):
+    BUY = "buy"
+    SELL = "sell"
+
 class TransactionBase(BaseModel):
     symbol: str = Field(..., description="Stock symbol")
     quantity: int = Field(..., description="Number of shares")
     price: float = Field(..., description="Price per share")
-    type: str = Field(..., description="Transaction type (buy/sell)")
+    type: TransactionType = Field(..., description="Transaction type (buy/sell)")
     datestamp: datetime = Field(..., description="Transaction date")
 
 class TransactionResponse(TransactionBase):
@@ -119,7 +123,7 @@ class TransactionCreate(BaseModel):
     symbol: str = Field(..., description="Stock symbol")
     quantity: int = Field(..., description="Number of shares", gt=0)
     price: float = Field(..., description="Price per share", gt=0)
-    type: str = Field(..., description="Transaction type (buy/sell)")
+    type: TransactionType = Field(..., description="Transaction type (buy/sell)")
     date: datetime = Field(..., description="Transaction date")
     rowid: int = Field(..., description="External row identifier")
 

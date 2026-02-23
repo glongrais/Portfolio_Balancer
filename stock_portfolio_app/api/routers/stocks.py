@@ -3,7 +3,7 @@ Stocks API Router
 Endpoints for stock management and information
 """
 import logging
-from fastapi import APIRouter, HTTPException, status, Path, Query
+from fastapi import APIRouter, HTTPException, Response, status, Path, Query
 from typing import List, Optional
 
 from api.schemas import (
@@ -325,5 +325,35 @@ async def update_position(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update position: {str(e)}"
+        )
+
+@router.delete("/positions/{symbol}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_position(
+    symbol: str = Path(..., description="Stock ticker symbol")
+):
+    """
+    Delete a position from the portfolio.
+    Requires all shares to be sold first (quantity must be 0).
+    Stock record and transaction history are preserved.
+    """
+    try:
+        symbol_upper = symbol.upper()
+        DatabaseService.removePosition(symbol_upper)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error deleting position {symbol}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete position: {str(e)}"
         )
 

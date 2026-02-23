@@ -44,7 +44,7 @@ async def add_transaction(transaction: TransactionCreate):
         DatabaseService.upsertTransactions(
             date=transaction.date,
             rowid=transaction.rowid,
-            type=transaction.type.lower(),
+            type=transaction.type.value,
             symbol=transaction.symbol.upper(),
             quantity=transaction.quantity,
             price=transaction.price
@@ -58,6 +58,11 @@ async def add_transaction(transaction: TransactionCreate):
             "price": transaction.price,
             "date": transaction.date
         }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
     except Exception as e:
         logger.error(f"Error adding transaction: {e}")
         raise HTTPException(

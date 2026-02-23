@@ -237,19 +237,19 @@ def test_add_transaction_case_insensitive(mock_upsert):
     transaction_data = {
         'date': '2024-01-15',
         'rowid': 125,
-        'type': 'BUY',
+        'type': 'buy',
         'symbol': 'aapl',
         'quantity': 10,
         'price': 150.0
     }
-    
+
     resp = client.post('/api/transactions/', json=transaction_data)
-    
+
     assert resp.status_code == 201
     data = resp.json()
     assert data['symbol'] == 'AAPL'
-    
-    # Verify lowercase type and uppercase symbol
+
+    # Verify uppercase symbol passed to service
     mock_upsert.assert_called_once()
     call_kwargs = mock_upsert.call_args[1]
     assert call_kwargs['symbol'] == 'AAPL'
@@ -397,4 +397,28 @@ def test_get_transactions_with_max_limit(mock_connect):
     call_args = mock_conn.execute.call_args
     params = call_args[0][1]
     assert params[-1] == 1000  # Last parameter should be the limit
+
+
+# --- Sell validation tests ---
+
+@patch('services.database_service.DatabaseService.upsertTransactions')
+def test_add_sell_transaction_exceeding_held_returns_400(mock_upsert):
+    """Test that selling more shares than held returns 400."""
+    mock_upsert.side_effect = ValueError('Cannot sell 10 shares of AAPL: only 5 shares held')
+
+    client = create_test_client()
+
+    transaction_data = {
+        'date': '2024-01-20',
+        'rowid': 200,
+        'type': 'sell',
+        'symbol': 'AAPL',
+        'quantity': 10,
+        'price': 155.0
+    }
+
+    resp = client.post('/api/transactions/', json=transaction_data)
+
+    assert resp.status_code == 400
+    assert 'Cannot sell' in resp.json()['detail']
 
