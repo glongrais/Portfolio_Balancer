@@ -402,11 +402,11 @@ def test_balance_portfolio_proportional_skips_below_minimum():
     })
     assert resp.status_code == 200
     data = resp.json()
-    # MSFT would get 10% of 500 = 50, which is below min 100 → pruned
-    # AAPL gets all the budget instead
+    # AAPL (delta=40, highest priority) gets 90% of 500 = 450 → 45 shares
+    # MSFT (delta=-40) gets 10% of remaining = 50, below min 100 → skipped
     assert len(data['recommendations']) == 1
     assert data['recommendations'][0]['symbol'] == 'AAPL'
-    assert data['recommendations'][0]['shares'] == 50  # 500 / 10
+    assert data['recommendations'][0]['shares'] == 45  # 90% of 500 / 10
 
 
 def test_balance_portfolio_proportional_excludes_no_target():

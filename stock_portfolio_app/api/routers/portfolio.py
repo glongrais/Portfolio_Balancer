@@ -121,30 +121,31 @@ async def balance_portfolio(balance_request: BalanceRequest):
             ]
             eligible.sort(key=lambda p: p.delta(), reverse=True)
 
-            # Iteratively prune positions whose proportional allocation
-            # falls below min_amount_to_buy, then renormalize until stable
-            changed = True
-            while changed:
-                changed = False
-                target_sum = sum(p.distribution_target for p in eligible)
-                if target_sum == 0:
-                    break
-                next_eligible = []
-                for p in eligible:
-                    allocation = amount_to_buy * (p.distribution_target / target_sum)
-                    shares = math.floor(allocation / p.stock.price)
-                    if shares * p.stock.price >= min_amount_to_buy:
-                        next_eligible.append(p)
-                    else:
-                        changed = True
-                eligible = next_eligible
+            # Prune positions where even 1 share exceeds the total budget.
+            eligible = [p for p in eligible if p.stock.price <= amount_to_buy]
 
-            # Allocate proportionally among eligible positions
+            # Allocate proportionally among remaining eligible positions.
+            # Round up to 1 share when floor gives 0 or falls below
+            # min_amount_to_buy, so expensive underweight stocks still
+            # get bought.
             target_sum = sum(p.distribution_target for p in eligible)
+            remaining = amount_to_buy
             for position in eligible:
-                allocation = amount_to_buy * (position.distribution_target / target_sum)
+                allocation = remaining * (position.distribution_target / target_sum)
                 shares_to_buy = math.floor(allocation / position.stock.price)
+
+                if shares_to_buy * position.stock.price < min_amount_to_buy:
+                    # Round up so expensive stocks still get at least 1 share
+                    shares_to_buy = math.ceil(allocation / position.stock.price)
+
                 invest_amount = shares_to_buy * position.stock.price
+                if invest_amount > remaining or invest_amount < min_amount_to_buy:
+                    # Can't afford or still below minimum after round-up, skip
+                    target_sum -= position.distribution_target
+                    continue
+
+                remaining -= invest_amount
+                target_sum -= position.distribution_target
                 total_invested += invest_amount
 
                 recommendations.append(BalanceRecommendation(
