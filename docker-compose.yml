@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     container_name: portfolio-balancer-api
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - ./data:/app/data
       - ./stock_portfolio_app:/app/stock_portfolio_app
@@ -24,7 +24,7 @@ services:
     image: prom/prometheus:latest
     container_name: portfolio-prometheus
     ports:
-      - "9090:9090"
+      - "9091:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -37,7 +37,7 @@ services:
     image: grafana/grafana:latest
     container_name: portfolio-grafana
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin

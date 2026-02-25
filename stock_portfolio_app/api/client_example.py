@@ -10,7 +10,7 @@ class PortfolioClient:
     Client for interacting with the Portfolio Balancer API
     """
     
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:8001"):
         self.base_url = base_url
         self.api_url = f"{base_url}/api"
     
