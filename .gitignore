@@ -18,3 +18,5 @@ create/*
 stock_portfolio_app/data/portfolio.db
 .idea/*
 workbench/*
+stock_portfolio_app/.claude/settings.local.json
+/docs
