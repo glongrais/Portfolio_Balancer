@@ -53,10 +53,10 @@ SAMPLE_GRANT = {
     "gain_loss": 750.0,
     "gain_loss_pct": 20.0,
     "vesting_events": [
-        {"id": 1, "grant_id": 1, "date": "2025-01-15", "shares": 25, "taxed_shares": 10, "net_shares": 15},
-        {"id": 2, "grant_id": 1, "date": "2026-01-15", "shares": 25, "taxed_shares": 10, "net_shares": 15},
-        {"id": 3, "grant_id": 1, "date": "2027-01-15", "shares": 25, "taxed_shares": 10, "net_shares": 15},
-        {"id": 4, "grant_id": 1, "date": "2028-01-15", "shares": 25, "taxed_shares": 10, "net_shares": 15},
+        {"id": 1, "grant_id": 1, "date": "2025-01-15", "shares": 25, "taxed_shares": 10, "net_shares": 15, "vested": True},
+        {"id": 2, "grant_id": 1, "date": "2026-01-15", "shares": 25, "taxed_shares": 10, "net_shares": 15, "vested": True},
+        {"id": 3, "grant_id": 1, "date": "2027-01-15", "shares": 25, "taxed_shares": 10, "net_shares": 15, "vested": False},
+        {"id": 4, "grant_id": 1, "date": "2028-01-15", "shares": 25, "taxed_shares": 10, "net_shares": 15, "vested": False},
     ],
 }
 
@@ -190,7 +190,7 @@ def test_delete_grant_not_found(mock_delete_grant):
 def test_add_vesting_event(mock_add_event):
     """Test adding a vesting event."""
     mock_add_event.return_value = {
-        "id": 5, "grant_id": 1, "date": "2029-01-15", "shares": 10, "taxed_shares": 4, "net_shares": 6,
+        "id": 5, "grant_id": 1, "date": "2029-01-15", "shares": 10, "taxed_shares": 4, "net_shares": 6, "vested": False,
     }
     client = create_equity_client()
     resp = client.post('/api/equity/grants/1/vesting-events', json={
@@ -220,7 +220,7 @@ def test_add_vesting_event_exceeds_total(mock_add_event):
 def test_update_vesting_event(mock_update_event):
     """Test updating a vesting event."""
     mock_update_event.return_value = {
-        "id": 1, "grant_id": 1, "date": "2025-01-15", "shares": 25, "taxed_shares": 12, "net_shares": 13,
+        "id": 1, "grant_id": 1, "date": "2025-01-15", "shares": 25, "taxed_shares": 12, "net_shares": 13, "vested": True,
     }
     client = create_equity_client()
     resp = client.put('/api/equity/grants/1/vesting-events/1', json={

@@ -40,8 +40,8 @@ def test_addStock(mock_fetch_stock, mock_fetch_price, mock_connect, setup_databa
 
     mock_fetch_price.assert_called_once_with("AAPL")
     mock_cursor.execute.assert_called_once_with('''
-            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country, ex_dividend_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country, logo_url, quote_type, ex_dividend_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(symbol) DO UPDATE SET
                 name=excluded.name,
                 price=excluded.price,
@@ -50,8 +50,10 @@ def test_addStock(mock_fetch_stock, mock_fetch_price, mock_connect, setup_databa
                 sector=excluded.sector,
                 industry=excluded.industry,
                 country=excluded.country,
+                logo_url=excluded.logo_url,
+                quote_type=excluded.quote_type,
                 ex_dividend_date=excluded.ex_dividend_date
-            ''', ("AAPL", "Apple Inc.", 100.0, "USD", 1000000000000, "Technology", "Consumer Electronics", "US", None))
+            ''', ("AAPL", "Apple Inc.", 100.0, "USD", 1000000000000, "Technology", "Consumer Electronics", "US", "", "EQUITY", None))
 
     mock_cursor.commit.assert_called_once()
     mock_fetch_stock.assert_called_once_with(symbol="AAPL")

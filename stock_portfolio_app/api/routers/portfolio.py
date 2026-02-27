@@ -411,10 +411,11 @@ async def get_portfolio_value_history():
         portfolio_value_history = PortfolioService.getPortfolioValueHistory()
         portfolio_value_history_items = []
         for item in portfolio_value_history:
-            portfolio_value_history_items.append(PortfolioValueHistoryItem(
-                date=item[0],
-                value=item[1]
-            ))
+            if item[1] is not None:
+                portfolio_value_history_items.append(PortfolioValueHistoryItem(
+                    date=item[0],
+                    value=item[1]
+                ))
         return PortfolioValueHistoryResponse(
             portfolio_value_history=portfolio_value_history_items
         )

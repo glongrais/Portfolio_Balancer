@@ -80,6 +80,8 @@ async def get_stock(symbol: str = Path(..., description="Stock ticker symbol")):
             country=stock.country,
             dividend=stock.dividend,
             dividend_yield=stock.dividend_yield,
+            logo_url=stock.logo_url,
+            quote_type=stock.quote_type,
             ex_dividend_date=stock.ex_dividend_date
         )
     except HTTPException:
@@ -134,6 +136,8 @@ async def add_stock(stock_create: StockCreate):
             country=stock.country,
             dividend=stock.dividend,
             dividend_yield=stock.dividend_yield,
+            logo_url=stock.logo_url,
+            quote_type=stock.quote_type,
             ex_dividend_date=stock.ex_dividend_date
         )
     except Exception as e:

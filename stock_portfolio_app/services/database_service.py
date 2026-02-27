@@ -32,8 +32,8 @@ class DatabaseService:
         ticker_info = StockAPI.get_current_price(symbol)
         with get_connection(DB_PATH) as connection:
             connection.execute('''
-            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country, ex_dividend_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country, logo_url, quote_type, ex_dividend_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(symbol) DO UPDATE SET
                 name=excluded.name,
                 price=excluded.price,
@@ -42,6 +42,8 @@ class DatabaseService:
                 sector=excluded.sector,
                 industry=excluded.industry,
                 country=excluded.country,
+                logo_url=excluded.logo_url,
+                quote_type=excluded.quote_type,
                 ex_dividend_date=excluded.ex_dividend_date
             ''', (
                 ticker_info["symbol"],
@@ -52,6 +54,8 @@ class DatabaseService:
                 ticker_info.get("sector", ""),
                 ticker_info.get("industry", ""),
                 ticker_info.get("country", ""),
+                ticker_info.get("logo_url", ""),
+                ticker_info.get("quoteType", "EQUITY"),
                 ticker_info.get("exDividendDate"),
             ))
             connection.commit()
@@ -71,7 +75,15 @@ class DatabaseService:
                 stock = cls.stocks[stockid]
                 info = StockAPI.get_current_price(stock.symbol)
                 stock.price = info["currentPrice"]
-                connection.execute('UPDATE stocks SET price = ? WHERE stockid = ?', (info["currentPrice"], stockid,))
+                logo_url = info.get("logo_url", "")
+                if logo_url and not stock.logo_url:
+                    stock.logo_url = logo_url
+                    connection.execute(
+                        'UPDATE stocks SET price = ?, logo_url = ? WHERE stockid = ?',
+                        (info["currentPrice"], logo_url, stockid,)
+                    )
+                else:
+                    connection.execute('UPDATE stocks SET price = ? WHERE stockid = ?', (info["currentPrice"], stockid,))
                 log_count += 1
             connection.commit()
         logger.info("updateStocksPrice(): Price updated for %d stock(s)", log_count)
@@ -741,6 +753,7 @@ class DatabaseService:
         for event in events:
             taxed = event[4] if event[4] else 0
             net = event[3] - taxed
+            is_vested = event[2] <= today
             vesting_events.append({
                 "id": event[0],
                 "grant_id": event[1],
@@ -748,8 +761,9 @@ class DatabaseService:
                 "shares": event[3],
                 "taxed_shares": taxed,
                 "net_shares": net,
+                "vested": is_vested,
             })
-            if event[2] <= today:
+            if is_vested:
                 vested_shares += net
 
         unvested_shares = total_shares - vested_shares
@@ -909,6 +923,7 @@ class DatabaseService:
             event_id = cursor.lastrowid
             connection.commit()
 
+        today = datetime.datetime.now().strftime('%Y-%m-%d')
         return {
             "id": event_id,
             "grant_id": grant_id,
@@ -916,6 +931,7 @@ class DatabaseService:
             "shares": shares,
             "taxed_shares": taxed_shares,
             "net_shares": shares - taxed_shares,
+            "vested": date <= today,
         }
 
     @classmethod
@@ -971,6 +987,7 @@ class DatabaseService:
             )
             connection.commit()
 
+        today = datetime.datetime.now().strftime('%Y-%m-%d')
         return {
             "id": event_id,
             "grant_id": current_grant_id,
@@ -978,6 +995,7 @@ class DatabaseService:
             "shares": new_shares,
             "taxed_shares": new_taxed,
             "net_shares": new_shares - new_taxed,
+            "vested": new_date <= today,
         }
 
     @classmethod
@@ -1299,61 +1317,49 @@ class DatabaseService:
         Updates the historicalstocks table with data fetched from the StockAPI.
         Includes both portfolio position stocks and equity grant stocks.
 
-        :param start_date: Start date for the historical data (YYYY-MM-DD).
-        :param end_date: End date for the historical data (YYYY-MM-DD).
+        For each stock, fetches from its own MAX(datestamp) if it has data,
+        or from the beginning ('max' period) if it has no data yet.
         """
-        symbols = [p.stock.symbol for p in cls.positions.values()]
-
-        # Get global min/max timestamps from existing historical data
+        # Collect all symbols: portfolio positions + equity grants
+        all_symbols = set()
+        for p in cls.positions.values():
+            all_symbols.add(p.stock.symbol)
         with get_connection(DB_PATH) as connection:
-            row = connection.execute(
-                'SELECT MIN(datestamp), MAX(datestamp) FROM historicalstocks'
-            ).fetchone()
-            earliest_date = row[0]
-            last_timestamp = row[1]
+            cursor = connection.execute("SELECT DISTINCT stockid FROM equity_grants")
+            for row in cursor.fetchall():
+                stock = cls.stocks.get(row[0])
+                if stock:
+                    all_symbols.add(stock.symbol)
 
-        # Collect equity grant stocks, tracking which ones need backfill
-        equity_new_symbols = []
-        equity_backfill = []  # (symbol, backfill_end)
-        with get_connection(DB_PATH) as connection:
-            cursor = connection.execute(
-                "SELECT DISTINCT stockid FROM equity_grants"
-            )
-            equity_stockids = {row[0] for row in cursor.fetchall()}
-        for stockid in equity_stockids:
-            stock = cls.stocks.get(stockid)
-            if stock and stock.symbol not in symbols:
-                with get_connection(DB_PATH) as connection:
-                    cursor = connection.execute(
-                        "SELECT MIN(datestamp) FROM historicalstocks WHERE stockid = ?",
-                        (stockid,)
-                    )
-                    min_date = cursor.fetchone()[0]
-                if min_date is None:
-                    equity_new_symbols.append(stock.symbol)
-                else:
-                    symbols.append(stock.symbol)
-                    # Backfill if this stock's earliest date is after the portfolio's earliest
-                    if earliest_date and min_date > earliest_date:
-                        equity_backfill.append((stock.symbol, min_date))
+        # For each stock, find its last known date
+        # Group symbols by start date to minimize API calls
+        from collections import defaultdict
+        by_start = defaultdict(list)  # start_date -> [symbols]
+        for symbol in all_symbols:
+            stockid = cls.symbol_map.get(symbol)
+            if stockid is None:
+                continue
+            with get_connection(DB_PATH) as connection:
+                row = connection.execute(
+                    "SELECT MAX(datestamp) FROM historicalstocks WHERE stockid = ?",
+                    (stockid,)
+                ).fetchone()
+                last_date = row[0]
+            by_start[last_date].append(symbol)
 
-        # Incremental update for existing stocks
-        historical_data = StockAPI.get_historical_data(symbols, last_timestamp)
-        cls._insertHistoricalData(historical_data)
+        # Fetch and insert for each group
+        total = 0
+        for last_date, symbols in by_start.items():
+            if last_date is None:
+                # No data yet — fetch full history
+                logger.info("Full history fetch for: %s", ", ".join(symbols))
+                data = StockAPI.get_historical_data(symbols, start_date, end_date)
+            else:
+                data = StockAPI.get_historical_data(symbols, last_date, end_date)
+            cls._insertHistoricalData(data)
+            total += len(symbols)
 
-        # Full history fetch for new equity stocks that have no data yet
-        if equity_new_symbols:
-            fetch_start = earliest_date or start_date
-            new_data = StockAPI.get_historical_data(equity_new_symbols, fetch_start, end_date)
-            cls._insertHistoricalData(new_data)
-
-        # Backfill equity stocks that are missing early history
-        for symbol, backfill_end in equity_backfill:
-            logger.info("Backfilling historical data for %s from %s to %s", symbol, earliest_date, backfill_end)
-            backfill_data = StockAPI.get_historical_data([symbol], earliest_date, backfill_end)
-            cls._insertHistoricalData(backfill_data)
-
-        logger.info("updateHistoricalStocks(): Historical data updated for %d symbol(s)", len(symbols) + len(equity_new_symbols) + len(equity_backfill))
+        logger.info("updateHistoricalStocks(): Historical data updated for %d symbol(s)", total)
     
     @classmethod
     def updateHistoricalDividendsPortfolio(cls) -> None:

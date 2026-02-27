@@ -247,6 +247,7 @@ class VestingEventResponse(BaseModel):
     shares: int = Field(..., description="Number of shares vesting (gross)")
     taxed_shares: int = Field(default=0, description="Shares withheld for tax")
     net_shares: int = Field(..., description="Shares actually received (shares - taxed_shares)")
+    vested: bool = Field(..., description="Whether this event has vested (date <= today)")
 
 class VestingEventUpdate(BaseModel):
     date: Optional[str] = Field(None, description="New vesting date (YYYY-MM-DD)")

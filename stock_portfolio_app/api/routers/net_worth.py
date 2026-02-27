@@ -96,7 +96,7 @@ async def get_net_worth_history(
         pea_history = DatabaseService.getPortfolioValueHistory()
         for row in pea_history:
             date_str = row[0] if isinstance(row[0], str) else row[0].strftime('%Y-%m-%d')
-            if start_date <= date_str <= end_date:
+            if start_date <= date_str <= end_date and row[1] is not None:
                 monthly_data[date_str]["pea"] = float(row[1])
                 pea_dates.append(date_str)
 

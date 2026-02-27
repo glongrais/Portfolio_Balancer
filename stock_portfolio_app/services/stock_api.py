@@ -1,13 +1,16 @@
 import yfinance as yf
 from cachetools import cached, TTLCache
 import logging
-import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from urllib.parse import urlparse
 
 class StockAPI:
 
     logger = logging.getLogger(__name__)
+
+    # Ticker symbol overrides for the logo API when it uses a different symbol
+    LOGO_SYMBOL_MAP = {
+        "STLAP.PA": "STLA",
+    }
 
     @classmethod
     @cached(cache=TTLCache(maxsize=1024, ttl=60))
@@ -52,24 +55,10 @@ class StockAPI:
             "sector": info.get("sector", ""),
             "industry": info.get("industry", ""),
             "country": info.get("country", ""),
-            "logo_url": cls._build_logo_url(info.get("website", "")),
+            "logo_url": f"https://api.elbstream.com/logos/symbol/{cls.LOGO_SYMBOL_MAP.get(symbol, symbol)}?format=png&size=128",
             "quoteType": info.get("quoteType", "EQUITY"),
             "exDividendDate": ex_dividend_date,
         }
-
-    @staticmethod
-    def _build_logo_url(website: str) -> str:
-        if not website:
-            return ""
-        domain = urlparse(website).netloc or website
-        url = f"https://www.google.com/s2/favicons?domain={domain}&sz=128"
-        try:
-            resp = requests.head(url, timeout=3, allow_redirects=True)
-            if resp.status_code != 200:
-                return ""
-        except requests.RequestException:
-            return ""
-        return url
 
     @classmethod
     def get_ticker_info(cls, symbol: str) -> dict:
