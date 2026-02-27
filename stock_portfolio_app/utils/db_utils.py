@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 SLOW_QUERY_THRESHOLD_MS = float(os.environ.get('SLOW_QUERY_THRESHOLD_MS', '100'))
 
-REQUIRED_TABLES = ['stocks', 'positions', 'transactions', 'historicalstocks', 'historicaldividends', 'deposits']
+REQUIRED_TABLES = ['stocks', 'positions', 'transactions', 'historicalstocks', 'historicaldividends', 'deposits', 'net_worth_assets', 'net_worth_snapshots']
 REQUIRED_VIEWS = ['mar__stocks', 'int__portfolio_value_evolution', 'int__portfolio_dividends_total', 'int__transactions_dividends']
 
 
@@ -195,6 +195,24 @@ def initialize_database(db_path: str):
                     amount      REAL   NOT NULL,
                     portfolioid INTEGER NOT NULL,
                     currency    TEXT    DEFAULT 'EUR'
+    )
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS net_worth_assets (
+                    id TEXT PRIMARY KEY,
+                    label TEXT NOT NULL,
+                    current_value REAL NOT NULL DEFAULT 0,
+                    updated_at TEXT NOT NULL
+    )
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS net_worth_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT NOT NULL,
+                    asset_id TEXT NOT NULL,
+                    value REAL NOT NULL,
+                    FOREIGN KEY (asset_id) REFERENCES net_worth_assets (id),
+                    UNIQUE(date, asset_id)
     )
     ''')
     connection.commit()

@@ -504,6 +504,157 @@ class DatabaseService:
         }
 
     @classmethod
+    def getNetWorthAssets(cls) -> list:
+        """
+        Fetches all net worth asset categories from the database.
+
+        :return: List of asset dicts with id, label, current_value, updated_at.
+        """
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id, label, current_value, updated_at FROM net_worth_assets ORDER BY id ASC"
+            )
+            rows = cursor.fetchall()
+        return [
+            {
+                "id": row[0],
+                "label": row[1],
+                "current_value": row[2],
+                "updated_at": row[3],
+            }
+            for row in rows
+        ]
+
+    @classmethod
+    def addNetWorthAsset(cls, id: str, label: str, current_value: float) -> dict:
+        """
+        Adds a new net worth asset category.
+
+        :param id: Slug identifier (e.g. 'cto', 'crypto').
+        :param label: Display name.
+        :param current_value: Current value in EUR.
+        :return: Dict with the created asset data.
+        :raises ValueError: If an asset with this id already exists.
+        """
+        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        try:
+            with get_connection(DB_PATH) as connection:
+                connection.execute(
+                    "INSERT INTO net_worth_assets (id, label, current_value, updated_at) VALUES (?, ?, ?, ?)",
+                    (id, label, current_value, today)
+                )
+                connection.commit()
+        except sqlite3.IntegrityError:
+            raise ValueError(f"Asset with id '{id}' already exists")
+        return {
+            "id": id,
+            "label": label,
+            "current_value": current_value,
+            "updated_at": today,
+        }
+
+    @classmethod
+    def updateNetWorthAsset(cls, id: str, label: str = None, current_value: float = None) -> dict:
+        """
+        Updates an existing net worth asset category.
+
+        :param id: The asset id to update.
+        :param label: New display name (optional).
+        :param current_value: New value in EUR (optional).
+        :return: Dict with the updated asset data.
+        :raises KeyError: If the asset is not found.
+        """
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id, label, current_value, updated_at FROM net_worth_assets WHERE id = ?",
+                (id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise KeyError(f"Asset with id '{id}' not found")
+
+            current_label = row[1]
+            current_val = row[2]
+
+            new_label = label if label is not None else current_label
+            new_value = current_value if current_value is not None else current_val
+            today = datetime.datetime.now().strftime('%Y-%m-%d')
+
+            connection.execute(
+                "UPDATE net_worth_assets SET label = ?, current_value = ?, updated_at = ? WHERE id = ?",
+                (new_label, new_value, today, id)
+            )
+            connection.commit()
+
+        return {
+            "id": id,
+            "label": new_label,
+            "current_value": new_value,
+            "updated_at": today,
+        }
+
+    @classmethod
+    def deleteNetWorthAsset(cls, id: str) -> None:
+        """
+        Deletes a net worth asset category and its snapshots.
+
+        :param id: The asset id to delete.
+        :raises KeyError: If the asset is not found.
+        """
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id FROM net_worth_assets WHERE id = ?", (id,)
+            )
+            if not cursor.fetchone():
+                raise KeyError(f"Asset with id '{id}' not found")
+
+            connection.execute(
+                "DELETE FROM net_worth_snapshots WHERE asset_id = ?", (id,)
+            )
+            connection.execute(
+                "DELETE FROM net_worth_assets WHERE id = ?", (id,)
+            )
+            connection.commit()
+
+    @classmethod
+    def getNetWorthSnapshots(cls, start_date: str, end_date: str) -> list:
+        """
+        Fetches net worth snapshots within a date range.
+
+        :param start_date: Start date (YYYY-MM-DD).
+        :param end_date: End date (YYYY-MM-DD).
+        :return: List of dicts with date, asset_id, value.
+        """
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT date, asset_id, value FROM net_worth_snapshots "
+                "WHERE date >= ? AND date <= ? ORDER BY date ASC",
+                (start_date, end_date)
+            )
+            rows = cursor.fetchall()
+        return [
+            {"date": row[0], "asset_id": row[1], "value": row[2]}
+            for row in rows
+        ]
+
+    @classmethod
+    def addNetWorthSnapshot(cls, date: str, asset_id: str, value: float) -> None:
+        """
+        Adds or updates a net worth snapshot for a given date and asset.
+
+        :param date: Snapshot date (YYYY-MM-DD).
+        :param asset_id: The asset id.
+        :param value: The value at snapshot date.
+        """
+        with get_connection(DB_PATH) as connection:
+            connection.execute(
+                "INSERT INTO net_worth_snapshots (date, asset_id, value) VALUES (?, ?, ?) "
+                "ON CONFLICT(date, asset_id) DO UPDATE SET value = excluded.value",
+                (date, asset_id, value)
+            )
+            connection.commit()
+
+    @classmethod
     def getStockPriceHistory(cls, symbol: str, start_date: str = None, end_date: str = None) -> list:
         """
         Fetches historical price data for a single stock.

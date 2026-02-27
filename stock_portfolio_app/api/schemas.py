@@ -199,3 +199,37 @@ class StockPriceHistoryResponse(BaseModel):
 class UpdatePricesResponse(BaseModel):
     message: str = Field(..., description="Status message")
     updated_count: int = Field(..., description="Number of stocks updated")
+
+# Net Worth Schemas
+class NetWorthAssetItem(BaseModel):
+    id: str = Field(..., description="Asset slug identifier")
+    label: str = Field(..., description="Display name")
+    value: float = Field(..., description="Current value in EUR")
+
+class NetWorthCurrentResponse(BaseModel):
+    total: float = Field(..., description="Sum of all asset values")
+    assets: List[NetWorthAssetItem] = Field(..., description="List of asset categories")
+    last_updated: str = Field(..., description="ISO date of the most recent update (YYYY-MM-DD)")
+
+class NetWorthHistoryEntry(BaseModel):
+    date: str = Field(..., description="Snapshot date (YYYY-MM-DD)")
+    total: float = Field(..., description="Total net worth at that date")
+    assets: dict = Field(..., description="Dict keyed by asset id, values are floats in EUR")
+
+class NetWorthHistoryResponse(BaseModel):
+    data: List[NetWorthHistoryEntry] = Field(..., description="Monthly snapshot entries")
+
+class NetWorthAssetCreate(BaseModel):
+    id: str = Field(..., description="Slug identifier (e.g. 'cto', 'crypto')")
+    label: str = Field(..., description="Display name (e.g. 'CTO', 'Crypto')")
+    current_value: float = Field(..., description="Current value in EUR", ge=0)
+
+class NetWorthAssetUpdate(BaseModel):
+    label: Optional[str] = Field(None, description="New display name")
+    current_value: Optional[float] = Field(None, description="New value in EUR", ge=0)
+
+class NetWorthAssetResponse(BaseModel):
+    id: str = Field(..., description="Asset slug identifier")
+    label: str = Field(..., description="Display name")
+    current_value: float = Field(..., description="Current value in EUR")
+    updated_at: str = Field(..., description="Last update date (YYYY-MM-DD)")
