@@ -19,7 +19,7 @@ from api.middleware import (
     http_exception_handler,
     general_exception_handler
 )
-from api.routers import portfolio, stocks, transactions, deposits, dev, net_worth
+from api.routers import portfolio, stocks, transactions, deposits, dev, net_worth, equity
 from utils.file_utils import FileUtils
 
 # Configure structured JSON logging
@@ -55,6 +55,12 @@ async def lifespan(app: FastAPI):
         DatabaseService.getPositions()
         DatabaseService.updatePortfolioPositionsPrice()
         DatabaseService.updateHistoricalStocksPortfolio("", "")
+
+        # Update historical FX rates (non-blocking)
+        try:
+            DatabaseService.updateFxRatesHistory(["USDEUR", "SEKEUR"])
+        except Exception as e:
+            logger.warning(f"FX rates history update failed on startup (non-blocking): {e}")
 
         # Refresh data from Numbers file
         try:
@@ -111,6 +117,7 @@ app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["tr
 app.include_router(deposits.router, prefix="/api/v1/deposits", tags=["deposits"])
 app.include_router(dev.router, prefix="/api/v1/dev", tags=["dev"])
 app.include_router(net_worth.router, prefix="/api/v1/net-worth", tags=["net-worth"])
+app.include_router(equity.router, prefix="/api/v1/equity", tags=["equity"])
 
 @app.get("/")
 async def root():

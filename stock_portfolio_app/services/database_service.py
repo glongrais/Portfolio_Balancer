@@ -655,6 +655,589 @@ class DatabaseService:
             connection.commit()
 
     @classmethod
+    def getEquityGrants(cls) -> list:
+        """
+        Fetches all equity grants with their vesting events and computed values.
+
+        :return: List of grant dicts with vested/unvested computation.
+        """
+        today = datetime.datetime.now().strftime('%Y-%m-%d')
+
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id, name, stockid, total_shares, grant_date, grant_price FROM equity_grants ORDER BY id ASC"
+            )
+            grants = cursor.fetchall()
+
+        result = []
+        for grant in grants:
+            grant_id, name, stockid, total_shares, grant_date, grant_price = grant
+            result.append(cls._buildEquityGrantDict(
+                grant_id, name, stockid, total_shares, grant_date, grant_price, today
+            ))
+        return result
+
+    @classmethod
+    def getEquityGrant(cls, grant_id: int) -> dict:
+        """
+        Fetches a single equity grant with computed values.
+
+        :param grant_id: The grant ID.
+        :return: Grant dict with vested/unvested computation.
+        :raises KeyError: If the grant is not found.
+        """
+        today = datetime.datetime.now().strftime('%Y-%m-%d')
+
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id, name, stockid, total_shares, grant_date, grant_price FROM equity_grants WHERE id = ?",
+                (grant_id,)
+            )
+            row = cursor.fetchone()
+
+        if not row:
+            raise KeyError(f"Grant with id {grant_id} not found")
+
+        grant_id, name, stockid, total_shares, grant_date, grant_price = row
+        return cls._buildEquityGrantDict(
+            grant_id, name, stockid, total_shares, grant_date, grant_price, today
+        )
+
+    @classmethod
+    def _buildEquityGrantDict(cls, grant_id: int, name: str, stockid: int, total_shares: int, grant_date: str, grant_price: float, today: str) -> dict:
+        """
+        Builds a grant response dict with live price, FX rate, vested/unvested computation, and gain/loss.
+        """
+        # Get stock info
+        stock = cls.stocks.get(stockid)
+        if stock is None:
+            cls.getStock(stockid=stockid)
+            stock = cls.stocks.get(stockid)
+
+        symbol = stock.symbol if stock else "UNKNOWN"
+        stock_name = stock.name if stock else ""
+        currency = stock.currency if stock else "USD"
+
+        # Fetch live price and FX rate
+        try:
+            price_info = StockAPI.get_current_price(symbol)
+            share_price = price_info.get("currentPrice", 0.0) or 0.0
+        except Exception:
+            share_price = stock.price if stock else 0.0
+
+        fx_rate = StockAPI.get_fx_rate(currency, "EUR")
+
+        # Fetch vesting events
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id, grant_id, date, shares, taxed_shares FROM equity_vesting_events "
+                "WHERE grant_id = ? ORDER BY date ASC",
+                (grant_id,)
+            )
+            events = cursor.fetchall()
+
+        vesting_events = []
+        vested_shares = 0
+        for event in events:
+            taxed = event[4] if event[4] else 0
+            net = event[3] - taxed
+            vesting_events.append({
+                "id": event[0],
+                "grant_id": event[1],
+                "date": event[2],
+                "shares": event[3],
+                "taxed_shares": taxed,
+                "net_shares": net,
+            })
+            if event[2] <= today:
+                vested_shares += net
+
+        unvested_shares = total_shares - vested_shares
+        vested_value = round(vested_shares * share_price, 2)
+        unvested_value = round(unvested_shares * share_price, 2)
+        total_value = round(total_shares * share_price, 2)
+        gain_loss = round((share_price - grant_price) * vested_shares, 2)
+        gain_loss_pct = round((share_price - grant_price) / grant_price * 100, 2) if grant_price > 0 else 0.0
+
+        return {
+            "id": grant_id,
+            "name": name,
+            "symbol": symbol,
+            "stock_name": stock_name,
+            "total_shares": total_shares,
+            "grant_date": grant_date,
+            "grant_price": round(grant_price, 2),
+            "share_price": round(share_price, 2),
+            "currency": currency,
+            "fx_rate": round(fx_rate, 6),
+            "vested_shares": vested_shares,
+            "unvested_shares": unvested_shares,
+            "vested_value": vested_value,
+            "unvested_value": unvested_value,
+            "total_value": total_value,
+            "gain_loss": gain_loss,
+            "gain_loss_pct": gain_loss_pct,
+            "vesting_events": vesting_events,
+        }
+
+    @classmethod
+    def addEquityGrant(cls, name: str, symbol: str, total_shares: int, grant_date: str, grant_price: float, vesting_events: list) -> dict:
+        """
+        Creates a new equity grant with optional vesting events.
+
+        :param name: Grant name.
+        :param symbol: Stock ticker symbol.
+        :param total_shares: Total shares granted.
+        :param grant_date: Grant date (YYYY-MM-DD).
+        :param grant_price: Share price at grant date.
+        :param vesting_events: List of dicts with 'date' and 'shares'.
+        :return: Created grant dict.
+        :raises ValueError: If vesting events exceed total_shares.
+        """
+        event_total = sum(e["shares"] for e in vesting_events)
+        if event_total > total_shares:
+            raise ValueError(
+                f"Vesting events total ({event_total}) exceeds total_shares ({total_shares})"
+            )
+
+        stockid = cls.addStock(symbol)
+
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "INSERT INTO equity_grants (name, stockid, total_shares, grant_date, grant_price) VALUES (?, ?, ?, ?, ?)",
+                (name, stockid, total_shares, grant_date, grant_price)
+            )
+            grant_id = cursor.lastrowid
+
+            for event in vesting_events:
+                connection.execute(
+                    "INSERT INTO equity_vesting_events (grant_id, date, shares, taxed_shares) VALUES (?, ?, ?, ?)",
+                    (grant_id, event["date"], event["shares"], event.get("taxed_shares", 0))
+                )
+            connection.commit()
+
+        return cls.getEquityGrant(grant_id)
+
+    @classmethod
+    def updateEquityGrant(cls, grant_id: int, name: str = None) -> dict:
+        """
+        Updates equity grant metadata.
+
+        :param grant_id: The grant ID.
+        :param name: New grant name (optional).
+        :return: Updated grant dict.
+        :raises KeyError: If the grant is not found.
+        """
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id FROM equity_grants WHERE id = ?", (grant_id,)
+            )
+            if not cursor.fetchone():
+                raise KeyError(f"Grant with id {grant_id} not found")
+
+            if name is not None:
+                connection.execute(
+                    "UPDATE equity_grants SET name = ? WHERE id = ?",
+                    (name, grant_id)
+                )
+                connection.commit()
+
+        return cls.getEquityGrant(grant_id)
+
+    @classmethod
+    def deleteEquityGrant(cls, grant_id: int) -> None:
+        """
+        Deletes an equity grant and its vesting events.
+
+        :param grant_id: The grant ID.
+        :raises KeyError: If the grant is not found.
+        """
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id FROM equity_grants WHERE id = ?", (grant_id,)
+            )
+            if not cursor.fetchone():
+                raise KeyError(f"Grant with id {grant_id} not found")
+
+            connection.execute(
+                "DELETE FROM equity_vesting_events WHERE grant_id = ?", (grant_id,)
+            )
+            connection.execute(
+                "DELETE FROM equity_grants WHERE id = ?", (grant_id,)
+            )
+            connection.commit()
+
+    @classmethod
+    def addEquityVestingEvent(cls, grant_id: int, date: str, shares: int, taxed_shares: int = 0) -> dict:
+        """
+        Adds a vesting event to a grant.
+
+        :param grant_id: The grant ID.
+        :param date: Vesting date (YYYY-MM-DD).
+        :param shares: Number of shares vesting (gross).
+        :param taxed_shares: Shares withheld for tax.
+        :return: Created event dict.
+        :raises KeyError: If the grant is not found.
+        :raises ValueError: If adding this event would exceed total_shares.
+        """
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT total_shares FROM equity_grants WHERE id = ?", (grant_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise KeyError(f"Grant with id {grant_id} not found")
+
+            total_shares = row[0]
+
+            cursor = connection.execute(
+                "SELECT COALESCE(SUM(shares), 0) FROM equity_vesting_events WHERE grant_id = ?",
+                (grant_id,)
+            )
+            current_total = cursor.fetchone()[0]
+
+            if current_total + shares > total_shares:
+                raise ValueError(
+                    f"Adding {shares} shares would exceed total_shares ({total_shares}). "
+                    f"Current vesting total: {current_total}"
+                )
+
+            cursor = connection.execute(
+                "INSERT INTO equity_vesting_events (grant_id, date, shares, taxed_shares) VALUES (?, ?, ?, ?)",
+                (grant_id, date, shares, taxed_shares)
+            )
+            event_id = cursor.lastrowid
+            connection.commit()
+
+        return {
+            "id": event_id,
+            "grant_id": grant_id,
+            "date": date,
+            "shares": shares,
+            "taxed_shares": taxed_shares,
+            "net_shares": shares - taxed_shares,
+        }
+
+    @classmethod
+    def updateEquityVestingEvent(cls, event_id: int, date: str = None, shares: int = None, taxed_shares: int = None) -> dict:
+        """
+        Updates a vesting event.
+
+        :param event_id: The vesting event ID.
+        :param date: New vesting date (optional).
+        :param shares: New number of shares (optional).
+        :param taxed_shares: New taxed shares (optional).
+        :return: Updated event dict.
+        :raises KeyError: If the event is not found.
+        :raises ValueError: If new shares would exceed total_shares.
+        """
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id, grant_id, date, shares, taxed_shares FROM equity_vesting_events WHERE id = ?",
+                (event_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise KeyError(f"Vesting event with id {event_id} not found")
+
+            current_grant_id = row[1]
+            new_date = date if date is not None else row[2]
+            new_shares = shares if shares is not None else row[3]
+            new_taxed = taxed_shares if taxed_shares is not None else (row[4] or 0)
+
+            # Validate total doesn't exceed total_shares if shares changed
+            if shares is not None:
+                cursor = connection.execute(
+                    "SELECT total_shares FROM equity_grants WHERE id = ?", (current_grant_id,)
+                )
+                total_shares = cursor.fetchone()[0]
+
+                cursor = connection.execute(
+                    "SELECT COALESCE(SUM(shares), 0) FROM equity_vesting_events "
+                    "WHERE grant_id = ? AND id != ?",
+                    (current_grant_id, event_id)
+                )
+                other_total = cursor.fetchone()[0]
+
+                if other_total + new_shares > total_shares:
+                    raise ValueError(
+                        f"Updating to {new_shares} shares would exceed total_shares ({total_shares}). "
+                        f"Other events total: {other_total}"
+                    )
+
+            connection.execute(
+                "UPDATE equity_vesting_events SET date = ?, shares = ?, taxed_shares = ? WHERE id = ?",
+                (new_date, new_shares, new_taxed, event_id)
+            )
+            connection.commit()
+
+        return {
+            "id": event_id,
+            "grant_id": current_grant_id,
+            "date": new_date,
+            "shares": new_shares,
+            "taxed_shares": new_taxed,
+            "net_shares": new_shares - new_taxed,
+        }
+
+    @classmethod
+    def deleteEquityVestingEvent(cls, event_id: int) -> None:
+        """
+        Deletes a vesting event.
+
+        :param event_id: The vesting event ID.
+        :raises KeyError: If the event is not found.
+        """
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id FROM equity_vesting_events WHERE id = ?", (event_id,)
+            )
+            if not cursor.fetchone():
+                raise KeyError(f"Vesting event with id {event_id} not found")
+
+            connection.execute(
+                "DELETE FROM equity_vesting_events WHERE id = ?", (event_id,)
+            )
+            connection.commit()
+
+    @classmethod
+    def getEquityVestedTotal(cls) -> float:
+        """
+        Computes the total vested equity value in EUR across all grants.
+
+        :return: Total vested value in EUR.
+        """
+        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        total = 0.0
+
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id, stockid, total_shares FROM equity_grants"
+            )
+            grants = cursor.fetchall()
+
+        for grant in grants:
+            grant_id, stockid, total_shares = grant
+
+            stock = cls.stocks.get(stockid)
+            if stock is None:
+                continue
+
+            try:
+                price_info = StockAPI.get_current_price(stock.symbol)
+                share_price = price_info.get("currentPrice", 0.0) or 0.0
+            except Exception:
+                share_price = stock.price or 0.0
+
+            fx_rate = StockAPI.get_fx_rate(stock.currency or "EUR", "EUR")
+
+            with get_connection(DB_PATH) as connection:
+                cursor = connection.execute(
+                    "SELECT COALESCE(SUM(shares - taxed_shares), 0) FROM equity_vesting_events "
+                    "WHERE grant_id = ? AND date <= ?",
+                    (grant_id, today)
+                )
+                vested_shares = cursor.fetchone()[0]
+
+            total += vested_shares * share_price * fx_rate
+
+        return round(total, 2)
+
+    @classmethod
+    def getEquitySummary(cls) -> dict:
+        """
+        Computes an aggregated equity summary across all grants.
+
+        :return: Dict with total vested/unvested values, gain/loss, and grant count.
+        """
+        grants = cls.getEquityGrants()
+
+        total_vested = 0.0
+        total_unvested = 0.0
+        total_gain_loss = 0.0
+        total_grant_cost = 0.0
+
+        for g in grants:
+            total_vested += g["vested_value"]
+            total_unvested += g["unvested_value"]
+            total_gain_loss += g["gain_loss"]
+            total_grant_cost += g["vested_shares"] * g["grant_price"]
+
+        total_gain_loss_pct = round(total_gain_loss / total_grant_cost * 100, 2) if total_grant_cost > 0 else 0.0
+        currency = grants[0]["currency"] if grants else "USD"
+
+        return {
+            "total_vested_value": round(total_vested, 2),
+            "total_unvested_value": round(total_unvested, 2),
+            "total_gain_loss": round(total_gain_loss, 2),
+            "total_gain_loss_pct": total_gain_loss_pct,
+            "grants_count": len(grants),
+            "currency": currency,
+        }
+
+    @classmethod
+    def getEquityValueHistory(cls, start_date: str, end_date: str, target_dates: list = None, convert_to_eur: bool = False) -> list:
+        """
+        Computes historical equity vested value for a set of target dates.
+
+        For each target date, uses the latest available stock price and FX rate
+        up to that date, so equity appears from the vesting date onward even if
+        historical price data is sparse.
+
+        :param start_date: Start date (YYYY-MM-DD).
+        :param end_date: End date (YYYY-MM-DD).
+        :param target_dates: Sorted list of date strings to compute values for.
+                             If None, uses dates from historicalstocks.
+        :return: List of (date_str, value_eur) tuples.
+        """
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT eg.id, eg.stockid, COALESCE(s.currency, 'EUR') "
+                "FROM equity_grants eg JOIN stocks s ON eg.stockid = s.stockid"
+            )
+            grants = cursor.fetchall()
+
+        if not grants:
+            return []
+
+        result = {}  # date -> total equity value
+
+        for grant_id, stockid, currency in grants:
+            # Get vesting events sorted by date
+            with get_connection(DB_PATH) as connection:
+                cursor = connection.execute(
+                    "SELECT date, (shares - taxed_shares) as net "
+                    "FROM equity_vesting_events WHERE grant_id = ? ORDER BY date ASC",
+                    (grant_id,)
+                )
+                events = cursor.fetchall()
+
+            if not events:
+                continue
+
+            # Get ALL historical prices up to end_date (including before start_date
+            # so we can carry forward the latest price)
+            with get_connection(DB_PATH) as connection:
+                cursor = connection.execute(
+                    "SELECT datestamp, closeprice FROM historicalstocks "
+                    "WHERE stockid = ? AND datestamp <= ? "
+                    "ORDER BY datestamp ASC",
+                    (stockid, end_date)
+                )
+                all_prices = cursor.fetchall()
+
+            # Build price lookup dict for forward-fill
+            price_by_date = {row[0]: row[1] for row in all_prices}
+            price_dates_sorted = [row[0] for row in all_prices]
+
+            if not all_prices:
+                continue
+
+            # Build FX rate lookup (only needed when converting to EUR)
+            fx_lookup = {}
+            if convert_to_eur and currency and currency != "EUR":
+                pair = f"{currency}EUR"
+                with get_connection(DB_PATH) as connection:
+                    cursor = connection.execute(
+                        "SELECT date, rate FROM fx_rates_history "
+                        "WHERE pair = ? AND date <= ? "
+                        "ORDER BY date ASC",
+                        (pair, end_date)
+                    )
+                    fx_lookup = {row[0]: row[1] for row in cursor.fetchall()}
+
+            # Determine which dates to iterate over
+            if target_dates is not None:
+                dates_to_process = target_dates
+            else:
+                dates_to_process = [d for d in price_dates_sorted if d >= start_date]
+
+            # Walk through target dates
+            cumulative_vested = 0
+            event_idx = 0
+            last_price = None
+            last_fx = 1.0
+            price_idx = 0
+
+            # Pre-accumulate vesting events before first target date
+            first_date = dates_to_process[0] if dates_to_process else start_date
+            while event_idx < len(events) and events[event_idx][0] < first_date:
+                cumulative_vested += events[event_idx][1]
+                event_idx += 1
+
+            # Pre-fill last_price from prices before first target date
+            for p_date, p_val in all_prices:
+                if p_date < first_date:
+                    last_price = p_val
+                else:
+                    break
+
+            # Pre-fill last_fx from rates before first target date
+            if convert_to_eur and currency and currency != "EUR":
+                for fx_date in sorted(fx_lookup.keys()):
+                    if fx_date < first_date:
+                        last_fx = fx_lookup[fx_date]
+                    else:
+                        break
+
+            for date_str in dates_to_process:
+                # Accumulate vesting events up to this date
+                while event_idx < len(events) and events[event_idx][0] <= date_str:
+                    cumulative_vested += events[event_idx][1]
+                    event_idx += 1
+
+                if cumulative_vested <= 0:
+                    continue
+
+                # Forward-fill price: use exact match or carry forward last known
+                if date_str in price_by_date:
+                    last_price = price_by_date[date_str]
+
+                if last_price is None:
+                    continue
+
+                # Forward-fill FX rate (only when converting to EUR)
+                if convert_to_eur and currency and currency != "EUR":
+                    if date_str in fx_lookup:
+                        last_fx = fx_lookup[date_str]
+
+                value = cumulative_vested * last_price * (last_fx if convert_to_eur else 1.0)
+                result[date_str] = result.get(date_str, 0.0) + value
+
+        return sorted(result.items())
+
+    @classmethod
+    def updateFxRatesHistory(cls, pairs: list) -> None:
+        """
+        Fetches and stores historical FX rates for given currency pairs.
+
+        :param pairs: List of currency pair strings (e.g. ['USDEUR', 'SEKEUR']).
+        """
+        for pair in pairs:
+            # Get the last stored date for this pair
+            with get_connection(DB_PATH) as connection:
+                cursor = connection.execute(
+                    "SELECT MAX(date) FROM fx_rates_history WHERE pair = ?", (pair,)
+                )
+                last_date = cursor.fetchone()[0]
+
+            start_date = last_date if last_date else "2020-01-01"
+            rates = StockAPI.get_historical_fx_rates(pair, start_date)
+
+            if not rates:
+                continue
+
+            with get_connection(DB_PATH) as connection:
+                for date_str, rate in rates:
+                    connection.execute(
+                        "INSERT INTO fx_rates_history (pair, date, rate) VALUES (?, ?, ?) "
+                        "ON CONFLICT(pair, date) DO UPDATE SET rate = excluded.rate",
+                        (pair, date_str, rate)
+                    )
+                connection.commit()
+            logger.info("updateFxRatesHistory(): Updated %d rate(s) for %s", len(rates), pair)
+
+    @classmethod
     def getStockPriceHistory(cls, symbol: str, start_date: str = None, end_date: str = None) -> list:
         """
         Fetches historical price data for a single stock.
@@ -692,22 +1275,8 @@ class DatabaseService:
         ]
 
     @classmethod
-    def updateHistoricalStocksPortfolio(cls, start_date: str, end_date: str) -> None:
-        """
-        Updates the historicalstocks table with data fetched from the StockAPI.
-
-        :param start_date: Start date for the historical data (YYYY-MM-DD).
-        :param end_date: End date for the historical data (YYYY-MM-DD).
-        """
-        symbols = [p.stock.symbol for p in cls.positions.values()]
-
-        # Fetch the last timestamp from the table
-        with get_connection(DB_PATH) as connection:
-            answers = connection.execute('SELECT MAX(datestamp) FROM historicalstocks')
-            last_timestamp = answers.fetchone()[0]
-
-        historical_data = StockAPI.get_historical_data(symbols, last_timestamp)
-
+    def _insertHistoricalData(cls, historical_data) -> None:
+        """Inserts historical stock data rows into the database."""
         with get_connection(DB_PATH) as connection:
             cursor = connection.cursor()
             for stock_data in historical_data:
@@ -723,7 +1292,68 @@ class DatabaseService:
                         closeprice = excluded.closeprice
                     ''', (row['Close'], stockid, row['Date'].strftime('%Y-%m-%d')))
             connection.commit()
-        logger.info("updateHistoricalStocks(): Historical data updated for %d symbol(s)", len(symbols))
+
+    @classmethod
+    def updateHistoricalStocksPortfolio(cls, start_date: str, end_date: str) -> None:
+        """
+        Updates the historicalstocks table with data fetched from the StockAPI.
+        Includes both portfolio position stocks and equity grant stocks.
+
+        :param start_date: Start date for the historical data (YYYY-MM-DD).
+        :param end_date: End date for the historical data (YYYY-MM-DD).
+        """
+        symbols = [p.stock.symbol for p in cls.positions.values()]
+
+        # Get global min/max timestamps from existing historical data
+        with get_connection(DB_PATH) as connection:
+            row = connection.execute(
+                'SELECT MIN(datestamp), MAX(datestamp) FROM historicalstocks'
+            ).fetchone()
+            earliest_date = row[0]
+            last_timestamp = row[1]
+
+        # Collect equity grant stocks, tracking which ones need backfill
+        equity_new_symbols = []
+        equity_backfill = []  # (symbol, backfill_end)
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT DISTINCT stockid FROM equity_grants"
+            )
+            equity_stockids = {row[0] for row in cursor.fetchall()}
+        for stockid in equity_stockids:
+            stock = cls.stocks.get(stockid)
+            if stock and stock.symbol not in symbols:
+                with get_connection(DB_PATH) as connection:
+                    cursor = connection.execute(
+                        "SELECT MIN(datestamp) FROM historicalstocks WHERE stockid = ?",
+                        (stockid,)
+                    )
+                    min_date = cursor.fetchone()[0]
+                if min_date is None:
+                    equity_new_symbols.append(stock.symbol)
+                else:
+                    symbols.append(stock.symbol)
+                    # Backfill if this stock's earliest date is after the portfolio's earliest
+                    if earliest_date and min_date > earliest_date:
+                        equity_backfill.append((stock.symbol, min_date))
+
+        # Incremental update for existing stocks
+        historical_data = StockAPI.get_historical_data(symbols, last_timestamp)
+        cls._insertHistoricalData(historical_data)
+
+        # Full history fetch for new equity stocks that have no data yet
+        if equity_new_symbols:
+            fetch_start = earliest_date or start_date
+            new_data = StockAPI.get_historical_data(equity_new_symbols, fetch_start, end_date)
+            cls._insertHistoricalData(new_data)
+
+        # Backfill equity stocks that are missing early history
+        for symbol, backfill_end in equity_backfill:
+            logger.info("Backfilling historical data for %s from %s to %s", symbol, earliest_date, backfill_end)
+            backfill_data = StockAPI.get_historical_data([symbol], earliest_date, backfill_end)
+            cls._insertHistoricalData(backfill_data)
+
+        logger.info("updateHistoricalStocks(): Historical data updated for %d symbol(s)", len(symbols) + len(equity_new_symbols) + len(equity_backfill))
     
     @classmethod
     def updateHistoricalDividendsPortfolio(cls) -> None:

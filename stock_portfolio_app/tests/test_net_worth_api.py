@@ -26,11 +26,13 @@ def create_test_client():
     return TestClient(app)
 
 
+@patch('services.database_service.DatabaseService.getEquityVestedTotal')
 @patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
 @patch('services.database_service.DatabaseService.getNetWorthAssets')
-def test_get_current_net_worth(mock_get_assets, mock_pea_value):
+def test_get_current_net_worth(mock_get_assets, mock_pea_value, mock_equity_total):
     """Test getting current net worth with PEA + stored assets."""
     mock_pea_value.return_value = 89000.0
+    mock_equity_total.return_value = 0.0
     mock_get_assets.return_value = [
         {"id": "cto", "label": "CTO", "current_value": 12000.0, "updated_at": "2026-02-26"},
         {"id": "savings", "label": "Savings", "current_value": 10000.0, "updated_at": "2026-02-26"},
@@ -52,11 +54,13 @@ def test_get_current_net_worth(mock_get_assets, mock_pea_value):
     assert 'last_updated' in data
 
 
+@patch('services.database_service.DatabaseService.getEquityVestedTotal')
 @patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
 @patch('services.database_service.DatabaseService.getNetWorthAssets')
-def test_get_current_net_worth_no_assets(mock_get_assets, mock_pea_value):
+def test_get_current_net_worth_no_assets(mock_get_assets, mock_pea_value, mock_equity_total):
     """Test getting current net worth with only PEA (no stored assets)."""
     mock_pea_value.return_value = 50000.0
+    mock_equity_total.return_value = 0.0
     mock_get_assets.return_value = []
 
     client = create_test_client()
@@ -83,13 +87,15 @@ def test_get_current_net_worth_error(mock_pea_value):
 
 
 @patch('services.database_service.DatabaseService.getNetWorthSnapshots')
+@patch('services.database_service.DatabaseService.getEquityValueHistory')
 @patch('services.database_service.DatabaseService.getPortfolioValueHistory')
-def test_get_history(mock_pea_history, mock_snapshots):
+def test_get_history(mock_pea_history, mock_equity_history, mock_snapshots):
     """Test getting net worth history with PEA + stored asset snapshots."""
     mock_pea_history.return_value = [
         ("2024-01-31", 60000.0),
         ("2024-02-28", 62000.0),
     ]
+    mock_equity_history.return_value = []
     mock_snapshots.return_value = [
         {"date": "2024-01-31", "asset_id": "savings", "value": 15000.0},
         {"date": "2024-02-28", "asset_id": "savings", "value": 15500.0},
@@ -107,6 +113,36 @@ def test_get_history(mock_pea_history, mock_snapshots):
     assert data['data'][0]['assets']['savings'] == 15000.0
     assert data['data'][1]['date'] == '2024-02-28'
     assert data['data'][1]['total'] == 77500.0
+
+
+@patch('services.database_service.DatabaseService.getNetWorthSnapshots')
+@patch('services.database_service.DatabaseService.getEquityValueHistory')
+@patch('services.database_service.DatabaseService.getPortfolioValueHistory')
+def test_get_history_includes_equity(mock_pea_history, mock_equity_history, mock_snapshots):
+    """Test that net worth history includes equity from equity grants."""
+    mock_pea_history.return_value = [
+        ("2024-01-31", 50000.0),
+        ("2024-02-28", 52000.0),
+    ]
+    mock_equity_history.return_value = [
+        ("2024-01-31", 4000.0),
+        ("2024-02-28", 4200.0),
+    ]
+    mock_snapshots.return_value = []
+
+    client = create_test_client()
+    resp = client.get('/api/net-worth/history?start_date=2024-01-01&end_date=2024-12-31')
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data['data']) == 2
+    assert data['data'][0]['date'] == '2024-01-31'
+    assert data['data'][0]['total'] == 54000.0
+    assert data['data'][0]['assets']['pea'] == 50000.0
+    assert data['data'][0]['assets']['equity'] == 4000.0
+    assert data['data'][1]['date'] == '2024-02-28'
+    assert data['data'][1]['total'] == 56200.0
+    assert data['data'][1]['assets']['equity'] == 4200.0
 
 
 def test_get_history_invalid_dates():

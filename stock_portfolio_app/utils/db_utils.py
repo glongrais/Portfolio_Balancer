@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 SLOW_QUERY_THRESHOLD_MS = float(os.environ.get('SLOW_QUERY_THRESHOLD_MS', '100'))
 
-REQUIRED_TABLES = ['stocks', 'positions', 'transactions', 'historicalstocks', 'historicaldividends', 'deposits', 'net_worth_assets', 'net_worth_snapshots']
+REQUIRED_TABLES = ['stocks', 'positions', 'transactions', 'historicalstocks', 'historicaldividends', 'deposits', 'net_worth_assets', 'net_worth_snapshots', 'equity_grants', 'equity_vesting_events', 'fx_rates_history']
 REQUIRED_VIEWS = ['mar__stocks', 'int__portfolio_value_evolution', 'int__portfolio_dividends_total', 'int__transactions_dividends']
 
 
@@ -215,12 +215,43 @@ def initialize_database(db_path: str):
                     UNIQUE(date, asset_id)
     )
     ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS equity_grants (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    stockid INTEGER NOT NULL,
+                    total_shares INTEGER NOT NULL,
+                    grant_date TEXT NOT NULL,
+                    FOREIGN KEY (stockid) REFERENCES stocks (stockid)
+    )
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS equity_vesting_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    grant_id INTEGER NOT NULL,
+                    date TEXT NOT NULL,
+                    shares INTEGER NOT NULL,
+                    FOREIGN KEY (grant_id) REFERENCES equity_grants (id),
+                    UNIQUE(grant_id, date)
+    )
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS fx_rates_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    pair TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    rate REAL NOT NULL,
+                    UNIQUE(pair, date)
+    )
+    ''')
     connection.commit()
 
     # Migrate existing tables: add columns that may not exist yet
     _add_column_if_missing(cursor, 'stocks', 'logo_url', "TEXT DEFAULT ''")
     _add_column_if_missing(cursor, 'stocks', 'quote_type', "TEXT DEFAULT 'EQUITY'")
     _add_column_if_missing(cursor, 'stocks', 'ex_dividend_date', "TEXT DEFAULT NULL")
+    _add_column_if_missing(cursor, 'equity_vesting_events', 'taxed_shares', "INTEGER NOT NULL DEFAULT 0")
+    _add_column_if_missing(cursor, 'equity_grants', 'grant_price', "REAL NOT NULL DEFAULT 0")
 
     # Recreate dbt-managed views to reflect new columns in stocks table
     _migrate_dbt_views(cursor)

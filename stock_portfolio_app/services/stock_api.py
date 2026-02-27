@@ -120,6 +120,53 @@ class StockAPI:
         return data
     
     @classmethod
+    @cached(cache=TTLCache(maxsize=64, ttl=300))
+    def get_fx_rate(cls, from_currency: str, to_currency: str = "EUR") -> float:
+        """
+        Fetches the current FX rate between two currencies.
+
+        Parameters:
+        - from_currency: Source currency code (e.g. 'USD')
+        - to_currency: Target currency code (default 'EUR')
+
+        Returns:
+        - float: Exchange rate (e.g. 0.92 for USD→EUR)
+        """
+        if from_currency.upper() == to_currency.upper():
+            return 1.0
+        try:
+            ticker = cls._get_ticker(f"{from_currency}{to_currency}=X")
+            info = ticker.info
+            return info.get("regularMarketPrice", 1.0) or 1.0
+        except Exception as e:
+            cls.logger.warning(f"Failed to fetch FX rate {from_currency}/{to_currency}: {e}")
+            return 1.0
+
+    @classmethod
+    def get_historical_fx_rates(cls, pair: str, start_date: str) -> list:
+        """
+        Fetches historical FX rates for a currency pair.
+
+        Parameters:
+        - pair: Currency pair (e.g. 'USDEUR')
+        - start_date: Start date for history (YYYY-MM-DD)
+
+        Returns:
+        - list: List of (date_str, rate) tuples
+        """
+        try:
+            ticker = cls._get_ticker(f"{pair}=X")
+            hist = ticker.history(start=start_date)
+            hist.reset_index(inplace=True)
+            return [
+                (row['Date'].strftime('%Y-%m-%d'), row['Close'])
+                for _, row in hist.iterrows()
+            ]
+        except Exception as e:
+            cls.logger.warning(f"Failed to fetch historical FX rates for {pair}: {e}")
+            return []
+
+    @classmethod
     def get_current_year_dividends(cls, symbols: list):
         data = {}
         for symbol in symbols:

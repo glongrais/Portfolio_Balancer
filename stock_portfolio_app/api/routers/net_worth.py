@@ -33,8 +33,13 @@ async def get_current_net_worth():
     try:
         pea_value = float(PortfolioService.calculatePortfolioValue())
         stored_assets = DatabaseService.getNetWorthAssets()
+        equity_vested_total = DatabaseService.getEquityVestedTotal()
 
         assets = [NetWorthAssetItem(id="pea", label="PEA", value=pea_value)]
+        if equity_vested_total > 0:
+            assets.append(NetWorthAssetItem(
+                id="equity", label="Equity", value=equity_vested_total
+            ))
         for asset in stored_assets:
             assets.append(NetWorthAssetItem(
                 id=asset["id"],
@@ -87,11 +92,21 @@ async def get_net_worth_history(
         monthly_data = defaultdict(dict)
 
         # PEA history from portfolio value evolution
+        pea_dates = []
         pea_history = DatabaseService.getPortfolioValueHistory()
         for row in pea_history:
             date_str = row[0] if isinstance(row[0], str) else row[0].strftime('%Y-%m-%d')
             if start_date <= date_str <= end_date:
                 monthly_data[date_str]["pea"] = float(row[1])
+                pea_dates.append(date_str)
+
+        # Equity history: compute for every PEA date using forward-filled prices
+        equity_history = DatabaseService.getEquityValueHistory(
+            start_date, end_date, target_dates=sorted(pea_dates), convert_to_eur=True
+        )
+        for date_str, value in equity_history:
+            if value > 0:
+                monthly_data[date_str]["equity"] = round(value, 2)
 
         # Other asset snapshots
         snapshots = DatabaseService.getNetWorthSnapshots(start_date, end_date)

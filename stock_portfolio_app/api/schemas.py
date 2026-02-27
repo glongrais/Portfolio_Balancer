@@ -233,3 +233,68 @@ class NetWorthAssetResponse(BaseModel):
     label: str = Field(..., description="Display name")
     current_value: float = Field(..., description="Current value in EUR")
     updated_at: str = Field(..., description="Last update date (YYYY-MM-DD)")
+
+# Equity Schemas
+class VestingEventCreate(BaseModel):
+    date: str = Field(..., description="Vesting date (YYYY-MM-DD)")
+    shares: int = Field(..., description="Number of shares vesting (gross)", gt=0)
+    taxed_shares: int = Field(default=0, description="Shares withheld for tax", ge=0)
+
+class VestingEventResponse(BaseModel):
+    id: int = Field(..., description="Vesting event ID")
+    grant_id: int = Field(..., description="Grant ID")
+    date: str = Field(..., description="Vesting date (YYYY-MM-DD)")
+    shares: int = Field(..., description="Number of shares vesting (gross)")
+    taxed_shares: int = Field(default=0, description="Shares withheld for tax")
+    net_shares: int = Field(..., description="Shares actually received (shares - taxed_shares)")
+
+class VestingEventUpdate(BaseModel):
+    date: Optional[str] = Field(None, description="New vesting date (YYYY-MM-DD)")
+    shares: Optional[int] = Field(None, description="New number of shares vesting (gross)", gt=0)
+    taxed_shares: Optional[int] = Field(None, description="New shares withheld for tax", ge=0)
+
+class EquityGrantCreate(BaseModel):
+    name: str = Field(..., description="Grant name (e.g. 'Initial Grant 2024')")
+    symbol: str = Field(..., description="Stock ticker symbol (added to stocks table)")
+    total_shares: int = Field(..., description="Total number of shares granted", gt=0)
+    grant_date: str = Field(..., description="Grant date (YYYY-MM-DD)")
+    grant_price: float = Field(..., description="Share price at grant date", gt=0)
+    vesting_events: List[VestingEventCreate] = Field(default=[], description="Initial vesting schedule")
+
+class EquityGrantUpdate(BaseModel):
+    name: Optional[str] = Field(None, description="New grant name")
+
+class EquityGrantResponse(BaseModel):
+    id: int = Field(..., description="Grant ID")
+    name: str = Field(..., description="Grant name")
+    symbol: str = Field(..., description="Stock ticker symbol")
+    stock_name: str = Field(default="", description="Company name from stocks table")
+    total_shares: int = Field(..., description="Total shares granted")
+    grant_date: str = Field(..., description="Grant date (YYYY-MM-DD)")
+    grant_price: float = Field(..., description="Share price at grant date")
+    share_price: float = Field(..., description="Current share price (live)")
+    currency: str = Field(..., description="Stock's native currency")
+    fx_rate: float = Field(..., description="FX rate to EUR")
+    vested_shares: int = Field(..., description="Number of vested shares")
+    unvested_shares: int = Field(..., description="Number of unvested shares")
+    vested_value: float = Field(..., description="Vested value in stock currency")
+    unvested_value: float = Field(..., description="Unvested value in stock currency")
+    total_value: float = Field(..., description="Total value of all shares in stock currency")
+    gain_loss: float = Field(..., description="Gain/loss on vested shares in stock currency")
+    gain_loss_pct: float = Field(..., description="Gain/loss percentage vs grant price")
+    vesting_events: List[VestingEventResponse] = Field(..., description="Vesting schedule")
+
+class EquitySummaryResponse(BaseModel):
+    total_vested_value: float = Field(..., description="Total vested equity value in stock currency")
+    total_unvested_value: float = Field(..., description="Total unvested equity value in stock currency")
+    total_gain_loss: float = Field(..., description="Total gain/loss on vested shares in stock currency")
+    total_gain_loss_pct: float = Field(..., description="Overall gain/loss percentage")
+    grants_count: int = Field(..., description="Number of equity grants")
+    currency: str = Field(default="EUR", description="Currency")
+
+class EquityValueHistoryItem(BaseModel):
+    date: str = Field(..., description="Date (YYYY-MM-DD)")
+    value: float = Field(..., description="Vested equity value in EUR")
+
+class EquityValueHistoryResponse(BaseModel):
+    data: List[EquityValueHistoryItem] = Field(..., description="Historical equity value data points")
