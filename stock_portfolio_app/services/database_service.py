@@ -333,6 +333,22 @@ class DatabaseService:
         logger.info("removePosition(): Removed position %s from portfolio %d", symbol, portfolio_id)
 
     @classmethod
+    def getPortfolios(cls) -> list:
+
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute("SELECT * FROM portfolios")
+            rows = cursor.fetchall()
+
+        return [
+            {
+                "portfolio_id": row[0],
+                "name": row[1],
+                "currency": row[2],
+            }
+            for row in rows
+        ]
+
+    @classmethod
     def upsertTransactions(cls, date: datetime, rowid: int, type: str, symbol: str, quantity: float, price: float, portfolio_id: int = 1) -> None:
         """
         Add or update a transaction in the database.

@@ -111,9 +111,9 @@ app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
 
 # Include routers
-app.include_router(portfolio.router, prefix="/api/v1/portfolio", tags=["portfolio"])
-app.include_router(deposits.router, prefix="/api/v1/portfolio", tags=["deposits"])
-app.include_router(transactions.router, prefix="/api/v1/portfolio", tags=["transactions"])
+app.include_router(portfolio.router, prefix="/api/v1/portfolios", tags=["portfolio"])
+app.include_router(deposits.router, prefix="/api/v1/portfolios", tags=["deposits"])
+app.include_router(transactions.router, prefix="/api/v1/portfolios", tags=["transactions"])
 app.include_router(stocks.router, prefix="/api/v1/stocks", tags=["stocks"])
 app.include_router(dev.router, prefix="/api/v1/dev", tags=["dev"])
 app.include_router(net_worth.router, prefix="/api/v1/net-worth", tags=["net-worth"])

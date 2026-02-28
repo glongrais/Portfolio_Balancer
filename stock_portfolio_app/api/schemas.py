@@ -64,6 +64,11 @@ class PositionUpdate(BaseModel):
     distribution_target: Optional[float] = Field(None, description="New target distribution percentage", ge=0, le=100)
 
 # Portfolio Schemas
+class PortfoliosResponse(BaseModel):
+    portfolio_id: int = Field(..., description="Portfolio identifier")
+    name: str = Field(..., description="Portfolio name")
+    currency: str = Field(..., description="Currency")
+
 class PortfolioValueResponse(BaseModel):
     total_value: float = Field(..., description="Total portfolio value")
     currency: str = Field(default="EUR", description="Currency")

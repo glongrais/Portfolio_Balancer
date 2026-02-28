@@ -160,6 +160,13 @@ def initialize_database(db_path: str):
     )
     ''')
     cursor.execute('''
+    CREATE TABLE IF NOT EXISTS portfolios (
+                    portfolioid INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT,
+                    currency TEXT
+    )
+    ''')
+    cursor.execute('''
     CREATE TABLE IF NOT EXISTS historicalstocks (
                     closeprice REAL    NULL    ,
                     stockid    INTEGER NOT NULL,

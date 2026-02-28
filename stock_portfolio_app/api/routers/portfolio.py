@@ -23,6 +23,7 @@ from api.schemas import (
     PositionCreate,
     PositionUpdate,
     UpdatePricesResponse,
+    PortfoliosResponse,
     PortfolioValueHistoryResponse,
     PortfolioValueHistoryItem,
     DividendCalendarEvent,
@@ -36,6 +37,27 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+@router.get("/", response_model=List[PortfoliosResponse])
+async def get_portfolios():
+    """
+    Get all portfolios
+    """
+
+    try:
+        portfolios = []
+        for portfolio in DatabaseService.getPortfolios():
+            portfolios.append(PortfoliosResponse(
+                portfolio_id=portfolio["portfolio_id"],
+                name=portfolio["name"],
+                currency=portfolio["currency"]
+            ))
+        return portfolios
+    except Exception as e:
+        logger.error(f"Error fetching the portfolios: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch the portfolios: {str(e)}"
+        )
 @router.get("/{portfolio_id}/value", response_model=PortfolioValueResponse)
 async def get_portfolio_value(portfolio_id: int = Path(..., description="Portfolio ID")):
     """
