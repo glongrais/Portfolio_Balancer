@@ -25,7 +25,7 @@ def reset_database_service():
 def create_test_client():
     """Create a minimal FastAPI app with transactions router."""
     app = FastAPI()
-    app.include_router(transactions_router.router, prefix="/api/transactions", tags=["transactions"])
+    app.include_router(transactions_router.router, prefix="/api/portfolio", tags=["transactions"])
     return TestClient(app)
 
 
@@ -36,16 +36,16 @@ def test_get_transactions_all(mock_connect):
     mock_cursor = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
     mock_conn.execute.return_value = mock_cursor
-    
+
     # Mock transaction data (8 columns: transactionid, stockid, symbol, quantity, price, type, datestamp, name)
     mock_cursor.fetchall.return_value = [
         (1, 1, 'AAPL', 10, 150.0, 'buy', '2024-01-15', 'Apple Inc.'),
         (2, 2, 'GOOGL', 5, 2000.0, 'buy', '2024-01-16', 'Alphabet Inc.'),
     ]
-    
+
     client = create_test_client()
-    resp = client.get('/api/transactions/')
-    
+    resp = client.get('/api/portfolio/1/transactions/')
+
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 2
@@ -62,19 +62,19 @@ def test_get_transactions_filter_by_symbol(mock_connect):
     mock_cursor = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
     mock_conn.execute.return_value = mock_cursor
-    
+
     mock_cursor.fetchall.return_value = [
         (1, 1, 'AAPL', 10, 150.0, 'buy', '2024-01-15', 'Apple Inc.'),
     ]
 
     client = create_test_client()
-    resp = client.get('/api/transactions/?symbol=AAPL')
-    
+    resp = client.get('/api/portfolio/1/transactions/?symbol=AAPL')
+
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
     assert data[0]['symbol'] == 'AAPL'
-    
+
     # Verify the query was called with correct parameters
     call_args = mock_conn.execute.call_args
     assert 'WHERE' in call_args[0][0]
@@ -88,14 +88,14 @@ def test_get_transactions_filter_by_type(mock_connect):
     mock_cursor = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
     mock_conn.execute.return_value = mock_cursor
-    
+
     mock_cursor.fetchall.return_value = [
         (2, 1, 'AAPL', 5, 155.0, 'sell', '2024-01-20', 'Apple Inc.'),
     ]
 
     client = create_test_client()
-    resp = client.get('/api/transactions/?transaction_type=sell')
-    
+    resp = client.get('/api/portfolio/1/transactions/?transaction_type=sell')
+
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
@@ -109,23 +109,24 @@ def test_get_transactions_filter_by_both(mock_connect):
     mock_cursor = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
     mock_conn.execute.return_value = mock_cursor
-    
+
     mock_cursor.fetchall.return_value = [
         (2, 1, 'AAPL', 5, 155.0, 'sell', '2024-01-20', 'Apple Inc.'),
     ]
 
     client = create_test_client()
-    resp = client.get('/api/transactions/?symbol=AAPL&transaction_type=sell')
-    
+    resp = client.get('/api/portfolio/1/transactions/?symbol=AAPL&transaction_type=sell')
+
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
-    
+
     # Verify both conditions are in the query
     call_args = mock_conn.execute.call_args
     query = call_args[0][0]
     assert query.count('WHERE') == 1
-    assert query.count('AND') == 1
+    # portfolioid + symbol + type = 2 ANDs
+    assert query.count('AND') == 2
 
 
 @patch('sqlite3.connect')
@@ -135,16 +136,16 @@ def test_get_transactions_with_limit(mock_connect):
     mock_cursor = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
     mock_conn.execute.return_value = mock_cursor
-    
+
     mock_cursor.fetchall.return_value = [(i, 1, 'AAPL', 1, 150.0, 'buy', f'2024-01-{i:02d}', 'Apple Inc.') for i in range(1, 11)]
-    
+
     client = create_test_client()
-    resp = client.get('/api/transactions/?limit=10')
-    
+    resp = client.get('/api/portfolio/1/transactions/?limit=10')
+
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 10
-    
+
     # Verify limit is in the query
     call_args = mock_conn.execute.call_args
     assert 'LIMIT' in call_args[0][0]
@@ -158,12 +159,12 @@ def test_get_transactions_empty_result(mock_connect):
     mock_cursor = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
     mock_conn.execute.return_value = mock_cursor
-    
+
     mock_cursor.fetchall.return_value = []
-    
+
     client = create_test_client()
-    resp = client.get('/api/transactions/')
-    
+    resp = client.get('/api/portfolio/1/transactions/')
+
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 0
@@ -174,7 +175,7 @@ def test_add_transaction_buy(mock_upsert):
     """Test adding a buy transaction."""
     from datetime import datetime
     client = create_test_client()
-    
+
     transaction_data = {
         'date': '2024-01-15',
         'rowid': 123,
@@ -183,9 +184,9 @@ def test_add_transaction_buy(mock_upsert):
         'quantity': 10,
         'price': 150.0
     }
-    
-    resp = client.post('/api/transactions/', json=transaction_data)
-    
+
+    resp = client.post('/api/portfolio/1/transactions/', json=transaction_data)
+
     assert resp.status_code == 201
     data = resp.json()
     assert data['message'] == 'Transaction added successfully'
@@ -193,7 +194,7 @@ def test_add_transaction_buy(mock_upsert):
     assert data['type'] == 'buy'
     assert data['quantity'] == 10
     assert data['price'] == 150.0
-    
+
     # Verify upsertTransactions was called
     mock_upsert.assert_called_once()
     call_kwargs = mock_upsert.call_args[1]
@@ -202,6 +203,7 @@ def test_add_transaction_buy(mock_upsert):
     assert call_kwargs['symbol'] == 'AAPL'
     assert call_kwargs['quantity'] == 10
     assert call_kwargs['price'] == 150.0
+    assert call_kwargs['portfolio_id'] == 1
     # Date is converted to datetime object by Pydantic
     assert isinstance(call_kwargs['date'], datetime)
 
@@ -210,7 +212,7 @@ def test_add_transaction_buy(mock_upsert):
 def test_add_transaction_sell(mock_upsert):
     """Test adding a sell transaction."""
     client = create_test_client()
-    
+
     transaction_data = {
         'date': '2024-01-20',
         'rowid': 124,
@@ -219,9 +221,9 @@ def test_add_transaction_sell(mock_upsert):
         'quantity': 5,
         'price': 300.0
     }
-    
-    resp = client.post('/api/transactions/', json=transaction_data)
-    
+
+    resp = client.post('/api/portfolio/1/transactions/', json=transaction_data)
+
     assert resp.status_code == 201
     data = resp.json()
     assert data['message'] == 'Transaction added successfully'
@@ -233,7 +235,7 @@ def test_add_transaction_sell(mock_upsert):
 def test_add_transaction_case_insensitive(mock_upsert):
     """Test that symbol is converted to uppercase."""
     client = create_test_client()
-    
+
     transaction_data = {
         'date': '2024-01-15',
         'rowid': 125,
@@ -243,7 +245,7 @@ def test_add_transaction_case_insensitive(mock_upsert):
         'price': 150.0
     }
 
-    resp = client.post('/api/transactions/', json=transaction_data)
+    resp = client.post('/api/portfolio/1/transactions/', json=transaction_data)
 
     assert resp.status_code == 201
     data = resp.json()
@@ -263,19 +265,19 @@ def test_get_transaction_summary_all(mock_connect):
     mock_cursor = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
     mock_conn.execute.return_value = mock_cursor
-    
+
     mock_cursor.fetchall.return_value = [
         ('AAPL', 'Apple Inc.', 5, 100, 10, 15000.0, 1500.0),
         ('GOOGL', 'Alphabet Inc.', 3, 50, 5, 100000.0, 10000.0),
     ]
-    
+
     client = create_test_client()
-    resp = client.get('/api/transactions/summary')
-    
+    resp = client.get('/api/portfolio/1/transactions/summary')
+
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 2
-    
+
     # Check first stock
     assert data[0]['symbol'] == 'AAPL'
     assert data[0]['name'] == 'Apple Inc.'
@@ -295,19 +297,19 @@ def test_get_transaction_summary_by_symbol(mock_connect):
     mock_cursor = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
     mock_conn.execute.return_value = mock_cursor
-    
+
     mock_cursor.fetchall.return_value = [
         ('AAPL', 'Apple Inc.', 5, 100, 10, 15000.0, 1500.0),
     ]
-    
+
     client = create_test_client()
-    resp = client.get('/api/transactions/summary?symbol=AAPL')
-    
+    resp = client.get('/api/portfolio/1/transactions/summary?symbol=AAPL')
+
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
     assert data[0]['symbol'] == 'AAPL'
-    
+
     # Verify the query includes WHERE clause
     call_args = mock_conn.execute.call_args
     assert 'WHERE' in call_args[0][0]
@@ -321,12 +323,12 @@ def test_get_transaction_summary_empty(mock_connect):
     mock_cursor = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
     mock_conn.execute.return_value = mock_cursor
-    
+
     mock_cursor.fetchall.return_value = []
-    
+
     client = create_test_client()
-    resp = client.get('/api/transactions/summary')
-    
+    resp = client.get('/api/portfolio/1/transactions/summary')
+
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 0
@@ -336,9 +338,9 @@ def test_get_transaction_summary_empty(mock_connect):
 def test_add_transaction_error_handling(mock_upsert):
     """Test error handling when adding transaction fails."""
     mock_upsert.side_effect = Exception('Database error')
-    
+
     client = create_test_client()
-    
+
     transaction_data = {
         'date': '2024-01-15',
         'rowid': 126,
@@ -347,9 +349,9 @@ def test_add_transaction_error_handling(mock_upsert):
         'quantity': 10,
         'price': 150.0
     }
-    
-    resp = client.post('/api/transactions/', json=transaction_data)
-    
+
+    resp = client.post('/api/portfolio/1/transactions/', json=transaction_data)
+
     assert resp.status_code == 500
     assert 'Failed to add transaction' in resp.json()['detail']
 
@@ -358,10 +360,10 @@ def test_add_transaction_error_handling(mock_upsert):
 def test_get_transactions_error_handling(mock_connect):
     """Test error handling when fetching transactions fails."""
     mock_connect.side_effect = Exception('Database connection error')
-    
+
     client = create_test_client()
-    resp = client.get('/api/transactions/')
-    
+    resp = client.get('/api/portfolio/1/transactions/')
+
     assert resp.status_code == 500
     assert 'Failed to fetch transactions' in resp.json()['detail']
 
@@ -370,10 +372,10 @@ def test_get_transactions_error_handling(mock_connect):
 def test_get_summary_error_handling(mock_connect):
     """Test error handling when fetching summary fails."""
     mock_connect.side_effect = Exception('Database error')
-    
+
     client = create_test_client()
-    resp = client.get('/api/transactions/summary')
-    
+    resp = client.get('/api/portfolio/1/transactions/summary')
+
     assert resp.status_code == 500
     assert 'Failed to fetch transaction summary' in resp.json()['detail']
 
@@ -386,13 +388,13 @@ def test_get_transactions_with_max_limit(mock_connect):
     mock_connect.return_value.__enter__.return_value = mock_conn
     mock_conn.execute.return_value = mock_cursor
     mock_cursor.fetchall.return_value = []
-    
+
     client = create_test_client()
     # Try to request more than max limit (1000)
-    resp = client.get('/api/transactions/?limit=1000')
-    
+    resp = client.get('/api/portfolio/1/transactions/?limit=1000')
+
     assert resp.status_code == 200
-    
+
     # Verify limit parameter in query
     call_args = mock_conn.execute.call_args
     params = call_args[0][1]
@@ -417,8 +419,7 @@ def test_add_sell_transaction_exceeding_held_returns_400(mock_upsert):
         'price': 155.0
     }
 
-    resp = client.post('/api/transactions/', json=transaction_data)
+    resp = client.post('/api/portfolio/1/transactions/', json=transaction_data)
 
     assert resp.status_code == 400
     assert 'Cannot sell' in resp.json()['detail']
-

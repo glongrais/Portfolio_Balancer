@@ -34,7 +34,7 @@ def create_test_client():
 def test_get_portfolio_value_empty_portfolio():
     """Test getting portfolio value with no positions."""
     client = create_test_client()
-    resp = client.get('/api/portfolio/value')
+    resp = client.get('/api/portfolio/1/value')
     assert resp.status_code == 200
     data = resp.json()
     assert data['total_value'] == 0
@@ -48,10 +48,10 @@ def test_get_portfolio_value_with_positions():
     stock2 = Stock(stockid=2, symbol='GOOGL', name='Google', price=2000.0)
     position1 = Position(stockid=1, quantity=10, stock=stock1)
     position2 = Position(stockid=2, quantity=5, stock=stock2)
-    DatabaseService.positions = {1: position1, 2: position2}
-    
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
+
     client = create_test_client()
-    resp = client.get('/api/portfolio/value')
+    resp = client.get('/api/portfolio/1/value')
     assert resp.status_code == 200
     data = resp.json()
     assert data['total_value'] == 11500  # 10*150 + 5*2000
@@ -61,7 +61,7 @@ def test_get_portfolio_value_with_positions():
 def test_get_positions_empty():
     """Test getting positions when portfolio is empty."""
     client = create_test_client()
-    resp = client.get('/api/portfolio/positions')
+    resp = client.get('/api/portfolio/1/positions')
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
@@ -71,9 +71,9 @@ def test_get_positions_empty():
 def test_get_positions_with_data():
     """Test getting positions with stock data."""
     stock = Stock(
-        stockid=1, 
-        symbol='AAPL', 
-        name='Apple Inc.', 
+        stockid=1,
+        symbol='AAPL',
+        name='Apple Inc.',
         price=150.0,
         currency='USD',
         market_cap=2500000000000,
@@ -84,16 +84,16 @@ def test_get_positions_with_data():
         dividend_yield=0.0061
     )
     position = Position(
-        stockid=1, 
-        quantity=10, 
+        stockid=1,
+        quantity=10,
         distribution_target=25.0,
         distribution_real=20.0,
         stock=stock
     )
-    DatabaseService.positions = {1: position}
-    
+    DatabaseService.positions = {1: {1: position}}
+
     client = create_test_client()
-    resp = client.get('/api/portfolio/positions')
+    resp = client.get('/api/portfolio/1/positions')
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
@@ -110,23 +110,23 @@ def test_balance_portfolio_basic():
     stock1 = Stock(stockid=1, symbol='AAPL', name='Apple', price=100.0)
     stock2 = Stock(stockid=2, symbol='GOOGL', name='Google', price=200.0)
     position1 = Position(
-        stockid=1, 
-        quantity=10, 
+        stockid=1,
+        quantity=10,
         distribution_target=50.0,
         distribution_real=30.0,
         stock=stock1
     )
     position2 = Position(
-        stockid=2, 
-        quantity=5, 
+        stockid=2,
+        quantity=5,
         distribution_target=50.0,
         distribution_real=70.0,
         stock=stock2
     )
-    DatabaseService.positions = {1: position1, 2: position2}
-    
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
+
     client = create_test_client()
-    resp = client.post('/api/portfolio/balance', json={
+    resp = client.post('/api/portfolio/1/balance', json={
         'amount_to_buy': 1000,
         'min_amount_to_buy': 50
     })
@@ -148,10 +148,10 @@ def test_balance_portfolio_insufficient_funds():
         distribution_real=30.0,
         stock=stock
     )
-    DatabaseService.positions = {1: position}
-    
+    DatabaseService.positions = {1: {1: position}}
+
     client = create_test_client()
-    resp = client.post('/api/portfolio/balance', json={
+    resp = client.post('/api/portfolio/1/balance', json={
         'amount_to_buy': 500,  # Not enough to buy one share
         'min_amount_to_buy': 50
     })
@@ -171,10 +171,10 @@ def test_balance_portfolio_below_minimum():
         distribution_real=48.0,
         stock=stock
     )
-    DatabaseService.positions = {1: position}
-    
+    DatabaseService.positions = {1: {1: position}}
+
     client = create_test_client()
-    resp = client.post('/api/portfolio/balance', json={
+    resp = client.post('/api/portfolio/1/balance', json={
         'amount_to_buy': 150,
         'min_amount_to_buy': 200  # Minimum is higher than what we'd buy
     })
@@ -202,10 +202,10 @@ def test_get_distribution():
         distribution_real=86.96,
         stock=stock2
     )
-    DatabaseService.positions = {1: position1, 2: position2}
-    
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
+
     client = create_test_client()
-    resp = client.get('/api/portfolio/distribution')
+    resp = client.get('/api/portfolio/1/distribution')
     assert resp.status_code == 200
     data = resp.json()
     assert 'distributions' in data
@@ -221,15 +221,15 @@ def test_get_total_dividends(monkeypatch):
     """Test getting total yearly dividends."""
     stock = Stock(stockid=1, symbol='AAPL', name='Apple', price=150.0, dividend=0.92)
     position = Position(stockid=1, quantity=10, stock=stock)
-    DatabaseService.positions = {1: position}
-    
-    def fake_get_total_dividend():
+    DatabaseService.positions = {1: {1: position}}
+
+    def fake_get_total_dividend(portfolio_id=1):
         return 100.50
-    
+
     monkeypatch.setattr(PortfolioService, 'getDividendTotal', fake_get_total_dividend)
-    
+
     client = create_test_client()
-    resp = client.get('/api/portfolio/dividends/total')
+    resp = client.get('/api/portfolio/1/dividends/total')
     assert resp.status_code == 200
     data = resp.json()
     assert data['total_dividend'] == 100.50
@@ -242,15 +242,15 @@ def test_get_dividends_breakdown(monkeypatch):
     stock2 = Stock(stockid=2, symbol='MSFT', name='Microsoft Corp.', price=300.0)
     position1 = Position(stockid=1, quantity=10, stock=stock1)
     position2 = Position(stockid=2, quantity=5, stock=stock2)
-    DatabaseService.positions = {1: position1, 2: position2}
-    
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
+
     def fake_fetch_dividends(symbols):
         return {'AAPL': 0.92, 'MSFT': 2.72}
-    
+
     monkeypatch.setattr('services.stock_api.StockAPI.get_current_year_dividends', fake_fetch_dividends)
-    
+
     client = create_test_client()
-    resp = client.get('/api/portfolio/dividends/breakdown')
+    resp = client.get('/api/portfolio/1/dividends/breakdown')
     assert resp.status_code == 200
     data = resp.json()
     assert 'dividends' in data
@@ -270,18 +270,18 @@ def test_update_positions_prices(monkeypatch):
     stock2 = Stock(stockid=2, symbol='GOOGL', name='Google', price=2000.0)
     position1 = Position(stockid=1, quantity=10, stock=stock1)
     position2 = Position(stockid=2, quantity=5, stock=stock2)
-    DatabaseService.positions = {1: position1, 2: position2}
-    
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
+
     called = {'count': 0}
-    
+
     def fake_update_prices():
         called['count'] += 1
         # Simulate price updates
         stock1.price = 155.0
         stock2.price = 2100.0
-    
+
     monkeypatch.setattr(DatabaseService, 'updatePortfolioPositionsPrice', classmethod(lambda cls: fake_update_prices()))
-    
+
     client = create_test_client()
     resp = client.post('/api/portfolio/positions/update-prices')
     assert resp.status_code == 200
@@ -294,10 +294,10 @@ def test_update_positions_prices(monkeypatch):
 def test_get_positions_with_null_stock():
     """Test getting positions when a position has no stock attached."""
     position = Position(stockid=1, quantity=10, distribution_target=25.0, stock=None)
-    DatabaseService.positions = {1: position}
-    
+    DatabaseService.positions = {1: {1: position}}
+
     client = create_test_client()
-    resp = client.get('/api/portfolio/positions')
+    resp = client.get('/api/portfolio/1/positions')
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
@@ -309,7 +309,7 @@ def test_balance_portfolio_multiple_recommendations():
     stock1 = Stock(stockid=1, symbol='AAPL', name='Apple', price=100.0)
     stock2 = Stock(stockid=2, symbol='MSFT', name='Microsoft', price=200.0)
     stock3 = Stock(stockid=3, symbol='GOOGL', name='Google', price=150.0)
-    
+
     position1 = Position(
         stockid=1,
         quantity=5,
@@ -331,11 +331,11 @@ def test_balance_portfolio_multiple_recommendations():
         distribution_real=15.0,
         stock=stock3
     )
-    
-    DatabaseService.positions = {1: position1, 2: position2, 3: position3}
-    
+
+    DatabaseService.positions = {1: {1: position1, 2: position2, 3: position3}}
+
     client = create_test_client()
-    resp = client.post('/api/portfolio/balance', json={
+    resp = client.post('/api/portfolio/1/balance', json={
         'amount_to_buy': 2000,
         'min_amount_to_buy': 50
     })
@@ -361,10 +361,10 @@ def test_balance_portfolio_proportional_strategy():
         stockid=2, quantity=100, distribution_target=30.0,
         distribution_real=50.0, stock=stock2
     )
-    DatabaseService.positions = {1: position1, 2: position2}
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
 
     client = create_test_client()
-    resp = client.post('/api/portfolio/balance', json={
+    resp = client.post('/api/portfolio/1/balance', json={
         'amount_to_buy': 1000,
         'min_amount_to_buy': 50,
         'strategy': 'proportional'
@@ -392,10 +392,10 @@ def test_balance_portfolio_proportional_skips_below_minimum():
         stockid=2, quantity=10, distribution_target=10.0,
         distribution_real=50.0, stock=stock2
     )
-    DatabaseService.positions = {1: position1, 2: position2}
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
 
     client = create_test_client()
-    resp = client.post('/api/portfolio/balance', json={
+    resp = client.post('/api/portfolio/1/balance', json={
         'amount_to_buy': 500,
         'min_amount_to_buy': 100,
         'strategy': 'proportional'
@@ -422,10 +422,10 @@ def test_balance_portfolio_proportional_excludes_no_target():
         stockid=2, quantity=10, distribution_target=None,
         distribution_real=50.0, stock=stock2  # no target set
     )
-    DatabaseService.positions = {1: position1, 2: position2}
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
 
     client = create_test_client()
-    resp = client.post('/api/portfolio/balance', json={
+    resp = client.post('/api/portfolio/1/balance', json={
         'amount_to_buy': 500,
         'min_amount_to_buy': 50,
         'strategy': 'proportional'
@@ -449,10 +449,10 @@ def test_balance_portfolio_default_strategy_is_proportional():
         stockid=2, quantity=10, distribution_target=40.0,
         distribution_real=50.0, stock=stock2
     )
-    DatabaseService.positions = {1: position1, 2: position2}
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
 
     client = create_test_client()
-    resp = client.post('/api/portfolio/balance', json={
+    resp = client.post('/api/portfolio/1/balance', json={
         'amount_to_buy': 1000,
         'min_amount_to_buy': 50
     })
@@ -462,4 +462,3 @@ def test_balance_portfolio_default_strategy_is_proportional():
     # Proportional: AAPL gets 60% = 60 shares, MSFT gets 40% = 40 shares
     assert recs['AAPL']['shares'] == 60
     assert recs['MSFT']['shares'] == 40
-

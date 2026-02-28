@@ -3,7 +3,7 @@ Transactions API Router
 Endpoints for transaction management and history
 """
 import logging
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, HTTPException, status, Query, Path
 from typing import Optional
 
 from api.schemas import TransactionCreate
@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("/{portfolio_id}/transactions/")
 async def get_transactions(
+    portfolio_id: int = Path(..., description="Portfolio ID"),
     symbol: Optional[str] = Query(None, description="Filter by stock symbol"),
     transaction_type: Optional[str] = Query(None, description="Filter by transaction type (buy/sell)"),
     limit: int = Query(100, description="Maximum number of transactions to return", ge=1, le=1000)
@@ -26,7 +27,8 @@ async def get_transactions(
         return DatabaseService.getTransactions(
             symbol=symbol,
             transaction_type=transaction_type,
-            limit=limit
+            limit=limit,
+            portfolio_id=portfolio_id,
         )
     except Exception as e:
         logger.error(f"Error fetching transactions: {e}")
@@ -35,8 +37,11 @@ async def get_transactions(
             detail=f"Failed to fetch transactions: {str(e)}"
         )
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
-async def add_transaction(transaction: TransactionCreate):
+@router.post("/{portfolio_id}/transactions/", status_code=status.HTTP_201_CREATED)
+async def add_transaction(
+    transaction: TransactionCreate,
+    portfolio_id: int = Path(..., description="Portfolio ID"),
+):
     """
     Add a new transaction to the portfolio
     """
@@ -47,7 +52,8 @@ async def add_transaction(transaction: TransactionCreate):
             type=transaction.type.value,
             symbol=transaction.symbol.upper(),
             quantity=transaction.quantity,
-            price=transaction.price
+            price=transaction.price,
+            portfolio_id=portfolio_id,
         )
 
         return {
@@ -70,15 +76,16 @@ async def add_transaction(transaction: TransactionCreate):
             detail=f"Failed to add transaction: {str(e)}"
         )
 
-@router.get("/summary")
+@router.get("/{portfolio_id}/transactions/summary")
 async def get_transaction_summary(
-    symbol: Optional[str] = Query(None, description="Filter by stock symbol")
+    portfolio_id: int = Path(..., description="Portfolio ID"),
+    symbol: Optional[str] = Query(None, description="Filter by stock symbol"),
 ):
     """
     Get transaction summary statistics
     """
     try:
-        return DatabaseService.getTransactionSummary(symbol=symbol)
+        return DatabaseService.getTransactionSummary(symbol=symbol, portfolio_id=portfolio_id)
     except Exception as e:
         logger.error(f"Error fetching transaction summary: {e}")
         raise HTTPException(

@@ -9,9 +9,6 @@ from typing import List, Optional
 from api.schemas import (
     StockResponse,
     StockCreate,
-    PositionCreate,
-    PositionUpdate,
-    PositionResponse,
     UpdatePricesResponse,
     StockPriceHistoryResponse,
     StockPriceHistoryItem,
@@ -64,10 +61,10 @@ async def get_stock(symbol: str = Path(..., description="Stock ticker symbol")):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Stock with symbol '{symbol}' not found"
             )
-        
+
         stockid = DatabaseService.symbol_map[symbol]
         stock = DatabaseService.stocks[stockid]
-        
+
         return StockResponse(
             stockid=stock.stockid,
             symbol=stock.symbol,
@@ -100,7 +97,7 @@ async def add_stock(stock_create: StockCreate):
     """
     try:
         symbol = stock_create.symbol.upper()
-        
+
         # Check if stock already exists
         if symbol in DatabaseService.symbol_map:
             stockid = DatabaseService.symbol_map[symbol]
@@ -119,11 +116,11 @@ async def add_stock(stock_create: StockCreate):
                 dividend=stock.dividend,
                 dividend_yield=stock.dividend_yield
             )
-        
+
         # Add new stock
         stockid = DatabaseService.addStock(symbol)
         stock = DatabaseService.stocks[stockid]
-        
+
         return StockResponse(
             stockid=stock.stockid,
             symbol=stock.symbol,
@@ -199,165 +196,3 @@ async def update_all_stock_prices():
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update stock prices: {str(e)}"
         )
-
-@router.post("/positions", response_model=PositionResponse, status_code=status.HTTP_201_CREATED)
-async def add_position(position_create: PositionCreate):
-    """
-    Add a new position to the portfolio
-    """
-    try:
-        symbol = position_create.symbol.upper()
-        
-        # Check if position already exists
-        if symbol in DatabaseService.symbol_map:
-            stockid = DatabaseService.symbol_map[symbol]
-            if stockid in DatabaseService.positions:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Position for {symbol} already exists. Use PUT to update."
-                )
-        
-        # Add position
-        DatabaseService.addPosition(
-            symbol=symbol,
-            quantity=position_create.quantity,
-            distribution_target=position_create.distribution_target
-        )
-        
-        # Retrieve the newly added position
-        stockid = DatabaseService.symbol_map[symbol]
-        position = DatabaseService.positions[stockid]
-        
-        stock_dict = None
-        if position.stock:
-            stock_dict = {
-                "stockid": position.stock.stockid,
-                "symbol": position.stock.symbol,
-                "name": position.stock.name,
-                "price": position.stock.price,
-                "currency": position.stock.currency,
-                "market_cap": position.stock.market_cap,
-                "sector": position.stock.sector,
-                "industry": position.stock.industry,
-                "country": position.stock.country,
-                "dividend": position.stock.dividend,
-                "dividend_yield": position.stock.dividend_yield,
-                "ex_dividend_date": position.stock.ex_dividend_date
-            }
-        
-        return PositionResponse(
-            stockid=position.stockid,
-            quantity=position.quantity,
-            distribution_target=position.distribution_target,
-            distribution_real=position.distribution_real,
-            stock=stock_dict,
-            delta=position.delta()
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error adding position {position_create.symbol}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to add position: {str(e)}"
-        )
-
-@router.put("/positions/{symbol}", response_model=PositionResponse)
-async def update_position(
-    position_update: PositionUpdate,
-    symbol: str = Path(..., description="Stock ticker symbol")
-):
-    """
-    Update an existing position in the portfolio
-    """
-    try:
-        symbol = symbol.upper()
-        
-        # Check if position exists
-        if symbol not in DatabaseService.symbol_map:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Stock with symbol '{symbol}' not found"
-            )
-        
-        stockid = DatabaseService.symbol_map[symbol]
-        if stockid not in DatabaseService.positions:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Position for {symbol} not found"
-            )
-        
-        # Update position
-        DatabaseService.updatePosition(
-            symbol=symbol,
-            quantity=position_update.quantity,
-            distribution_target=position_update.distribution_target
-        )
-        
-        # Retrieve updated position
-        position = DatabaseService.positions[stockid]
-        
-        stock_dict = None
-        if position.stock:
-            stock_dict = {
-                "stockid": position.stock.stockid,
-                "symbol": position.stock.symbol,
-                "name": position.stock.name,
-                "price": position.stock.price,
-                "currency": position.stock.currency,
-                "market_cap": position.stock.market_cap,
-                "sector": position.stock.sector,
-                "industry": position.stock.industry,
-                "country": position.stock.country,
-                "dividend": position.stock.dividend,
-                "dividend_yield": position.stock.dividend_yield,
-                "ex_dividend_date": position.stock.ex_dividend_date
-            }
-        
-        return PositionResponse(
-            stockid=position.stockid,
-            quantity=position.quantity,
-            distribution_target=position.distribution_target,
-            distribution_real=position.distribution_real,
-            stock=stock_dict,
-            delta=position.delta()
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating position {symbol}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update position: {str(e)}"
-        )
-
-@router.delete("/positions/{symbol}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_position(
-    symbol: str = Path(..., description="Stock ticker symbol")
-):
-    """
-    Delete a position from the portfolio.
-    Requires all shares to be sold first (quantity must be 0).
-    Stock record and transaction history are preserved.
-    """
-    try:
-        symbol_upper = symbol.upper()
-        DatabaseService.removePosition(symbol_upper)
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-    except KeyError as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e)
-        )
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
-    except Exception as e:
-        logger.error(f"Error deleting position {symbol}: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete position: {str(e)}"
-        )
-

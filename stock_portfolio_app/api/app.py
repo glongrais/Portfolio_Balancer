@@ -112,9 +112,9 @@ app.add_exception_handler(Exception, general_exception_handler)
 
 # Include routers
 app.include_router(portfolio.router, prefix="/api/v1/portfolio", tags=["portfolio"])
+app.include_router(deposits.router, prefix="/api/v1/portfolio", tags=["deposits"])
+app.include_router(transactions.router, prefix="/api/v1/portfolio", tags=["transactions"])
 app.include_router(stocks.router, prefix="/api/v1/stocks", tags=["stocks"])
-app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
-app.include_router(deposits.router, prefix="/api/v1/deposits", tags=["deposits"])
 app.include_router(dev.router, prefix="/api/v1/dev", tags=["dev"])
 app.include_router(net_worth.router, prefix="/api/v1/net-worth", tags=["net-worth"])
 app.include_router(equity.router, prefix="/api/v1/equity", tags=["equity"])
@@ -148,7 +148,7 @@ async def health_check():
         "status": status,
         "database": "ok" if db_ok else "unreachable",
         "stocks_count": len(DatabaseService.stocks),
-        "positions_count": len(DatabaseService.positions)
+        "positions_count": sum(len(pp) for pp in DatabaseService.positions.values())
     }
 
 @app.get("/api/health/db")

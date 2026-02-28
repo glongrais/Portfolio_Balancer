@@ -156,7 +156,7 @@ def test_updatePortfolioPositionsPrice(mock_logger_warning, mock_sqlite_connect,
     stock2 = Stock(stockid=2, symbol='GOOG', price=90.0)
     position2 = Position(stockid=2, quantity=5, stock=stock2)
     
-    DatabaseService.positions = {1: position1, 2: position2}
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
     
     # Call the method under test
     DatabaseService.updatePortfolioPositionsPrice()
@@ -196,11 +196,11 @@ def test_updatePortfolioPositionsPrice_no_positions(mock_logger_warning, mock_sq
 def test_updatePortfolioPositionsPrice_no_stock_in_position(mock_logger_warning, mock_sqlite_connect, mock_fetch_real_time_price, setup_database_service):
     # Mock positions with one missing stock
     position1 = Position(stockid=1, quantity=10, stock=None)
-    DatabaseService.positions = {1: position1}
-    
+    DatabaseService.positions = {1: {1: position1}}
+
     # Call the method under test
     DatabaseService.updatePortfolioPositionsPrice()
-    
+
     # Check if the correct warning message was logged
     mock_logger_warning.assert_called_once_with("updatePortfolioPositionsPrice(): Position %d has no stock set. Skipping price update for this position", 1)
     
@@ -221,8 +221,8 @@ def test_getPositions(mock_getStock, mock_connect, setup_database_service):
 
     mock_getStock.assert_not_called()
     assert len(DatabaseService.positions) == 1
-    assert DatabaseService.positions[1].quantity == 10
-    assert DatabaseService.positions[1].stock.stockid == 1
+    assert DatabaseService.positions[1][1].quantity == 10
+    assert DatabaseService.positions[1][1].stock.stockid == 1
 
 @patch('sqlite3.connect')
 @patch('services.database_service.DatabaseService.getStock')
@@ -241,8 +241,8 @@ def test_getPositions_stock_in_database(mock_stocks_dict, mock_getStock, mock_co
 
     mock_getStock.assert_called_once()
     assert len(DatabaseService.positions) == 1
-    assert DatabaseService.positions[1].quantity == 10
-    assert DatabaseService.positions[1].stock.stockid == 1
+    assert DatabaseService.positions[1][1].quantity == 10
+    assert DatabaseService.positions[1][1].stock.stockid == 1
 
 @patch('sqlite3.connect')
 @patch('services.database_service.DatabaseService.getStock')
@@ -260,8 +260,8 @@ def test_getPositions_stock_not_in_database(mock_logger, mock_getStock, mock_con
     mock_logger.assert_called_once()
     mock_getStock.assert_called_once()
     assert len(DatabaseService.positions) == 1
-    assert DatabaseService.positions[1].quantity == 10
-    assert DatabaseService.positions[1].stock == None
+    assert DatabaseService.positions[1][1].quantity == 10
+    assert DatabaseService.positions[1][1].stock == None
 
 @patch('sqlite3.connect')
 @patch('services.database_service.DatabaseService.addStock')
@@ -279,14 +279,14 @@ def test_addPosition(mock_stocks_dict, mock_addStock, mock_connect, setup_databa
     mock_addStock.assert_called_once_with(symbol="AAPL")
     mock_cursor.execute.assert_called_once()
     mock_cursor.commit.assert_called_once()
-    assert 1 in DatabaseService.positions
+    assert 1 in DatabaseService.positions.get(1, {})
 
 @patch('sqlite3.connect')
 @patch('services.database_service.DatabaseService.addStock')
 @patch('logging.Logger.warning')
 def test_addPosition_already_in_database(mock_logger, mock_addStock, mock_connect, setup_database_service):
     mock_addStock.return_value = 1
-    DatabaseService.positions = {1: Position(stockid=1, quantity=10)}
+    DatabaseService.positions = {1: {1: Position(stockid=1, quantity=10)}}
     DatabaseService.addPosition(symbol="AAPL", quantity=10, distribution_target=10.0)
 
     mock_addStock.assert_called_once_with(symbol="AAPL")
@@ -300,7 +300,7 @@ def test_addPosition_already_in_database(mock_logger, mock_addStock, mock_connec
 def test_removePosition_success(mock_connect, setup_database_service):
     stock = Stock(stockid=1, symbol='AAPL', price=150.0)
     position = Position(stockid=1, quantity=0, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
     DatabaseService.symbol_map = {'AAPL': 1}
     DatabaseService.stocks = {1: stock}
 
@@ -310,10 +310,10 @@ def test_removePosition_success(mock_connect, setup_database_service):
     DatabaseService.removePosition('AAPL')
 
     mock_conn.execute.assert_called_once_with(
-        "DELETE FROM positions WHERE stockid = ?", (1,)
+        "DELETE FROM positions WHERE stockid = ? AND portfolio_id = ?", (1, 1)
     )
     mock_conn.commit.assert_called_once()
-    assert 1 not in DatabaseService.positions
+    assert 1 not in DatabaseService.positions[1]
     # Stock and symbol_map should be preserved
     assert 'AAPL' in DatabaseService.symbol_map
     assert 1 in DatabaseService.stocks
@@ -335,7 +335,7 @@ def test_removePosition_position_not_found(setup_database_service):
 def test_removePosition_quantity_not_zero(setup_database_service):
     stock = Stock(stockid=1, symbol='AAPL', price=150.0)
     position = Position(stockid=1, quantity=10, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
     DatabaseService.symbol_map = {'AAPL': 1}
     DatabaseService.stocks = {1: stock}
 
@@ -343,7 +343,7 @@ def test_removePosition_quantity_not_zero(setup_database_service):
         DatabaseService.removePosition('AAPL')
 
     # Position should still exist
-    assert 1 in DatabaseService.positions
+    assert 1 in DatabaseService.positions[1]
 
 
 @patch('sqlite3.connect')
@@ -353,31 +353,31 @@ def test_update_position(mock_logger_info, mock_logger_warning, mock_sqlite_conn
     # Mock DatabaseService.positions and symbol_map
     stock = Stock(stockid=1, symbol='AAPL', price=140.0)
     position = Position(stockid=1, quantity=10, distribution_target=20.0, distribution_real=15.0, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
     DatabaseService.symbol_map = {'AAPL': 1}
-    
+
     # Mock SQLite connection and cursor
     mock_connection = MagicMock()
     mock_sqlite_connect.return_value.__enter__.return_value = mock_connection
-    
+
     # Call the method under test
     DatabaseService.updatePosition('AAPL', quantity=15, distribution_target=25.0)
-    
+
     # Check if the database update was called with correct values
     mock_connection.execute.assert_called_once_with(
-        "UPDATE positions SET quantity = ?, distribution_target = ? WHERE stockid = ?", 
-        [15, 25.0, 1]
+        "UPDATE positions SET quantity = ?, distribution_target = ? WHERE stockid = ? AND portfolio_id = ?",
+        [15, 25.0, 1, 1]
     )
     mock_connection.commit.assert_called_once()
-    
+
     # Check if the in-memory position was updated correctly
     assert position.quantity == 15
     assert position.distribution_target == 25.0
-    
+
     # Check if the debug log was called
     mock_logger_info.assert_called_once_with(
-        "updatePosition(): Position %s updated. Quantity: %s, Average cost basis: %s, Distribution target: %s, Distribution real: %s",
-        'AAPL', 15, None, 25.0, 15.0
+        "updatePosition(): Position %s updated in portfolio %d. Quantity: %s, Average cost basis: %s, Distribution target: %s, Distribution real: %s",
+        'AAPL', 1, 15, None, 25.0, 15.0
     )
 
 @patch('sqlite3.connect')
@@ -401,9 +401,9 @@ def test_update_position_no_fields_to_update(mock_logger_warning, mock_sqlite_co
     # Mock DatabaseService.positions and symbol_map
     stock = Stock(stockid=1, symbol='AAPL', price=140.0)
     position = Position(stockid=1, quantity=10, distribution_target=20.0, distribution_real=15.0, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
     DatabaseService.symbol_map = {'AAPL': 1}
-    
+
     # Call the method under test with no fields to update
     DatabaseService.updatePosition('AAPL')
 
@@ -435,8 +435,10 @@ def test_getTransactions_all(mock_connect, setup_database_service):
     assert result[1]['symbol'] == 'GOOGL'
 
     query = mock_conn.execute.call_args[0][0]
-    assert 'WHERE' not in query
+    assert 'WHERE' in query
     assert 'LIMIT' in query
+    params = mock_conn.execute.call_args[0][1]
+    assert params[0] == 1  # portfolio_id
 
 
 @patch('sqlite3.connect')
@@ -455,6 +457,7 @@ def test_getTransactions_filter_by_symbol(mock_connect, setup_database_service):
     query = mock_conn.execute.call_args[0][0]
     params = mock_conn.execute.call_args[0][1]
     assert 'WHERE' in query
+    assert params[0] == 1  # portfolio_id
     assert 'AAPL' in params
 
 
@@ -471,6 +474,7 @@ def test_getTransactions_filter_by_type(mock_connect, setup_database_service):
     query = mock_conn.execute.call_args[0][0]
     params = mock_conn.execute.call_args[0][1]
     assert 't.type = ?' in query
+    assert params[0] == 1  # portfolio_id
     assert 'sell' in params
 
 
@@ -486,8 +490,8 @@ def test_getTransactions_filter_both(mock_connect, setup_database_service):
 
     query = mock_conn.execute.call_args[0][0]
     params = mock_conn.execute.call_args[0][1]
-    assert query.count('AND') == 1
-    assert params == ['AAPL', 'buy', 10]
+    assert query.count('AND') == 2
+    assert params == [1, 'AAPL', 'buy', 10]
 
 
 @patch('sqlite3.connect')
@@ -527,7 +531,9 @@ def test_getTransactionSummary_all(mock_connect, setup_database_service):
     assert result[0]['net_investment'] == 13500.0
 
     query = mock_conn.execute.call_args[0][0]
-    assert 'WHERE' not in query
+    assert 'WHERE' in query
+    params = mock_conn.execute.call_args[0][1]
+    assert params[0] == 1  # portfolio_id
 
 
 @patch('sqlite3.connect')
@@ -545,6 +551,7 @@ def test_getTransactionSummary_by_symbol(mock_connect, setup_database_service):
     query = mock_conn.execute.call_args[0][0]
     params = mock_conn.execute.call_args[0][1]
     assert 'WHERE' in query
+    assert params[0] == 1  # portfolio_id
     assert 'AAPL' in params
 
 
@@ -575,7 +582,7 @@ def test_upsertTransactions_sell_updates_position(mock_update, mock_getStock, mo
 
     stock = Stock(stockid=1, symbol='AAPL', price=150.0)
     position = Position(stockid=1, quantity=10, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
     DatabaseService.symbol_map = {'AAPL': 1}
 
     from datetime import datetime
@@ -585,7 +592,7 @@ def test_upsertTransactions_sell_updates_position(mock_update, mock_getStock, mo
     )
 
     mock_conn.execute.assert_called_once()
-    mock_update.assert_called_once_with('AAPL', quantity=7)
+    mock_update.assert_called_once_with('AAPL', quantity=7, portfolio_id=1)
 
 
 @patch('services.database_service.DatabaseService.getStock')
@@ -594,7 +601,7 @@ def test_upsertTransactions_sell_more_than_held_rejected(mock_getStock, setup_da
 
     stock = Stock(stockid=1, symbol='AAPL', price=150.0)
     position = Position(stockid=1, quantity=5, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
     DatabaseService.symbol_map = {'AAPL': 1}
 
     from datetime import datetime
@@ -618,7 +625,7 @@ def test_upsertTransactions_buy_updates_position(mock_update, mock_getStock, moc
 
     stock = Stock(stockid=1, symbol='AAPL', price=150.0)
     position = Position(stockid=1, quantity=10, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
     DatabaseService.symbol_map = {'AAPL': 1}
 
     from datetime import datetime
@@ -627,7 +634,7 @@ def test_upsertTransactions_buy_updates_position(mock_update, mock_getStock, moc
         symbol='AAPL', quantity=5, price=145.0
     )
 
-    mock_update.assert_called_once_with('AAPL', quantity=15)
+    mock_update.assert_called_once_with('AAPL', quantity=15, portfolio_id=1)
 
 
 # --- getDeposits tests ---
@@ -652,7 +659,7 @@ def test_getDeposits(mock_connect, setup_database_service):
     assert result[1]['depositid'] == 2
 
     params = mock_conn.execute.call_args[0][1]
-    assert params == (100,)
+    assert params == (1, 100)
 
 
 @patch('sqlite3.connect')
@@ -666,7 +673,7 @@ def test_getDeposits_with_limit(mock_connect, setup_database_service):
     DatabaseService.getDeposits(limit=5)
 
     params = mock_conn.execute.call_args[0][1]
-    assert params == (5,)
+    assert params == (1, 5)
 
 
 @patch('sqlite3.connect')
@@ -746,7 +753,7 @@ def test_addDeposit(mock_connect, setup_database_service):
     query = mock_conn.execute.call_args[0][0]
     assert 'INSERT INTO deposits' in query
     params = mock_conn.execute.call_args[0][1]
-    assert params == ('2024-03-15', 2000.0)
+    assert params == ('2024-03-15', 2000.0, 1)
     mock_conn.commit.assert_called_once()
 
 

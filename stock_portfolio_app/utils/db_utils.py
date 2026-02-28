@@ -252,6 +252,7 @@ def initialize_database(db_path: str):
     _add_column_if_missing(cursor, 'stocks', 'ex_dividend_date', "TEXT DEFAULT NULL")
     _add_column_if_missing(cursor, 'equity_vesting_events', 'taxed_shares', "INTEGER NOT NULL DEFAULT 0")
     _add_column_if_missing(cursor, 'equity_grants', 'grant_price', "REAL NOT NULL DEFAULT 0")
+    _add_column_if_missing(cursor, 'positions', 'portfolio_id', "INTEGER NOT NULL DEFAULT 1")
 
     # Recreate dbt-managed views to reflect new columns in stocks table
     _migrate_dbt_views(cursor)

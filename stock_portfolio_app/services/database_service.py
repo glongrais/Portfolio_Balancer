@@ -15,7 +15,12 @@ class DatabaseService:
 
     symbol_map: Dict[str, int] = {}
     stocks: Dict[int, Stock] = {}
-    positions: Dict[int, Position] = {}
+    positions: Dict[int, Dict[int, Position]] = {}
+
+    @classmethod
+    def getPositionsForPortfolio(cls, portfolio_id: int) -> Dict[int, Position]:
+        """Returns the positions dict for a given portfolio_id (stockid → Position)."""
+        return cls.positions.get(portfolio_id, {})
 
     @classmethod
     def addStock(cls, symbol) -> int:
@@ -143,17 +148,23 @@ class DatabaseService:
         """
         Updates the price of all the positions in the portfolio in parallel.
         """
-        if not cls.positions:
+        # Collect all unique positions across all portfolios
+        all_positions = {}
+        for portfolio_positions in cls.positions.values():
+            for stockid, position in portfolio_positions.items():
+                if stockid not in all_positions:
+                    all_positions[stockid] = position
+
+        if not all_positions:
             logger.warning("updatePortfolioPositionsPrice(): No position in the portfolio")
             return
-
 
         def update_single_position(position_data):
             stockid, position = position_data
             if position.stock is None:
                 logger.warning("updatePortfolioPositionsPrice(): Position %d has no stock set. Skipping price update for this position", stockid)
                 return None
-            
+
             info = StockAPI.get_current_price(position.stock.symbol)
             position.stock.price = info["currentPrice"]
             position.stock.logo_url = info.get("logo_url", "")
@@ -164,9 +175,9 @@ class DatabaseService:
 
         # Run price updates in parallel
         with ThreadPoolExecutor() as executor:
-            future_to_position = {executor.submit(update_single_position, (stockid, position)): 
-                                (stockid, position) for stockid, position in cls.positions.items()}
-            
+            future_to_position = {executor.submit(update_single_position, (stockid, position)):
+                                (stockid, position) for stockid, position in all_positions.items()}
+
             # Update database with results
             with get_connection(DB_PATH) as connection:
                 for future in as_completed(future_to_position):
@@ -186,11 +197,13 @@ class DatabaseService:
     def getPositions(cls) -> None:
         """
         Fetches all portfolio positions from the database and updates the in-memory cache.
+        Positions are stored as positions[portfolio_id][stockid] = Position.
         """
+        cls.positions = {}
         with get_connection(DB_PATH) as connection:
             connection.row_factory = Position.dataclass_factory
             answers = connection.execute("SELECT * FROM positions")
-        log_count = 0  
+        log_count = 0
         for answer in answers:
             if answer.stockid not in cls.stocks:
                 if cls.getStock(stockid=answer.stockid) > -1:
@@ -199,48 +212,59 @@ class DatabaseService:
                     logger.error("getPosition(): Stock with id %d not in the database", answer.stockid)
             else:
                 answer.stock = cls.stocks[answer.stockid]
-            cls.positions[answer.stockid] = answer
+            pid = answer.portfolio_id
+            if pid not in cls.positions:
+                cls.positions[pid] = {}
+            cls.positions[pid][answer.stockid] = answer
             log_count += 1
         logger.info("getPosition(): %d portfolio position(s) fetched from the database", log_count)
     
     @classmethod
-    def addPosition(cls, symbol, quantity: int, distribution_target: float=None) -> None:
+    def addPosition(cls, symbol, quantity: float, distribution_target: float=None, portfolio_id: int=1) -> None:
         """
         Add a new position in the portfolio database and in-memory cache.
 
         :param symbol: The symbol of the stock in the position
+        :param portfolio_id: The portfolio to add the position to
         """
         stockid = cls.addStock(symbol=symbol)
 
-        if stockid in cls.positions:
-            logger.warning("addPosition(): Position %s already in the portfolio", symbol)
+        portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
+        if stockid in portfolio_positions:
+            logger.warning("addPosition(): Position %s already in portfolio %d", symbol, portfolio_id)
             return
         with get_connection(DB_PATH) as connection:
-            connection.execute("INSERT INTO positions (stockid, quantity, distribution_target) VALUES (?, ?, ?)", (stockid, quantity, distribution_target))
+            connection.execute("INSERT INTO positions (stockid, quantity, distribution_target, portfolio_id) VALUES (?, ?, ?, ?)", (stockid, quantity, distribution_target, portfolio_id))
             connection.commit()
-        cls.positions[stockid] = Position(stockid=stockid, quantity=quantity, distribution_target=distribution_target, stock=cls.stocks[stockid])
-        logger.info("addPosition(): Added position %s to the portfolio", symbol)
+        if portfolio_id not in cls.positions:
+            cls.positions[portfolio_id] = {}
+        cls.positions[portfolio_id][stockid] = Position(stockid=stockid, quantity=quantity,
+                                          distribution_target=distribution_target,
+                                          stock=cls.stocks[stockid], portfolio_id=portfolio_id)
+        logger.info("addPosition(): Added position %s to portfolio %d", symbol, portfolio_id)
 
     @classmethod
-    def updatePosition(cls, symbol, quantity: int=None, average_cost_basis: float=None, distribution_target: float=None, distribution_real: float=None) -> None:
+    def updatePosition(cls, symbol, quantity: float=None, average_cost_basis: float=None, distribution_target: float=None, distribution_real: float=None, portfolio_id: int=1) -> None:
         """
         Update an existing position in the portfolio database and in-memory cache.
-        
+
         :param symbol: The stock symbol of the position to update.
         :param quantity: The new quantity of the position (default is None).
         :param distribution_target: The new target distribution of the position (default is None).
         :param distribution_real: The new real distribution of the position (default is None).
+        :param portfolio_id: The portfolio the position belongs to.
         """
         if symbol not in cls.symbol_map:
             logger.warning("updatePosition(): Position %s not in the portfolio", symbol)
             return
 
         stockid = cls.symbol_map[symbol]
-        if stockid not in cls.positions:
-            logger.warning("updatePosition(): Position %s not in the portfolio", symbol)
+        portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
+        if stockid not in portfolio_positions:
+            logger.warning("updatePosition(): Position %s not in portfolio %d", symbol, portfolio_id)
             return
 
-        position = cls.positions[stockid]
+        position = portfolio_positions[stockid]
         fields_to_update = []
         params = []
 
@@ -264,25 +288,26 @@ class DatabaseService:
             logger.warning("updatePosition(): No fields to update for position %s", symbol)
             return
 
-        params.append(stockid)
-        query = "UPDATE positions SET " + ", ".join(fields_to_update) + " WHERE stockid = ?"
+        params.extend([stockid, portfolio_id])
+        query = "UPDATE positions SET " + ", ".join(fields_to_update) + " WHERE stockid = ? AND portfolio_id = ?"
 
         with get_connection(DB_PATH) as connection:
             connection.execute(query, params)
             connection.commit()
 
         logger.debug(
-            "updatePosition(): Position %s updated. Quantity: %s, Average cost basis: %s, Distribution target: %s, Distribution real: %s",
-            symbol, position.quantity, position.average_cost_basis, position.distribution_target, position.distribution_real
+            "updatePosition(): Position %s updated in portfolio %d. Quantity: %s, Average cost basis: %s, Distribution target: %s, Distribution real: %s",
+            symbol, portfolio_id, position.quantity, position.average_cost_basis, position.distribution_target, position.distribution_real
         )
 
     @classmethod
-    def removePosition(cls, symbol: str) -> None:
+    def removePosition(cls, symbol: str, portfolio_id: int = 1) -> None:
         """
         Remove a position from the portfolio. Requires quantity to be 0.
         Stock record and transaction history are preserved.
 
         :param symbol: The stock symbol of the position to remove.
+        :param portfolio_id: The portfolio the position belongs to.
         :raises KeyError: If the stock or position is not found.
         :raises ValueError: If the position still has shares.
         """
@@ -290,24 +315,25 @@ class DatabaseService:
             raise KeyError(f"Stock with symbol '{symbol}' not found")
 
         stockid = cls.symbol_map[symbol]
-        if stockid not in cls.positions:
-            raise KeyError(f"Position for '{symbol}' not found")
+        portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
+        if stockid not in portfolio_positions:
+            raise KeyError(f"Position for '{symbol}' not found in portfolio {portfolio_id}")
 
-        current_qty = cls.positions[stockid].quantity
+        current_qty = portfolio_positions[stockid].quantity
         if current_qty != 0:
             raise ValueError(
                 f"Cannot remove position '{symbol}': quantity is {current_qty}. Sell all shares first."
             )
 
         with get_connection(DB_PATH) as connection:
-            connection.execute("DELETE FROM positions WHERE stockid = ?", (stockid,))
+            connection.execute("DELETE FROM positions WHERE stockid = ? AND portfolio_id = ?", (stockid, portfolio_id))
             connection.commit()
 
-        del cls.positions[stockid]
-        logger.info("removePosition(): Removed position %s from the portfolio", symbol)
+        del cls.positions[portfolio_id][stockid]
+        logger.info("removePosition(): Removed position %s from portfolio %d", symbol, portfolio_id)
 
     @classmethod
-    def upsertTransactions(cls, date: datetime, rowid: int, type: str, symbol: str, quantity: int, price: float) -> None:
+    def upsertTransactions(cls, date: datetime, rowid: int, type: str, symbol: str, quantity: float, price: float, portfolio_id: int = 1) -> None:
         """
         Add or update a transaction in the database.
         For buy/sell transactions, automatically updates position quantity if the position exists.
@@ -317,15 +343,18 @@ class DatabaseService:
         :param symbol: The symbol of the stock in the transaction.
         :param quantity: The quantity of the stock in the transaction.
         :param price: The price of the stock in the transaction.
+        :param portfolio_id: The portfolio this transaction belongs to.
         :raises ValueError: If selling more shares than currently held.
         """
         stockid = cls.getStock(symbol=symbol)
         if stockid == -1:
             stockid = cls.addStock(symbol)
 
+        portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
+
         # Validate sell quantity before inserting the transaction
-        if type == 'sell' and stockid in cls.positions:
-            current_qty = cls.positions[stockid].quantity
+        if type == 'sell' and stockid in portfolio_positions:
+            current_qty = portfolio_positions[stockid].quantity
             if quantity > current_qty:
                 raise ValueError(
                     f"Cannot sell {quantity} shares of {symbol}: only {current_qty} shares held"
@@ -334,46 +363,48 @@ class DatabaseService:
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "INSERT INTO transactions (stockid, portfolioid, rowid, quantity, price, type, datestamp) "
-                "VALUES (?, 1, ?, ?, ?, ?, ?) ON CONFLICT(portfolioid, rowid) DO NOTHING",
-                (stockid, rowid, quantity, price, type, date,)
+                "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(portfolioid, rowid) DO NOTHING",
+                (stockid, portfolio_id, rowid, quantity, price, type, date,)
             )
             connection.commit()
             rows_inserted = cursor.rowcount
 
-        logger.info("upsertTransactions(): Transaction added for stock %s", symbol)
+        logger.info("upsertTransactions(): Transaction added for stock %s in portfolio %d", symbol, portfolio_id)
 
         # Auto-update position quantity if a row was actually inserted
-        if rows_inserted > 0 and stockid in cls.positions:
-            old_qty = cls.positions[stockid].quantity
+        if rows_inserted > 0 and stockid in portfolio_positions:
+            old_qty = portfolio_positions[stockid].quantity
             if type == 'sell':
                 new_qty = old_qty - quantity
-                cls.updatePosition(symbol, quantity=new_qty)
+                cls.updatePosition(symbol, quantity=new_qty, portfolio_id=portfolio_id)
                 logger.info(
                     "upsertTransactions(): Sold %d shares of %s. Position quantity: %d -> %d",
                     quantity, symbol, old_qty, new_qty
                 )
             elif type == 'buy':
                 new_qty = old_qty + quantity
-                cls.updatePosition(symbol, quantity=new_qty)
+                cls.updatePosition(symbol, quantity=new_qty, portfolio_id=portfolio_id)
                 logger.info(
                     "upsertTransactions(): Bought %d shares of %s. Position quantity: %d -> %d",
                     quantity, symbol, old_qty, new_qty
                 )
 
     @classmethod
-    def getTransactions(cls, symbol: str = None, transaction_type: str = None, limit: int = 100) -> list:
+    def getTransactions(cls, symbol: str = None, transaction_type: str = None, limit: int = 100, portfolio_id: int = 1) -> list:
         """
         Fetches transaction history from the database with optional filtering.
 
         :param symbol: Filter by stock symbol (optional).
         :param transaction_type: Filter by transaction type - buy/sell (optional).
         :param limit: Maximum number of transactions to return.
+        :param portfolio_id: The portfolio to fetch transactions for.
         :return: List of transaction dicts.
         """
         query = ("SELECT t.transactionid, t.stockid, s.symbol, t.quantity, t.price, t.type, t.datestamp, s.name "
                  "FROM transactions t JOIN stocks s ON t.stockid = s.stockid")
         params = []
-        conditions = []
+        conditions = ["t.portfolioid = ?"]
+        params.append(portfolio_id)
 
         if symbol:
             conditions.append("s.symbol = ?")
@@ -383,8 +414,7 @@ class DatabaseService:
             conditions.append("t.type = ?")
             params.append(transaction_type.lower())
 
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
+        query += " WHERE " + " AND ".join(conditions)
 
         query += " ORDER BY t.datestamp DESC LIMIT ?"
         params.append(limit)
@@ -408,11 +438,12 @@ class DatabaseService:
         ]
 
     @classmethod
-    def getTransactionSummary(cls, symbol: str = None) -> list:
+    def getTransactionSummary(cls, symbol: str = None, portfolio_id: int = 1) -> list:
         """
         Gets transaction summary statistics, optionally filtered by symbol.
 
         :param symbol: Filter by stock symbol (optional).
+        :param portfolio_id: The portfolio to fetch summary for.
         :return: List of summary dicts per stock.
         """
         query = """
@@ -426,11 +457,12 @@ class DatabaseService:
                 SUM(CASE WHEN t.type = 'sell' THEN t.quantity * t.price ELSE 0 END) as total_divested
             FROM transactions t
             JOIN stocks s ON t.stockid = s.stockid
+            WHERE t.portfolioid = ?
         """
-        params = []
+        params = [portfolio_id]
 
         if symbol:
-            query += " WHERE s.symbol = ?"
+            query += " AND s.symbol = ?"
             params.append(symbol.upper())
 
         query += " GROUP BY s.symbol, s.name ORDER BY total_invested DESC"
@@ -455,17 +487,18 @@ class DatabaseService:
         ]
 
     @classmethod
-    def getDeposits(cls, limit: int = 100) -> list:
+    def getDeposits(cls, limit: int = 100, portfolio_id: int = 1) -> list:
         """
         Fetches deposit history from the database.
 
         :param limit: Maximum number of deposits to return.
+        :param portfolio_id: The portfolio to fetch deposits for.
         :return: List of deposit dicts.
         """
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
-                "SELECT depositid, datestamp, amount, portfolioid, currency FROM deposits ORDER BY datestamp DESC LIMIT ?",
-                (limit,)
+                "SELECT depositid, datestamp, amount, portfolioid, currency FROM deposits WHERE portfolioid = ? ORDER BY datestamp DESC LIMIT ?",
+                (portfolio_id, limit,)
             )
             rows = cursor.fetchall()
         return [
@@ -480,30 +513,32 @@ class DatabaseService:
         ]
 
     @classmethod
-    def getTotalDeposits(cls) -> float:
+    def getTotalDeposits(cls, portfolio_id: int = 1) -> float:
         """
         Calculates the total amount deposited.
 
+        :param portfolio_id: The portfolio to calculate total for.
         :return: Total deposit amount.
         """
         with get_connection(DB_PATH) as connection:
-            cursor = connection.execute("SELECT COALESCE(SUM(amount), 0) FROM deposits")
+            cursor = connection.execute("SELECT COALESCE(SUM(amount), 0) FROM deposits WHERE portfolioid = ?", (portfolio_id,))
             total = cursor.fetchone()[0]
         return round(total, 2)
 
     @classmethod
-    def addDeposit(cls, datestamp: str, amount: float) -> dict:
+    def addDeposit(cls, datestamp: str, amount: float, portfolio_id: int = 1) -> dict:
         """
         Adds a new deposit to the database.
 
         :param datestamp: The deposit date (YYYY-MM-DD string).
         :param amount: The deposit amount.
+        :param portfolio_id: The portfolio to add the deposit to.
         :return: Dict with the created deposit data.
         """
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
-                "INSERT INTO deposits (datestamp, amount, portfolioid, currency) VALUES (?, ?, 1, 'EUR')",
-                (datestamp, amount)
+                "INSERT INTO deposits (datestamp, amount, portfolioid, currency) VALUES (?, ?, ?, 'EUR')",
+                (datestamp, amount, portfolio_id)
             )
             connection.commit()
             deposit_id = cursor.lastrowid
@@ -511,7 +546,7 @@ class DatabaseService:
             "depositid": deposit_id,
             "datestamp": datestamp,
             "amount": amount,
-            "portfolioid": 1,
+            "portfolioid": portfolio_id,
             "currency": "EUR",
         }
 
@@ -1322,8 +1357,9 @@ class DatabaseService:
         """
         # Collect all symbols: portfolio positions + equity grants
         all_symbols = set()
-        for p in cls.positions.values():
-            all_symbols.add(p.stock.symbol)
+        for portfolio_positions in cls.positions.values():
+            for p in portfolio_positions.values():
+                all_symbols.add(p.stock.symbol)
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute("SELECT DISTINCT stockid FROM equity_grants")
             for row in cursor.fetchall():
@@ -1369,7 +1405,7 @@ class DatabaseService:
         :param symbols: List of stock symbols to fetch historical dividends for.
         """
 
-        symbols = [p.stock.symbol for p in cls.positions.values()]
+        symbols = [p.stock.symbol for portfolio_positions in cls.positions.values() for p in portfolio_positions.values()]
         historical_dividends = StockAPI.get_historical_dividends(symbols)
 
         with get_connection(DB_PATH) as connection:
@@ -1390,60 +1426,118 @@ class DatabaseService:
         logger.info("updateHistoricalDividends(): Historical dividends updated for %d symbol(s)", len(symbols))
 
     @classmethod
-    def getPortfolioValueHistory(cls) -> list:
+    def getPortfolioValueHistory(cls, portfolio_id: int = 1) -> list:
         """
-        Retrieves the portfolio value history.
+        Retrieves the portfolio value history for a specific portfolio.
 
+        :param portfolio_id: The portfolio to fetch history for.
         Returns:
         - list: Portfolio value history
         """
         with get_connection(DB_PATH) as connection:
-            answers = connection.execute("SELECT * FROM int__portfolio_value_evolution")
-        return answers
+            answers = connection.execute('''
+                WITH
+                transactions_buy AS (
+                    SELECT stockid, strftime('%Y-%m-%d', datestamp) AS datestamp, quantity
+                    FROM transactions
+                    WHERE type = 'BUY' AND portfolioid = ?
+                ),
+                transactions_sell AS (
+                    SELECT stockid, strftime('%Y-%m-%d', datestamp) AS datestamp, -quantity as quantity
+                    FROM transactions
+                    WHERE type = 'SELL' AND portfolioid = ?
+                ),
+                transactions_union AS (
+                    SELECT * FROM transactions_buy
+                    UNION ALL
+                    SELECT * FROM transactions_sell
+                ),
+                daily_transactions AS (
+                    SELECT stockid, datestamp, SUM(quantity) AS daily_quantity
+                    FROM transactions_union
+                    GROUP BY stockid, datestamp
+                ),
+                cumulative_positions AS (
+                    SELECT stockid, datestamp,
+                           SUM(daily_quantity) OVER (PARTITION BY stockid ORDER BY datestamp) AS cumulative_quantity
+                    FROM daily_transactions
+                ),
+                filled_cumulative_datestamp AS (
+                    SELECT
+                        hs.datestamp, hs.stockid, hs.closeprice,
+                        cp.cumulative_quantity,
+                        MAX(hs.datestamp) FILTER (WHERE cp.cumulative_quantity > 0)
+                            OVER (PARTITION BY hs.stockid ORDER BY hs.datestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+                            AS last_updated_datestamp
+                    FROM historicalstocks hs
+                    LEFT JOIN cumulative_positions cp
+                        ON hs.datestamp = cp.datestamp AND hs.stockid = cp.stockid
+                    WHERE hs.datestamp >= (SELECT MIN(datestamp) FROM cumulative_positions)
+                ),
+                filled_cumulative_quantity AS (
+                    SELECT fcd.closeprice, fcd.datestamp, fcd.stockid,
+                           cp2.cumulative_quantity AS filled_cumulative_quantity
+                    FROM filled_cumulative_datestamp fcd
+                    LEFT JOIN cumulative_positions cp2
+                        ON fcd.last_updated_datestamp = cp2.datestamp AND fcd.stockid = cp2.stockid
+                )
+                SELECT datestamp, ROUND(SUM(filled_cumulative_quantity * closeprice), 2) AS portfolio_value
+                FROM filled_cumulative_quantity
+                GROUP BY datestamp
+                ORDER BY datestamp
+            ''', (portfolio_id, portfolio_id))
+            rows = answers.fetchall()
+        return rows
     
     @classmethod
-    def getDividendTotal(cls) -> float:
+    def getDividendTotal(cls, portfolio_id: int = 1) -> float:
         """
         Calculates the total yearly dividend for the portfolio.
 
+        :param portfolio_id: The portfolio to calculate dividends for.
         Returns:
         - float: Total yearly dividend
         """
         total_dividend = 0.0
         with get_connection(DB_PATH) as connection:
-            answers = connection.execute('''SELECT * FROM int__portfolio_dividends_total''')
+            answers = connection.execute(
+                "SELECT COALESCE(SUM(quantity * price), 0) FROM transactions WHERE type = 'DIVIDEND' AND portfolioid = ?",
+                (portfolio_id,)
+            )
             total_dividend = float(answers.fetchone()[0])
         return round(total_dividend, 2)
 
     @classmethod
-    def getDividendYearToDate(cls, year: str) -> float:
+    def getDividendYearToDate(cls, year: str, portfolio_id: int = 1) -> float:
         """
         Calculates the total dividends received for a given year.
 
         Args:
         - year: The year to calculate dividends for (e.g., '2024')
+        - portfolio_id: The portfolio to calculate dividends for.
 
         Returns:
         - float: Total dividends for the year
         """
         with get_connection(DB_PATH) as connection:
             result = connection.execute(
-                '''SELECT SUM(total_dividends) 
-                   FROM int__transactions_dividends 
-                   WHERE strftime('%Y', datestamp) = ?''',
-                (year,)
+                '''SELECT COALESCE(SUM(quantity * price), 0)
+                   FROM transactions
+                   WHERE type = 'DIVIDEND' AND portfolioid = ? AND strftime('%Y', datestamp) = ?''',
+                (portfolio_id, year,)
             )
             row = result.fetchone()
             return round(row[0], 2) if row[0] else 0.0
 
     @classmethod
-    def getNextDividendInfo(cls) -> dict:
+    def getNextDividendInfo(cls, portfolio_id: int = 1) -> dict:
         """
         Finds the next upcoming projected dividend across all portfolio positions.
 
         Uses the projection algorithm to determine the earliest future dividend
         based on historical payment patterns.
 
+        :param portfolio_id: The portfolio to check dividends for.
         Returns:
         - dict: Contains stockid, dividend_rate, and date (never returns None)
         """
@@ -1453,9 +1547,10 @@ class DatabaseService:
         today = dt.now().strftime('%Y-%m-%d')
         end_date = (dt.now() + timedelta(days=365)).strftime('%Y-%m-%d')
 
+        portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
         earliest = None
         try:
-            for stockid in cls.positions:
+            for stockid in portfolio_positions:
                 projected = cls._projectDividends(stockid, today, end_date)
                 if projected:
                     first = projected[0]
@@ -1471,17 +1566,19 @@ class DatabaseService:
         return earliest if earliest else default_result
 
     @classmethod
-    def getDividendCalendar(cls, start_date: str, end_date: str) -> list:
+    def getDividendCalendar(cls, start_date: str, end_date: str, portfolio_id: int = 1) -> list:
         """
         Returns dividend calendar events (historical + projected) for the given date range.
 
         :param start_date: Start date in YYYY-MM-DD format.
         :param end_date: End date in YYYY-MM-DD format.
+        :param portfolio_id: The portfolio to fetch dividend calendar for.
         :return: List of dividend calendar event dicts sorted by date.
         """
         from datetime import datetime as dt, timedelta
 
         events = []
+        portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
         # Track transaction dates per stock for proximity-based deduplication.
         # The ex-dividend date (yfinance) and payment date (transaction) for the
         # same dividend event can differ by up to ~30 days.
@@ -1495,9 +1592,10 @@ class DatabaseService:
                 FROM transactions t
                 JOIN stocks s ON t.stockid = s.stockid
                 WHERE t.type = 'DIVIDEND'
+                  AND t.portfolioid = ?
                   AND DATE(t.datestamp) >= ? AND DATE(t.datestamp) <= ?
                 ORDER BY d ASC
-            ''', (start_date, end_date))
+            ''', (portfolio_id, start_date, end_date))
             tx_rows = cursor.fetchall()
 
         for row in tx_rows:
@@ -1520,7 +1618,8 @@ class DatabaseService:
         # dates regardless of whether the user held the stock.
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
-                "SELECT DISTINCT stockid FROM transactions WHERE type = 'DIVIDEND'"
+                "SELECT DISTINCT stockid FROM transactions WHERE type = 'DIVIDEND' AND portfolioid = ?",
+                (portfolio_id,)
             )
             stocks_with_transactions = {row[0] for row in cursor.fetchall()}
 
@@ -1531,9 +1630,10 @@ class DatabaseService:
                 FROM historicaldividends hd
                 JOIN stocks s ON hd.stockid = s.stockid
                 JOIN positions p ON hd.stockid = p.stockid
-                WHERE hd.datestamp >= ? AND hd.datestamp <= ?
+                WHERE p.portfolio_id = ?
+                  AND hd.datestamp >= ? AND hd.datestamp <= ?
                 ORDER BY hd.datestamp ASC
-            ''', (start_date, end_date))
+            ''', (portfolio_id, start_date, end_date))
             hd_rows = cursor.fetchall()
 
         for row in hd_rows:
@@ -1542,7 +1642,7 @@ class DatabaseService:
             # the authoritative source for those stocks
             if stockid in stocks_with_transactions:
                 continue
-            quantity = cls.positions[stockid].quantity if stockid in cls.positions else 0
+            quantity = portfolio_positions[stockid].quantity if stockid in portfolio_positions else 0
             events.append({
                 "date": row[0],
                 "symbol": row[3],
@@ -1553,7 +1653,7 @@ class DatabaseService:
             })
 
         # Generate projected dividends for each position
-        for stockid, position in cls.positions.items():
+        for stockid, position in portfolio_positions.items():
             if position.stock is None:
                 continue
             projected = cls._projectDividends(stockid, start_date, end_date)

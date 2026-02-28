@@ -197,9 +197,9 @@ def test_getDividendCalendar_historical_only(mock_connect):
 
     stock = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0)
     position = Position(stockid=1, quantity=10, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
 
-    result = DatabaseService.getDividendCalendar("2024-01-01", "2024-06-30")
+    result = DatabaseService.getDividendCalendar("2024-01-01", "2024-06-30", portfolio_id=1)
 
     assert len(result) == 1
     assert result[0]["type"] == "historical"
@@ -226,9 +226,9 @@ def test_getDividendCalendar_skips_yfinance_when_transactions_exist(mock_connect
 
     stock = Stock(stockid=1, symbol='ASML.AS', name='ASML Holding N.V.', price=700.0)
     position = Position(stockid=1, quantity=4, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
 
-    result = DatabaseService.getDividendCalendar("2026-01-01", "2026-12-31")
+    result = DatabaseService.getDividendCalendar("2026-01-01", "2026-12-31", portfolio_id=1)
 
     assert len(result) == 1
     assert result[0]["date"] == "2026-02-18"
@@ -259,9 +259,9 @@ def test_getDividendCalendar_projected_only(mock_connect):
 
     stock = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0)
     position = Position(stockid=1, quantity=10, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
 
-    result = DatabaseService.getDividendCalendar("2025-01-01", "2025-12-31")
+    result = DatabaseService.getDividendCalendar("2025-01-01", "2025-12-31", portfolio_id=1)
 
     assert len(result) > 0
     for event in result:
@@ -294,9 +294,9 @@ def test_getDividendCalendar_mixed(mock_connect):
 
     stock = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0)
     position = Position(stockid=1, quantity=5, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
 
-    result = DatabaseService.getDividendCalendar("2025-01-01", "2025-12-31")
+    result = DatabaseService.getDividendCalendar("2025-01-01", "2025-12-31", portfolio_id=1)
 
     types = {e["type"] for e in result}
     assert "historical" in types
@@ -326,9 +326,9 @@ def test_getDividendCalendar_yfinance_fallback_no_transactions(mock_connect):
 
     stock = Stock(stockid=1, symbol='NEW.PA', name='New Stock SA', price=50.0)
     position = Position(stockid=1, quantity=20, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
 
-    result = DatabaseService.getDividendCalendar("2025-01-01", "2025-12-31")
+    result = DatabaseService.getDividendCalendar("2025-01-01", "2025-12-31", portfolio_id=1)
 
     assert len(result) == 1
     assert result[0]["symbol"] == "NEW.PA"
@@ -352,7 +352,7 @@ def test_getDividendCalendar_empty_portfolio(mock_connect):
 
     DatabaseService.positions = {}
 
-    result = DatabaseService.getDividendCalendar("2025-01-01", "2025-12-31")
+    result = DatabaseService.getDividendCalendar("2025-01-01", "2025-12-31", portfolio_id=1)
 
     assert result == []
 
@@ -376,9 +376,9 @@ def test_getDividendCalendar_transaction_not_in_yfinance(mock_connect):
 
     stock = Stock(stockid=1, symbol='TTE.PA', name='TotalEnergies SE', price=55.0)
     position = Position(stockid=1, quantity=150, stock=stock)
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
 
-    result = DatabaseService.getDividendCalendar("2026-01-01", "2026-12-31")
+    result = DatabaseService.getDividendCalendar("2026-01-01", "2026-12-31", portfolio_id=1)
 
     assert len(result) == 1
     assert result[0]["date"] == "2026-01-05"
@@ -413,7 +413,7 @@ def test_calendar_endpoint_success(mock_get_calendar):
     ]
 
     client = create_test_client()
-    resp = client.get("/api/portfolio/dividends/calendar?start_date=2024-01-01&end_date=2025-12-31")
+    resp = client.get("/api/portfolio/1/dividends/calendar?start_date=2024-01-01&end_date=2025-12-31")
 
     assert resp.status_code == 200
     data = resp.json()
@@ -422,13 +422,13 @@ def test_calendar_endpoint_success(mock_get_calendar):
     assert data["end_date"] == "2025-12-31"
     assert data["total_historical"] == 5.0
     assert data["total_projected"] == 5.0
-    mock_get_calendar.assert_called_once_with("2024-01-01", "2025-12-31")
+    mock_get_calendar.assert_called_once_with("2024-01-01", "2025-12-31", portfolio_id=1)
 
 
 def test_calendar_endpoint_invalid_date():
     """GET /dividends/calendar with invalid date format should return 400."""
     client = create_test_client()
-    resp = client.get("/api/portfolio/dividends/calendar?start_date=not-a-date&end_date=2025-12-31")
+    resp = client.get("/api/portfolio/1/dividends/calendar?start_date=not-a-date&end_date=2025-12-31")
 
     assert resp.status_code == 400
     assert "Invalid date format" in resp.json()["detail"]
@@ -437,7 +437,7 @@ def test_calendar_endpoint_invalid_date():
 def test_calendar_endpoint_start_after_end():
     """GET /dividends/calendar with start_date > end_date should return 400."""
     client = create_test_client()
-    resp = client.get("/api/portfolio/dividends/calendar?start_date=2026-01-01&end_date=2025-01-01")
+    resp = client.get("/api/portfolio/1/dividends/calendar?start_date=2026-01-01&end_date=2025-01-01")
 
     assert resp.status_code == 400
     assert "start_date must be before" in resp.json()["detail"]
@@ -449,7 +449,7 @@ def test_calendar_endpoint_empty(mock_get_calendar):
     mock_get_calendar.return_value = []
 
     client = create_test_client()
-    resp = client.get("/api/portfolio/dividends/calendar?start_date=2025-01-01&end_date=2025-12-31")
+    resp = client.get("/api/portfolio/1/dividends/calendar?start_date=2025-01-01&end_date=2025-12-31")
 
     assert resp.status_code == 200
     data = resp.json()

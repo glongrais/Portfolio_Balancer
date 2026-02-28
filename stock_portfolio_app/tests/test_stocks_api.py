@@ -7,8 +7,9 @@ from models.Stock import Stock
 from models.Position import Position
 from services.database_service import DatabaseService
 
-# Import the stocks router module and use its router for a lightweight test app
+# Import the stocks router module and the portfolio router for position CRUD tests
 from api.routers import stocks as stocks_router
+from api.routers import portfolio as portfolio_router
 
 
 @pytest.fixture(autouse=True)
@@ -25,9 +26,10 @@ def reset_database_service():
 
 
 def create_test_client():
-    """Create a minimal FastAPI app including only the stocks router to avoid app lifespan/startup logic."""
+    """Create a minimal FastAPI app including the stocks and portfolio routers to avoid app lifespan/startup logic."""
     app = FastAPI()
     app.include_router(stocks_router.router, prefix="/api/stocks", tags=["stocks"])
+    app.include_router(portfolio_router.router, prefix="/api/portfolio", tags=["portfolio"])
     return TestClient(app)
 
 
@@ -106,20 +108,20 @@ def test_update_prices_calls_service_and_returns_count(monkeypatch):
 
 def test_add_position_creates_position(monkeypatch):
     # Monkeypatch addPosition so it doesn't touch the sqlite DB but updates in-memory structures
-    def fake_add_position(symbol, quantity, distribution_target=None):
+    def fake_add_position(symbol, quantity, distribution_target=None, portfolio_id=1):
         # create a new stock and position in-memory
         stockid = max(DatabaseService.stocks.keys(), default=0) + 1
         stock = Stock(stockid=stockid, symbol=symbol, name=symbol, price=10.0)
         DatabaseService.stocks[stockid] = stock
         DatabaseService.symbol_map[symbol] = stockid
-        pos = Position(stockid=stockid, quantity=quantity, distribution_target=distribution_target, stock=stock)
-        DatabaseService.positions[stockid] = pos
+        pos = Position(stockid=stockid, quantity=quantity, distribution_target=distribution_target, stock=stock, portfolio_id=portfolio_id)
+        DatabaseService.positions.setdefault(portfolio_id, {})[stockid] = pos
 
-    monkeypatch.setattr(DatabaseService, 'addPosition', classmethod(lambda cls, symbol, quantity, distribution_target=None: fake_add_position(symbol, quantity, distribution_target)))
+    monkeypatch.setattr(DatabaseService, 'addPosition', classmethod(lambda cls, symbol, quantity, distribution_target=None, portfolio_id=1: fake_add_position(symbol, quantity, distribution_target, portfolio_id)))
 
     client = create_test_client()
     payload = {'symbol': 'NVDA', 'quantity': 5, 'distribution_target': 0.2}
-    resp = client.post('/api/stocks/positions', json=payload)
+    resp = client.post('/api/portfolio/1/positions', json=payload)
     assert resp.status_code == 201
     data = resp.json()
     assert data['quantity'] == 5
@@ -130,25 +132,25 @@ def test_add_position_creates_position(monkeypatch):
 def test_update_position_changes_values(monkeypatch):
     # prepare existing stock and position
     stock = Stock(stockid=10, symbol='AMZN', name='Amazon', price=3300.0)
-    pos = Position(stockid=10, quantity=2, distribution_target=0.1, distribution_real=0.05, stock=stock)
+    pos = Position(stockid=10, quantity=2, distribution_target=0.1, distribution_real=0.05, stock=stock, portfolio_id=1)
     DatabaseService.stocks = {10: stock}
     DatabaseService.symbol_map = {'AMZN': 10}
-    DatabaseService.positions = {10: pos}
+    DatabaseService.positions = {1: {10: pos}}
 
     # Monkeypatch updatePosition to change the in-memory position
-    def fake_update_position(symbol, quantity=None, distribution_target=None, distribution_real=None):
+    def fake_update_position(symbol, quantity=None, distribution_target=None, distribution_real=None, portfolio_id=1):
         sid = DatabaseService.symbol_map[symbol]
-        p = DatabaseService.positions[sid]
+        p = DatabaseService.positions[portfolio_id][sid]
         if quantity is not None:
             p.quantity = quantity
         if distribution_target is not None:
             p.distribution_target = distribution_target
 
-    monkeypatch.setattr(DatabaseService, 'updatePosition', classmethod(lambda cls, symbol, quantity=None, distribution_target=None, distribution_real=None: fake_update_position(symbol, quantity, distribution_target, distribution_real)))
+    monkeypatch.setattr(DatabaseService, 'updatePosition', classmethod(lambda cls, symbol, quantity=None, distribution_target=None, distribution_real=None, portfolio_id=1: fake_update_position(symbol, quantity, distribution_target, distribution_real, portfolio_id)))
 
     client = create_test_client()
     payload = {'quantity': 4, 'distribution_target': 0.15}
-    resp = client.put('/api/stocks/positions/AMZN', json=payload)
+    resp = client.put('/api/portfolio/1/positions/AMZN', json=payload)
     assert resp.status_code == 200
     data = resp.json()
     assert data['quantity'] == 4
@@ -171,7 +173,7 @@ def test_get_stock_case_insensitive():
     s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
     DatabaseService.stocks = {1: s}
     DatabaseService.symbol_map = {'AAPL': 1}
-    
+
     client = create_test_client()
     # Use lowercase symbol
     resp = client.get('/api/stocks/aapl')
@@ -183,14 +185,14 @@ def test_get_stock_case_insensitive():
 def test_add_position_already_exists():
     """Test adding a position that already exists returns 400."""
     stock = Stock(stockid=1, symbol='TSLA', name='Tesla Inc.', price=700.0)
-    position = Position(stockid=1, quantity=10, stock=stock)
+    position = Position(stockid=1, quantity=10, stock=stock, portfolio_id=1)
     DatabaseService.stocks = {1: stock}
     DatabaseService.symbol_map = {'TSLA': 1}
-    DatabaseService.positions = {1: position}
-    
+    DatabaseService.positions = {1: {1: position}}
+
     client = create_test_client()
     payload = {'symbol': 'TSLA', 'quantity': 5, 'distribution_target': 0.2}
-    resp = client.post('/api/stocks/positions', json=payload)
+    resp = client.post('/api/portfolio/1/positions', json=payload)
     assert resp.status_code == 400
     assert 'already exists' in resp.json()['detail']
 
@@ -199,7 +201,7 @@ def test_update_position_not_found():
     """Test updating a position that doesn't exist returns 404."""
     client = create_test_client()
     payload = {'quantity': 10, 'distribution_target': 0.2}
-    resp = client.put('/api/stocks/positions/UNKNOWN', json=payload)
+    resp = client.put('/api/portfolio/1/positions/UNKNOWN', json=payload)
     assert resp.status_code == 404
     assert 'not found' in resp.json()['detail']
 
@@ -210,10 +212,10 @@ def test_update_position_stock_exists_but_no_position():
     DatabaseService.stocks = {1: stock}
     DatabaseService.symbol_map = {'NFLX': 1}
     # No position created
-    
+
     client = create_test_client()
     payload = {'quantity': 10}
-    resp = client.put('/api/stocks/positions/NFLX', json=payload)
+    resp = client.put('/api/portfolio/1/positions/NFLX', json=payload)
     assert resp.status_code == 404
     assert 'Position for NFLX not found' in resp.json()['detail']
 
@@ -235,7 +237,7 @@ def test_get_stock_returns_all_fields():
     )
     DatabaseService.stocks = {1: s}
     DatabaseService.symbol_map = {'AAPL': 1}
-    
+
     client = create_test_client()
     resp = client.get('/api/stocks/AAPL')
     assert resp.status_code == 200
@@ -255,7 +257,7 @@ def test_get_stock_returns_all_fields():
 
 def test_add_position_includes_all_stock_fields():
     """Test that adding a position returns all stock fields."""
-    def fake_add_position(symbol, quantity, distribution_target=None):
+    def fake_add_position(symbol, quantity, distribution_target=None, portfolio_id=1):
         stockid = 1
         stock = Stock(
             stockid=stockid,
@@ -276,16 +278,17 @@ def test_add_position_includes_all_stock_fields():
             stockid=stockid,
             quantity=quantity,
             distribution_target=distribution_target,
-            stock=stock
+            stock=stock,
+            portfolio_id=portfolio_id,
         )
-        DatabaseService.positions[stockid] = pos
-    
+        DatabaseService.positions.setdefault(portfolio_id, {})[stockid] = pos
+
     # Use monkeypatch fixture properly
     import unittest.mock
-    with unittest.mock.patch.object(DatabaseService, 'addPosition', classmethod(lambda cls, symbol, quantity, distribution_target=None: fake_add_position(symbol, quantity, distribution_target))):
+    with unittest.mock.patch.object(DatabaseService, 'addPosition', classmethod(lambda cls, symbol, quantity, distribution_target=None, portfolio_id=1: fake_add_position(symbol, quantity, distribution_target, portfolio_id))):
         client = create_test_client()
         payload = {'symbol': 'TEST', 'quantity': 10, 'distribution_target': 0.25}
-        resp = client.post('/api/stocks/positions', json=payload)
+        resp = client.post('/api/portfolio/1/positions', json=payload)
         assert resp.status_code == 201
         data = resp.json()
         assert 'stock' in data
@@ -302,19 +305,20 @@ def test_position_response_includes_delta():
         quantity=10,
         distribution_target=30.0,
         distribution_real=20.0,
-        stock=stock
+        stock=stock,
+        portfolio_id=1,
     )
-    
-    def fake_add_position(symbol, quantity, distribution_target=None):
+
+    def fake_add_position(symbol, quantity, distribution_target=None, portfolio_id=1):
         DatabaseService.stocks[1] = stock
         DatabaseService.symbol_map[symbol] = 1
-        DatabaseService.positions[1] = position
-    
+        DatabaseService.positions.setdefault(portfolio_id, {})[1] = position
+
     import unittest.mock
-    with unittest.mock.patch.object(DatabaseService, 'addPosition', classmethod(lambda cls, symbol, quantity, distribution_target=None: fake_add_position(symbol, quantity, distribution_target))):
+    with unittest.mock.patch.object(DatabaseService, 'addPosition', classmethod(lambda cls, symbol, quantity, distribution_target=None, portfolio_id=1: fake_add_position(symbol, quantity, distribution_target, portfolio_id))):
         client = create_test_client()
         payload = {'symbol': 'AAPL', 'quantity': 10, 'distribution_target': 30.0}
-        resp = client.post('/api/stocks/positions', json=payload)
+        resp = client.post('/api/portfolio/1/positions', json=payload)
         assert resp.status_code == 201
         data = resp.json()
         assert 'delta' in data
@@ -329,26 +333,27 @@ def test_update_position_partial_update():
         quantity=5,
         distribution_target=0.2,
         distribution_real=0.15,
-        stock=stock
+        stock=stock,
+        portfolio_id=1,
     )
     DatabaseService.stocks = {1: stock}
     DatabaseService.symbol_map = {'MSFT': 1}
-    DatabaseService.positions = {1: pos}
-    
-    def fake_update_position(symbol, quantity=None, distribution_target=None, distribution_real=None):
+    DatabaseService.positions = {1: {1: pos}}
+
+    def fake_update_position(symbol, quantity=None, distribution_target=None, distribution_real=None, portfolio_id=1):
         sid = DatabaseService.symbol_map[symbol]
-        p = DatabaseService.positions[sid]
+        p = DatabaseService.positions[portfolio_id][sid]
         if quantity is not None:
             p.quantity = quantity
         if distribution_target is not None:
             p.distribution_target = distribution_target
-    
+
     import unittest.mock
-    with unittest.mock.patch.object(DatabaseService, 'updatePosition', classmethod(lambda cls, symbol, quantity=None, distribution_target=None, distribution_real=None: fake_update_position(symbol, quantity, distribution_target, distribution_real))):
+    with unittest.mock.patch.object(DatabaseService, 'updatePosition', classmethod(lambda cls, symbol, quantity=None, distribution_target=None, distribution_real=None, portfolio_id=1: fake_update_position(symbol, quantity, distribution_target, distribution_real, portfolio_id))):
         client = create_test_client()
         # Only update quantity
         payload = {'quantity': 10}
-        resp = client.put('/api/stocks/positions/MSFT', json=payload)
+        resp = client.put('/api/portfolio/1/positions/MSFT', json=payload)
         assert resp.status_code == 200
         data = resp.json()
         assert data['quantity'] == 10
@@ -463,54 +468,54 @@ def test_get_stock_price_history_error(mock_get_history):
 def test_delete_position_success(monkeypatch):
     """Test deleting a position with 0 shares returns 204."""
     stock = Stock(stockid=1, symbol='AAPL', name='Apple', price=150.0)
-    position = Position(stockid=1, quantity=0, stock=stock)
+    position = Position(stockid=1, quantity=0, stock=stock, portfolio_id=1)
     DatabaseService.stocks = {1: stock}
     DatabaseService.symbol_map = {'AAPL': 1}
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
 
-    def fake_remove_position(symbol):
+    def fake_remove_position(symbol, portfolio_id=1):
         stockid = DatabaseService.symbol_map[symbol]
-        del DatabaseService.positions[stockid]
+        del DatabaseService.positions[portfolio_id][stockid]
 
     monkeypatch.setattr(
         DatabaseService, 'removePosition',
-        classmethod(lambda cls, symbol: fake_remove_position(symbol))
+        classmethod(lambda cls, symbol, portfolio_id=1: fake_remove_position(symbol, portfolio_id))
     )
 
     client = create_test_client()
-    resp = client.delete('/api/stocks/positions/AAPL')
+    resp = client.delete('/api/portfolio/1/positions/AAPL')
     assert resp.status_code == 204
     assert resp.content == b''
 
 
 def test_delete_position_not_found(monkeypatch):
     """Test deleting a non-existent position returns 404."""
-    def fake_remove_position(symbol):
+    def fake_remove_position(symbol, portfolio_id=1):
         raise KeyError(f"Stock with symbol '{symbol}' not found")
 
     monkeypatch.setattr(
         DatabaseService, 'removePosition',
-        classmethod(lambda cls, symbol: fake_remove_position(symbol))
+        classmethod(lambda cls, symbol, portfolio_id=1: fake_remove_position(symbol, portfolio_id))
     )
 
     client = create_test_client()
-    resp = client.delete('/api/stocks/positions/UNKNOWN')
+    resp = client.delete('/api/portfolio/1/positions/UNKNOWN')
     assert resp.status_code == 404
     assert 'not found' in resp.json()['detail']
 
 
 def test_delete_position_has_shares(monkeypatch):
     """Test deleting a position with shares > 0 returns 400."""
-    def fake_remove_position(symbol):
+    def fake_remove_position(symbol, portfolio_id=1):
         raise ValueError(f"Cannot remove position '{symbol}': quantity is 10. Sell all shares first.")
 
     monkeypatch.setattr(
         DatabaseService, 'removePosition',
-        classmethod(lambda cls, symbol: fake_remove_position(symbol))
+        classmethod(lambda cls, symbol, portfolio_id=1: fake_remove_position(symbol, portfolio_id))
     )
 
     client = create_test_client()
-    resp = client.delete('/api/stocks/positions/AAPL')
+    resp = client.delete('/api/portfolio/1/positions/AAPL')
     assert resp.status_code == 400
     assert 'Sell all shares first' in resp.json()['detail']
 
@@ -518,23 +523,23 @@ def test_delete_position_has_shares(monkeypatch):
 def test_delete_position_case_insensitive(monkeypatch):
     """Test that delete endpoint uppercases the symbol."""
     stock = Stock(stockid=1, symbol='AAPL', name='Apple', price=150.0)
-    position = Position(stockid=1, quantity=0, stock=stock)
+    position = Position(stockid=1, quantity=0, stock=stock, portfolio_id=1)
     DatabaseService.stocks = {1: stock}
     DatabaseService.symbol_map = {'AAPL': 1}
-    DatabaseService.positions = {1: position}
+    DatabaseService.positions = {1: {1: position}}
 
     called_with = {}
-    def fake_remove_position(symbol):
+    def fake_remove_position(symbol, portfolio_id=1):
         called_with['symbol'] = symbol
         stockid = DatabaseService.symbol_map[symbol]
-        del DatabaseService.positions[stockid]
+        del DatabaseService.positions[portfolio_id][stockid]
 
     monkeypatch.setattr(
         DatabaseService, 'removePosition',
-        classmethod(lambda cls, symbol: fake_remove_position(symbol))
+        classmethod(lambda cls, symbol, portfolio_id=1: fake_remove_position(symbol, portfolio_id))
     )
 
     client = create_test_client()
-    resp = client.delete('/api/stocks/positions/aapl')
+    resp = client.delete('/api/portfolio/1/positions/aapl')
     assert resp.status_code == 204
     assert called_with['symbol'] == 'AAPL'

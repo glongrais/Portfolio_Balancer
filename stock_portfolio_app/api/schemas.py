@@ -41,7 +41,7 @@ class StockCreate(BaseModel):
 
 # Position Schemas
 class PositionBase(BaseModel):
-    quantity: int = Field(..., description="Number of shares held")
+    quantity: float = Field(..., description="Number of shares held")
     distribution_target: Optional[float] = Field(None, description="Target distribution percentage")
     distribution_real: float = Field(default=0.0, description="Current distribution percentage")
 
@@ -50,15 +50,17 @@ class PositionResponse(PositionBase):
     average_cost_basis: Optional[float] = Field(None, description="Average cost basis")
     stock: Optional[StockResponse] = Field(None, description="Associated stock information")
     delta: float = Field(..., description="Difference between target and real distribution")
+    portfolio_id: int = Field(default=1, description="Portfolio identifier")
     model_config = ConfigDict(from_attributes=True)
 
 class PositionCreate(BaseModel):
     symbol: str = Field(..., description="Stock symbol")
-    quantity: int = Field(..., description="Number of shares", gt=0)
+    quantity: float = Field(..., description="Number of shares", gt=0)
     distribution_target: Optional[float] = Field(None, description="Target distribution percentage", ge=0, le=100)
+    portfolio_id: Optional[int] = Field(1, description="Stock portfolio id")
 
 class PositionUpdate(BaseModel):
-    quantity: Optional[int] = Field(None, description="New quantity of shares", gt=0)
+    quantity: Optional[float] = Field(None, description="New quantity of shares", gt=0)
     distribution_target: Optional[float] = Field(None, description="New target distribution percentage", ge=0, le=100)
 
 # Portfolio Schemas
@@ -109,7 +111,7 @@ class TransactionType(str, Enum):
 
 class TransactionBase(BaseModel):
     symbol: str = Field(..., description="Stock symbol")
-    quantity: int = Field(..., description="Number of shares")
+    quantity: float = Field(..., description="Number of shares")
     price: float = Field(..., description="Price per share")
     type: TransactionType = Field(..., description="Transaction type (buy/sell)")
     datestamp: datetime = Field(..., description="Transaction date")
@@ -121,7 +123,7 @@ class TransactionResponse(TransactionBase):
 
 class TransactionCreate(BaseModel):
     symbol: str = Field(..., description="Stock symbol")
-    quantity: int = Field(..., description="Number of shares", gt=0)
+    quantity: float = Field(..., description="Number of shares", gt=0)
     price: float = Field(..., description="Price per share", gt=0)
     type: TransactionType = Field(..., description="Transaction type (buy/sell)")
     date: datetime = Field(..., description="Transaction date")
@@ -135,7 +137,7 @@ class DividendResponse(BaseModel):
 class DividendByStockItem(BaseModel):
     symbol: str = Field(..., description="Stock symbol")
     name: str = Field(..., description="Company name")
-    quantity: int = Field(..., description="Number of shares")
+    quantity: float = Field(..., description="Number of shares")
     dividend_rate: float = Field(..., description="Dividend per share")
     total_dividend: float = Field(..., description="Total dividend from this stock")
     expected_date: Optional[str] = Field(None, description="Expected payment date (YYYY-MM-DD)")
