@@ -19,17 +19,17 @@ class AmountResponse(BaseModel):
 # Stock Schemas
 class StockBase(BaseModel):
     symbol: str = Field(..., description="Stock ticker symbol")
-    name: str = Field(default="", description="Company name")
-    price: float = Field(default=0.0, description="Current stock price")
-    currency: str = Field(default="", description="Currency of the stock")
+    name: Optional[str] = Field(default="", description="Company name")
+    price: Optional[float] = Field(default=0.0, description="Current stock price")
+    currency: Optional[str] = Field(default="", description="Currency of the stock")
     market_cap: Optional[float] = Field(default=None, description="Market capitalization")
-    sector: str = Field(default="", description="Company sector")
-    industry: str = Field(default="", description="Company industry")
-    country: str = Field(default="", description="Company country")
-    dividend: float = Field(default=0.0, description="Dividend value")
-    dividend_yield: float = Field(default=0.0, description="Dividend yield percentage")
-    logo_url: str = Field(default="", description="URL to company logo")
-    quote_type: str = Field(default="EQUITY", description="Quote type (EQUITY, ETF, etc.)")
+    sector: Optional[str] = Field(default="", description="Company sector")
+    industry: Optional[str] = Field(default="", description="Company industry")
+    country: Optional[str] = Field(default="", description="Company country")
+    dividend: Optional[float] = Field(default=0.0, description="Dividend value")
+    dividend_yield: Optional[float] = Field(default=0.0, description="Dividend yield percentage")
+    logo_url: Optional[str] = Field(default="", description="URL to company logo")
+    quote_type: Optional[str] = Field(default="EQUITY", description="Quote type (EQUITY, ETF, etc.)")
     ex_dividend_date: Optional[str] = Field(default=None, description="Ex-dividend date (YYYY-MM-DD)")
 
 class StockResponse(StockBase):
