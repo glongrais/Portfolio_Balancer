@@ -26,15 +26,24 @@ def create_test_client():
     return TestClient(app)
 
 
+SAMPLE_PORTFOLIOS = [
+    {"portfolio_id": 1, "name": "PEA", "currency": "EUR"},
+    {"portfolio_id": 2, "name": "ISK", "currency": "SEK"},
+]
+
+
 @patch('services.database_service.DatabaseService.getEquityVestedTotal')
+@patch('services.stock_api.StockAPI.get_fx_rate')
 @patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
 @patch('services.database_service.DatabaseService.getNetWorthAssets')
-def test_get_current_net_worth(mock_get_assets, mock_pea_value, mock_equity_total):
-    """Test getting current net worth with PEA + stored assets."""
-    mock_pea_value.return_value = 89000.0
+@patch('services.database_service.DatabaseService.getPortfolios')
+def test_get_current_net_worth(mock_get_portfolios, mock_get_assets, mock_portfolio_value, mock_fx_rate, mock_equity_total):
+    """Test getting current net worth with multiple portfolios + stored assets."""
+    mock_get_portfolios.return_value = SAMPLE_PORTFOLIOS
+    mock_portfolio_value.side_effect = lambda pid: {1: 89000.0, 2: 50000.0}[pid]
+    mock_fx_rate.return_value = 0.09  # SEK to EUR
     mock_equity_total.return_value = 0.0
     mock_get_assets.return_value = [
-        {"id": "cto", "label": "CTO", "current_value": 12000.0, "updated_at": "2026-02-26"},
         {"id": "savings", "label": "Savings", "current_value": 10000.0, "updated_at": "2026-02-26"},
     ]
 
@@ -43,23 +52,27 @@ def test_get_current_net_worth(mock_get_assets, mock_pea_value, mock_equity_tota
 
     assert resp.status_code == 200
     data = resp.json()
-    assert data['total'] == 111000.0
+    # PEA: 89000, ISK: 50000 * 0.09 = 4500, Savings: 10000
     assert len(data['assets']) == 3
     assert data['assets'][0]['id'] == 'pea'
     assert data['assets'][0]['value'] == 89000.0
-    assert data['assets'][1]['id'] == 'cto'
-    assert data['assets'][1]['value'] == 12000.0
+    assert data['assets'][1]['id'] == 'isk'
+    assert data['assets'][1]['value'] == 4500.0
     assert data['assets'][2]['id'] == 'savings'
     assert data['assets'][2]['value'] == 10000.0
+    assert data['total'] == 103500.0
     assert 'last_updated' in data
+    mock_fx_rate.assert_called_once_with("SEK", "EUR")
 
 
 @patch('services.database_service.DatabaseService.getEquityVestedTotal')
 @patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
 @patch('services.database_service.DatabaseService.getNetWorthAssets')
-def test_get_current_net_worth_no_assets(mock_get_assets, mock_pea_value, mock_equity_total):
-    """Test getting current net worth with only PEA (no stored assets)."""
-    mock_pea_value.return_value = 50000.0
+@patch('services.database_service.DatabaseService.getPortfolios')
+def test_get_current_net_worth_no_assets(mock_get_portfolios, mock_get_assets, mock_portfolio_value, mock_equity_total):
+    """Test getting current net worth with only portfolios (no stored assets)."""
+    mock_get_portfolios.return_value = [{"portfolio_id": 1, "name": "PEA", "currency": "EUR"}]
+    mock_portfolio_value.return_value = 50000.0
     mock_equity_total.return_value = 0.0
     mock_get_assets.return_value = []
 
@@ -74,10 +87,10 @@ def test_get_current_net_worth_no_assets(mock_get_assets, mock_pea_value, mock_e
     assert data['assets'][0]['value'] == 50000.0
 
 
-@patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
-def test_get_current_net_worth_error(mock_pea_value):
+@patch('services.database_service.DatabaseService.getPortfolios')
+def test_get_current_net_worth_error(mock_get_portfolios):
     """Test error handling when fetching current net worth fails."""
-    mock_pea_value.side_effect = Exception("Database error")
+    mock_get_portfolios.side_effect = Exception("Database error")
 
     client = create_test_client()
     resp = client.get('/api/net-worth/current')
@@ -89,9 +102,11 @@ def test_get_current_net_worth_error(mock_pea_value):
 @patch('services.database_service.DatabaseService.getNetWorthSnapshots')
 @patch('services.database_service.DatabaseService.getEquityValueHistory')
 @patch('services.database_service.DatabaseService.getPortfolioValueHistory')
-def test_get_history(mock_pea_history, mock_equity_history, mock_snapshots):
-    """Test getting net worth history with PEA + stored asset snapshots."""
-    mock_pea_history.return_value = [
+@patch('services.database_service.DatabaseService.getPortfolios')
+def test_get_history(mock_get_portfolios, mock_portfolio_history, mock_equity_history, mock_snapshots):
+    """Test getting net worth history with multiple portfolios + stored asset snapshots."""
+    mock_get_portfolios.return_value = [{"portfolio_id": 1, "name": "PEA", "currency": "EUR"}]
+    mock_portfolio_history.return_value = [
         ("2024-01-31", 60000.0),
         ("2024-02-28", 62000.0),
     ]
@@ -118,9 +133,11 @@ def test_get_history(mock_pea_history, mock_equity_history, mock_snapshots):
 @patch('services.database_service.DatabaseService.getNetWorthSnapshots')
 @patch('services.database_service.DatabaseService.getEquityValueHistory')
 @patch('services.database_service.DatabaseService.getPortfolioValueHistory')
-def test_get_history_includes_equity(mock_pea_history, mock_equity_history, mock_snapshots):
+@patch('services.database_service.DatabaseService.getPortfolios')
+def test_get_history_includes_equity(mock_get_portfolios, mock_portfolio_history, mock_equity_history, mock_snapshots):
     """Test that net worth history includes equity from equity grants."""
-    mock_pea_history.return_value = [
+    mock_get_portfolios.return_value = [{"portfolio_id": 1, "name": "PEA", "currency": "EUR"}]
+    mock_portfolio_history.return_value = [
         ("2024-01-31", 50000.0),
         ("2024-02-28", 52000.0),
     ]

@@ -346,8 +346,10 @@ def test_get_history_invalid_dates():
 @patch('services.database_service.DatabaseService.getEquityVestedTotal')
 @patch('services.database_service.DatabaseService.getNetWorthAssets')
 @patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
-def test_net_worth_includes_vested_equity(mock_pea_value, mock_get_assets, mock_vested_total):
+@patch('services.database_service.DatabaseService.getPortfolios')
+def test_net_worth_includes_vested_equity(mock_get_portfolios, mock_pea_value, mock_get_assets, mock_vested_total):
     """Test that GET /net-worth/current includes equity when equity exists."""
+    mock_get_portfolios.return_value = [{"portfolio_id": 1, "name": "PEA", "currency": "EUR"}]
     mock_pea_value.return_value = 50000.0
     mock_get_assets.return_value = []
     mock_vested_total.return_value = 4140.0

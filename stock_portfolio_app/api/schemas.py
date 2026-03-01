@@ -111,8 +111,9 @@ class PortfolioValueHistoryResponse(BaseModel):
 
 # Transaction Schemas
 class TransactionType(str, Enum):
-    BUY = "buy"
-    SELL = "sell"
+    BUY = "BUY"
+    SELL = "SELL"
+    DIVIDEND = "DIVIDEND"
 
 class TransactionBase(BaseModel):
     symbol: str = Field(..., description="Stock symbol")

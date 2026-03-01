@@ -179,7 +179,7 @@ def test_add_transaction_buy(mock_upsert):
     transaction_data = {
         'date': '2024-01-15',
         'rowid': 123,
-        'type': 'buy',
+        'type': 'BUY',
         'symbol': 'AAPL',
         'quantity': 10,
         'price': 150.0
@@ -191,7 +191,7 @@ def test_add_transaction_buy(mock_upsert):
     data = resp.json()
     assert data['message'] == 'Transaction added successfully'
     assert data['symbol'] == 'AAPL'
-    assert data['type'] == 'buy'
+    assert data['type'] == 'BUY'
     assert data['quantity'] == 10
     assert data['price'] == 150.0
 
@@ -199,7 +199,7 @@ def test_add_transaction_buy(mock_upsert):
     mock_upsert.assert_called_once()
     call_kwargs = mock_upsert.call_args[1]
     assert call_kwargs['rowid'] == 123
-    assert call_kwargs['type'] == 'buy'
+    assert call_kwargs['type'] == 'BUY'
     assert call_kwargs['symbol'] == 'AAPL'
     assert call_kwargs['quantity'] == 10
     assert call_kwargs['price'] == 150.0
@@ -216,7 +216,7 @@ def test_add_transaction_sell(mock_upsert):
     transaction_data = {
         'date': '2024-01-20',
         'rowid': 124,
-        'type': 'sell',
+        'type': 'SELL',
         'symbol': 'MSFT',
         'quantity': 5,
         'price': 300.0
@@ -228,7 +228,7 @@ def test_add_transaction_sell(mock_upsert):
     data = resp.json()
     assert data['message'] == 'Transaction added successfully'
     assert data['symbol'] == 'MSFT'
-    assert data['type'] == 'sell'
+    assert data['type'] == 'SELL'
 
 
 @patch('services.database_service.DatabaseService.upsertTransactions')
@@ -239,7 +239,7 @@ def test_add_transaction_case_insensitive(mock_upsert):
     transaction_data = {
         'date': '2024-01-15',
         'rowid': 125,
-        'type': 'buy',
+        'type': 'BUY',
         'symbol': 'aapl',
         'quantity': 10,
         'price': 150.0
@@ -255,7 +255,7 @@ def test_add_transaction_case_insensitive(mock_upsert):
     mock_upsert.assert_called_once()
     call_kwargs = mock_upsert.call_args[1]
     assert call_kwargs['symbol'] == 'AAPL'
-    assert call_kwargs['type'] == 'buy'
+    assert call_kwargs['type'] == 'BUY'
 
 
 @patch('sqlite3.connect')
@@ -344,7 +344,7 @@ def test_add_transaction_error_handling(mock_upsert):
     transaction_data = {
         'date': '2024-01-15',
         'rowid': 126,
-        'type': 'buy',
+        'type': 'BUY',
         'symbol': 'AAPL',
         'quantity': 10,
         'price': 150.0
@@ -413,7 +413,7 @@ def test_add_sell_transaction_exceeding_held_returns_400(mock_upsert):
     transaction_data = {
         'date': '2024-01-20',
         'rowid': 200,
-        'type': 'sell',
+        'type': 'SELL',
         'symbol': 'AAPL',
         'quantity': 10,
         'price': 155.0

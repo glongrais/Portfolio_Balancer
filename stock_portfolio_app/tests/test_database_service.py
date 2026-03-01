@@ -587,7 +587,7 @@ def test_upsertTransactions_sell_updates_position(mock_update, mock_getStock, mo
 
     from datetime import datetime
     DatabaseService.upsertTransactions(
-        date=datetime(2024, 1, 15), rowid=1, type='sell',
+        date=datetime(2024, 1, 15), rowid=1, type='SELL',
         symbol='AAPL', quantity=3, price=155.0
     )
 
@@ -607,7 +607,7 @@ def test_upsertTransactions_sell_more_than_held_rejected(mock_getStock, setup_da
     from datetime import datetime
     with pytest.raises(ValueError, match="Cannot sell 10 shares of AAPL: only 5 shares held"):
         DatabaseService.upsertTransactions(
-            date=datetime(2024, 1, 15), rowid=1, type='sell',
+            date=datetime(2024, 1, 15), rowid=1, type='SELL',
             symbol='AAPL', quantity=10, price=155.0
         )
 
@@ -630,7 +630,7 @@ def test_upsertTransactions_buy_updates_position(mock_update, mock_getStock, moc
 
     from datetime import datetime
     DatabaseService.upsertTransactions(
-        date=datetime(2024, 1, 15), rowid=1, type='buy',
+        date=datetime(2024, 1, 15), rowid=1, type='BUY',
         symbol='AAPL', quantity=5, price=145.0
     )
 

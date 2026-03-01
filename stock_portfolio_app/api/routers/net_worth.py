@@ -18,6 +18,7 @@ from api.schemas import (
 )
 from services.database_service import DatabaseService
 from services.portfolio_service import PortfolioService
+from services.stock_api import StockAPI
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +32,21 @@ async def get_current_net_worth():
     PEA value is computed live from the portfolio.
     """
     try:
-        pea_value = float(PortfolioService.calculatePortfolioValue())
+        portfolios = DatabaseService.getPortfolios()
         stored_assets = DatabaseService.getNetWorthAssets()
         equity_vested_total = DatabaseService.getEquityVestedTotal()
 
-        assets = [NetWorthAssetItem(id="pea", label="PEA", value=pea_value)]
+        assets = []
+        for p in portfolios:
+            pid = p["portfolio_id"]
+            name = p["name"]
+            currency = p["currency"]
+            value = float(PortfolioService.calculatePortfolioValue(pid))
+            if currency != "EUR":
+                fx_rate = StockAPI.get_fx_rate(currency, "EUR")
+                value = round(value * fx_rate, 2)
+            assets.append(NetWorthAssetItem(id=name.lower(), label=name, value=value))
+
         if equity_vested_total > 0:
             assets.append(NetWorthAssetItem(
                 id="equity", label="Equity", value=equity_vested_total
@@ -91,18 +102,39 @@ async def get_net_worth_history(
         # Build monthly data: {YYYY-MM-DD: {asset_id: value}}
         monthly_data = defaultdict(dict)
 
-        # PEA history from portfolio value evolution
-        pea_dates = []
-        pea_history = DatabaseService.getPortfolioValueHistory()
-        for row in pea_history:
-            date_str = row[0] if isinstance(row[0], str) else row[0].strftime('%Y-%m-%d')
-            if start_date <= date_str <= end_date and row[1] is not None:
-                monthly_data[date_str]["pea"] = float(row[1])
-                pea_dates.append(date_str)
+        # Portfolio history from all portfolios
+        all_dates = []
+        portfolios = DatabaseService.getPortfolios()
+        for p in portfolios:
+            pid = p["portfolio_id"]
+            name = p["name"]
+            currency = p["currency"]
+            asset_key = name.lower()
 
-        # Equity history: compute for every PEA date using forward-filled prices
+            history = DatabaseService.getPortfolioValueHistory(pid)
+
+            # Build FX lookup for non-EUR portfolios
+            fx_lookup = {}
+            if currency != "EUR":
+                pair = f"{currency}EUR"
+                fx_lookup = DatabaseService.getFxRateLookup(pair, start_date, end_date)
+
+            last_fx = 1.0
+            for row in history:
+                date_str = row[0] if isinstance(row[0], str) else row[0].strftime('%Y-%m-%d')
+                if start_date <= date_str <= end_date and row[1] is not None:
+                    if currency != "EUR":
+                        if date_str in fx_lookup:
+                            last_fx = fx_lookup[date_str]
+                        value = round(float(row[1]) * last_fx, 2)
+                    else:
+                        value = float(row[1])
+                    monthly_data[date_str][asset_key] = value
+                    all_dates.append(date_str)
+
+        # Equity history: compute for every portfolio date using forward-filled prices
         equity_history = DatabaseService.getEquityValueHistory(
-            start_date, end_date, target_dates=sorted(pea_dates), convert_to_eur=True
+            start_date, end_date, target_dates=sorted(set(all_dates)), convert_to_eur=True
         )
         for date_str, value in equity_history:
             if value > 0:

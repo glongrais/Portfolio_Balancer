@@ -334,7 +334,11 @@ class DatabaseService:
 
     @classmethod
     def getPortfolios(cls) -> list:
+        """
+        Fetches all portfolios from the database.
 
+        :return: List of portfolio dicts with portfolio_id, name, currency.
+        """
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute("SELECT * FROM portfolios")
             rows = cursor.fetchall()
@@ -347,6 +351,23 @@ class DatabaseService:
             }
             for row in rows
         ]
+
+    @classmethod
+    def getFxRateLookup(cls, pair: str, start_date: str, end_date: str) -> dict:
+        """
+        Builds a date -> rate lookup dict from fx_rates_history for a currency pair.
+
+        :param pair: Currency pair string (e.g. 'SEKEUR').
+        :param start_date: Start date (for context, rates before start are included for forward-fill).
+        :param end_date: End date upper bound.
+        :return: Dict mapping date strings to FX rates.
+        """
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT date, rate FROM fx_rates_history WHERE pair = ? AND date <= ? ORDER BY date ASC",
+                (pair, end_date)
+            )
+            return {row[0]: row[1] for row in cursor.fetchall()}
 
     @classmethod
     def upsertTransactions(cls, date: datetime, rowid: int, type: str, symbol: str, quantity: float, price: float, portfolio_id: int = 1) -> None:
@@ -369,7 +390,7 @@ class DatabaseService:
         portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
 
         # Validate sell quantity before inserting the transaction
-        if type == 'sell' and stockid in portfolio_positions:
+        if type == 'SELL' and stockid in portfolio_positions:
             current_qty = portfolio_positions[stockid].quantity
             if quantity > current_qty:
                 raise ValueError(
@@ -390,14 +411,14 @@ class DatabaseService:
         # Auto-update position quantity if a row was actually inserted
         if rows_inserted > 0 and stockid in portfolio_positions:
             old_qty = portfolio_positions[stockid].quantity
-            if type == 'sell':
+            if type == 'SELL':
                 new_qty = old_qty - quantity
                 cls.updatePosition(symbol, quantity=new_qty, portfolio_id=portfolio_id)
                 logger.info(
                     "upsertTransactions(): Sold %d shares of %s. Position quantity: %d -> %d",
                     quantity, symbol, old_qty, new_qty
                 )
-            elif type == 'buy':
+            elif type == 'BUY':
                 new_qty = old_qty + quantity
                 cls.updatePosition(symbol, quantity=new_qty, portfolio_id=portfolio_id)
                 logger.info(
