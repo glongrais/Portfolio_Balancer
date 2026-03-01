@@ -2,6 +2,13 @@
 
 A comprehensive portfolio management application that reads stock portfolios, tracks transactions, analyzes distributions, and provides intelligent buy recommendations.
 
+## Benchmark
+
+`locust` is used to benchmark the API:
+```
+locust -f ./stock_portfolio_app/benchmark/locustfile.py
+```
+
 ## Features
 
 - **Portfolio Management**: Track stocks, positions, and transactions

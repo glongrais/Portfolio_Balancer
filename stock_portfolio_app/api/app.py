@@ -63,10 +63,10 @@ async def lifespan(app: FastAPI):
             logger.warning(f"FX rates history update failed on startup (non-blocking): {e}")
 
         # Refresh data from Numbers file
-        try:
-            FileUtils.refresh_from_numbers()
-        except Exception as e:
-            logger.warning(f"Numbers refresh failed on startup (non-blocking): {e}")
+        # try:
+        #     FileUtils.refresh_from_numbers()
+        # except Exception as e:
+        #     logger.warning(f"Numbers refresh failed on startup (non-blocking): {e}")
 
         logger.info("Portfolio Balancer API started successfully")
     except Exception as e:
