@@ -65,9 +65,11 @@ async def get_portfolio_value(portfolio_id: int = Path(..., description="Portfol
     """
     try:
         total_value = PortfolioService.calculatePortfolioValue(portfolio_id)
+        portfolios = DatabaseService.getPortfolios()
+        currency = next((p["currency"] for p in portfolios if p["portfolio_id"] == portfolio_id), "EUR")
         return PortfolioValueResponse(
             total_value=total_value,
-            currency="EUR",
+            currency=currency,
             positions_count=len(DatabaseService.getPositionsForPortfolio(portfolio_id))
         )
     except Exception as e:
