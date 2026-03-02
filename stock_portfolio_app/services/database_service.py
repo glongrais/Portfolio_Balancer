@@ -1426,7 +1426,10 @@ class DatabaseService:
             if last_date is None:
                 # No data yet — fetch full history
                 logger.info("Full history fetch for: %s", ", ".join(symbols))
-                data = StockAPI.get_historical_data(symbols, start_date, end_date)
+                if start_date != "":
+                    data = StockAPI.get_historical_data(symbols, start_date, end_date)
+                else:
+                    data = StockAPI.get_historical_data(symbols, "1900-01-01", end_date)
             else:
                 data = StockAPI.get_historical_data(symbols, last_date, end_date)
             cls._insertHistoricalData(data)
