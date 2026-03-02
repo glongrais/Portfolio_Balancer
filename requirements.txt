@@ -1,21 +1,21 @@
-numbers-parser==4.14.2
+numbers-parser
 yfinance
 yfinance[nospam]
-cachetools==5.3.3
-fastapi==0.115.0
-uvicorn[standard]==0.32.0
-pydantic==2.9.2
-python-multipart==0.0.22
-python-json-logger==4.0.0
-prometheus-fastapi-instrumentator==7.1.0
+cachetools
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+python-json-logger
+prometheus-fastapi-instrumentator
 
 # Analytics
-dbt-core==1.9.2
-dbt-sqlite==1.9.0
+dbt-core
+dbt-sqlite
 
 # Testing
-pytest==8.4.2
-httpx==0.28.1
+pytest
+httpx
 
 # Benchmark
 locust
