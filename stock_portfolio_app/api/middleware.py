@@ -17,14 +17,14 @@ async def log_requests_middleware(request: Request, call_next):
     start_time = time.time()
     
     # Log the request
-    logger.info(f"Incoming request: {request.method} {request.url.path}")
+    logger.debug(f"Incoming request: {request.method} {request.url.path}")
     
     # Process the request
     response = await call_next(request)
     
     # Calculate response time
     process_time = time.time() - start_time
-    logger.info(
+    logger.debug(
         f"Completed: {request.method} {request.url.path} - "
         f"Status: {response.status_code} - "
         f"Duration: {process_time:.2f}s"
