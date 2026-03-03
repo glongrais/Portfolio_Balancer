@@ -1,3 +1,4 @@
+import math
 import yfinance as yf
 from cachetools import cached, TTLCache
 import logging
@@ -11,6 +12,45 @@ class StockAPI:
     LOGO_SYMBOL_MAP = {
         "STLAP.PA": "STLA",
     }
+
+    EXCHANGE_CURRENCY_MAP = {
+        "NMS": "USD", "NYQ": "USD", "NGM": "USD", "NCM": "USD", "ASE": "USD", "BTS": "USD", "PNK": "USD",
+        "PAR": "EUR", "AMS": "EUR", "GER": "EUR", "MIL": "EUR", "BRU": "EUR", "LIS": "EUR", "MCE": "EUR",
+        "STO": "SEK", "CPH": "DKK", "HEL": "EUR", "OSL": "NOK",
+        "LSE": "GBP", "IOB": "GBP",
+        "TYO": "JPY", "HKG": "HKD", "SHH": "CNY", "SHZ": "CNY",
+        "TSX": "CAD", "ASX": "AUD",
+    }
+
+    @classmethod
+    def search_stocks(cls, query: str, count: int = 10) -> list:
+        lookup = yf.Lookup(query)
+        df = lookup.stock
+        if df is None or df.empty:
+            return []
+        results = []
+        def _str(val, default=""):
+            if val is None or (isinstance(val, float) and math.isnan(val)):
+                return default
+            return str(val)
+
+        def _float(val, default=None):
+            if val is None or (isinstance(val, float) and math.isnan(val)):
+                return default
+            return float(val)
+
+        for symbol, row in df.head(count).iterrows():
+            exchange = _str(row.get("exchange"))
+            results.append({
+                "symbol": symbol,
+                "name": _str(row.get("shortName")),
+                "exchange": exchange,
+                "currency": cls.EXCHANGE_CURRENCY_MAP.get(exchange, ""),
+                "price": _float(row.get("regularMarketPrice")),
+                "quote_type": _str(row.get("quoteType"), "EQUITY"),
+                "logo_url": f"https://api.elbstream.com/logos/symbol/{cls.LOGO_SYMBOL_MAP.get(symbol, symbol)}?format=png&size=128",
+            })
+        return results
 
     @classmethod
     @cached(cache=TTLCache(maxsize=1024, ttl=60))

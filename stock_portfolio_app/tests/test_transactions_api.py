@@ -404,6 +404,35 @@ def test_get_transactions_with_max_limit(mock_connect):
 # --- Sell validation tests ---
 
 @patch('services.database_service.DatabaseService.upsertTransactions')
+def test_add_transaction_without_rowid(mock_upsert):
+    """Test adding a transaction without rowid in payload."""
+    client = create_test_client()
+
+    transaction_data = {
+        'date': '2024-01-15',
+        'type': 'BUY',
+        'symbol': 'AAPL',
+        'quantity': 10,
+        'price': 150.0
+    }
+
+    resp = client.post('/api/portfolio/1/transactions/', json=transaction_data)
+
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data['message'] == 'Transaction added successfully'
+    assert data['symbol'] == 'AAPL'
+
+    # Verify upsertTransactions was called with rowid=None
+    mock_upsert.assert_called_once()
+    call_kwargs = mock_upsert.call_args[1]
+    assert call_kwargs['rowid'] is None
+    assert call_kwargs['symbol'] == 'AAPL'
+    assert call_kwargs['quantity'] == 10
+    assert call_kwargs['price'] == 150.0
+
+
+@patch('services.database_service.DatabaseService.upsertTransactions')
 def test_add_sell_transaction_exceeding_held_returns_400(mock_upsert):
     """Test that selling more shares than held returns 400."""
     mock_upsert.side_effect = ValueError('Cannot sell 10 shares of AAPL: only 5 shares held')

@@ -16,6 +16,16 @@ class AmountResponse(BaseModel):
     amount: float = Field(..., description="Amount")
     currency: str = Field(default="EUR", description="Currency")
 
+# Stock Search Schema
+class StockSearchResult(BaseModel):
+    symbol: str
+    name: Optional[str] = ""
+    exchange: Optional[str] = ""
+    currency: Optional[str] = ""
+    price: Optional[float] = None
+    quote_type: Optional[str] = "EQUITY"
+    logo_url: Optional[str] = ""
+
 # Stock Schemas
 class StockBase(BaseModel):
     symbol: str = Field(..., description="Stock ticker symbol")
@@ -55,7 +65,7 @@ class PositionResponse(PositionBase):
 
 class PositionCreate(BaseModel):
     symbol: str = Field(..., description="Stock symbol")
-    quantity: float = Field(..., description="Number of shares", gt=0)
+    quantity: float = Field(..., description="Number of shares", ge=0)
     distribution_target: Optional[float] = Field(None, description="Target distribution percentage", ge=0, le=100)
     portfolio_id: Optional[int] = Field(1, description="Stock portfolio id")
 
@@ -133,7 +143,7 @@ class TransactionCreate(BaseModel):
     price: float = Field(..., description="Price per share", gt=0)
     type: TransactionType = Field(..., description="Transaction type (buy/sell)")
     date: datetime = Field(..., description="Transaction date")
-    rowid: int = Field(..., description="External row identifier")
+    rowid: Optional[int] = Field(default=None, description="External row identifier (auto-generated if omitted)")
 
 # Dividend Schemas
 class DividendResponse(BaseModel):

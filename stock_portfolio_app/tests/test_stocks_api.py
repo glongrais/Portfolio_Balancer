@@ -6,6 +6,7 @@ from unittest.mock import patch, MagicMock
 from models.Stock import Stock
 from models.Position import Position
 from services.database_service import DatabaseService
+from services.stock_api import StockAPI
 
 # Import the stocks router module and the portfolio router for position CRUD tests
 from api.routers import stocks as stocks_router
@@ -543,3 +544,50 @@ def test_delete_position_case_insensitive(monkeypatch):
     resp = client.delete('/api/portfolio/1/positions/aapl')
     assert resp.status_code == 204
     assert called_with['symbol'] == 'AAPL'
+
+
+# --- Stock Search Endpoint Tests ---
+
+@patch.object(StockAPI, 'search_stocks')
+def test_search_stocks(mock_search):
+    """Test searching stocks returns results with correct shape."""
+    mock_search.return_value = [
+        {"symbol": "AAPL", "name": "Apple Inc.", "exchange": "NMS", "currency": "USD", "price": 150.0, "quote_type": "EQUITY", "logo_url": "https://example.com/aapl.png"},
+        {"symbol": "AMAT", "name": "Applied Materials", "exchange": "NMS", "currency": "USD", "price": 200.0, "quote_type": "EQUITY", "logo_url": "https://example.com/amat.png"},
+    ]
+    client = create_test_client()
+    resp = client.get('/api/stocks/search?q=apple')
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) == 2
+    assert data[0]['symbol'] == 'AAPL'
+    assert data[0]['name'] == 'Apple Inc.'
+    assert data[0]['exchange'] == 'NMS'
+    assert data[0]['currency'] == 'USD'
+    assert data[0]['price'] == 150.0
+    assert data[0]['quote_type'] == 'EQUITY'
+    assert 'logo_url' in data[0]
+    mock_search.assert_called_once_with('apple')
+
+
+@patch.object(StockAPI, 'search_stocks')
+def test_search_stocks_empty(mock_search):
+    """Test searching stocks with no matches returns empty array."""
+    mock_search.return_value = []
+    client = create_test_client()
+    resp = client.get('/api/stocks/search?q=xyznonexistent')
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) == 0
+
+
+@patch.object(StockAPI, 'search_stocks')
+def test_search_stocks_error(mock_search):
+    """Test search endpoint returns 500 on exception."""
+    mock_search.side_effect = Exception("yfinance API error")
+    client = create_test_client()
+    resp = client.get('/api/stocks/search?q=apple')
+    assert resp.status_code == 500
+    assert 'Failed to search stocks' in resp.json()['detail']

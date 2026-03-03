@@ -370,7 +370,7 @@ class DatabaseService:
             return {row[0]: row[1] for row in cursor.fetchall()}
 
     @classmethod
-    def upsertTransactions(cls, date: datetime, rowid: int, type: str, symbol: str, quantity: float, price: float, portfolio_id: int = 1) -> None:
+    def upsertTransactions(cls, date: datetime, rowid: int = None, type: str = '', symbol: str = '', quantity: float = 0, price: float = 0, portfolio_id: int = 1) -> None:
         """
         Add or update a transaction in the database.
         For buy/sell transactions, automatically updates position quantity if the position exists.
@@ -383,6 +383,14 @@ class DatabaseService:
         :param portfolio_id: The portfolio this transaction belongs to.
         :raises ValueError: If selling more shares than currently held.
         """
+        if rowid is None:
+            with get_connection(DB_PATH) as connection:
+                cursor = connection.execute(
+                    "SELECT COALESCE(MAX(rowid), 0) + 1 FROM transactions WHERE portfolioid = ?",
+                    (portfolio_id,)
+                )
+                rowid = cursor.fetchone()[0]
+
         stockid = cls.getStock(symbol=symbol)
         if stockid == -1:
             stockid = cls.addStock(symbol)

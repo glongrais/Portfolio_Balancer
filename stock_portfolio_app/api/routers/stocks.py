@@ -9,15 +9,34 @@ from typing import List, Optional
 from api.schemas import (
     StockResponse,
     StockCreate,
+    StockSearchResult,
     UpdatePricesResponse,
     StockPriceHistoryResponse,
     StockPriceHistoryItem,
 )
 from services.database_service import DatabaseService
+from services.stock_api import StockAPI
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+@router.get("/search", response_model=List[StockSearchResult])
+async def search_stocks(
+    q: str = Query(..., min_length=1, max_length=50, description="Search query (symbol or company name)"),
+):
+    """
+    Search for stocks by symbol or company name using yfinance
+    """
+    try:
+        results = StockAPI.search_stocks(q)
+        return [StockSearchResult(**r) for r in results]
+    except Exception as e:
+        logger.error(f"Error searching stocks: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to search stocks: {str(e)}"
+        )
 
 @router.get("/", response_model=List[StockResponse])
 async def get_all_stocks():
