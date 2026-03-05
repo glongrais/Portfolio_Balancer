@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 SLOW_QUERY_THRESHOLD_MS = float(os.environ.get('SLOW_QUERY_THRESHOLD_MS', '100'))
 
-REQUIRED_TABLES = ['stocks', 'positions', 'transactions', 'historicalstocks', 'historicaldividends', 'deposits', 'net_worth_assets', 'net_worth_snapshots', 'equity_grants', 'equity_vesting_events', 'fx_rates_history']
+REQUIRED_TABLES = ['stocks', 'positions', 'transactions', 'historicalstocks', 'historicaldividends', 'deposits', 'net_worth_assets', 'net_worth_snapshots', 'equity_grants', 'equity_vesting_events', 'fx_rates_history', 'savings_accounts', 'savings_transactions']
 REQUIRED_VIEWS = ['mar__stocks', 'int__portfolio_value_evolution', 'int__portfolio_dividends_total', 'int__transactions_dividends']
 
 
@@ -144,6 +144,9 @@ def initialize_database(db_path: str):
                     sector TEXT,
                     industry TEXT,
                     country TEXT,
+                    previous_close REAL DEFAULT 0,
+                    dividend REAL DEFAULT 0,
+                    dividend_yield REAL DEFAULT 0,
                     logo_url TEXT DEFAULT '',
                     quote_type TEXT DEFAULT 'EQUITY',
                     ex_dividend_date TEXT DEFAULT NULL
@@ -251,9 +254,35 @@ def initialize_database(db_path: str):
                     UNIQUE(pair, date)
     )
     ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS savings_accounts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    bank TEXT NOT NULL,
+                    currency TEXT NOT NULL DEFAULT 'EUR',
+                    balance REAL NOT NULL DEFAULT 0,
+                    interest_rate REAL NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+    )
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS savings_transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    account_id INTEGER NOT NULL,
+                    type TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    datestamp TEXT NOT NULL,
+                    note TEXT DEFAULT '',
+                    FOREIGN KEY (account_id) REFERENCES savings_accounts (id)
+    )
+    ''')
     connection.commit()
 
     # Migrate existing tables: add columns that may not exist yet
+    _add_column_if_missing(cursor, 'stocks', 'previous_close', "REAL DEFAULT 0")
+    _add_column_if_missing(cursor, 'stocks', 'dividend', "REAL DEFAULT 0")
+    _add_column_if_missing(cursor, 'stocks', 'dividend_yield', "REAL DEFAULT 0")
     _add_column_if_missing(cursor, 'stocks', 'logo_url', "TEXT DEFAULT ''")
     _add_column_if_missing(cursor, 'stocks', 'quote_type', "TEXT DEFAULT 'EQUITY'")
     _add_column_if_missing(cursor, 'stocks', 'ex_dividend_date', "TEXT DEFAULT NULL")
@@ -301,6 +330,7 @@ def _migrate_dbt_views(cursor):
         stockid, name, symbol,
         NULL AS price, NULL AS currency, NULL AS market_cap,
         NULL AS sector, NULL AS industry, NULL AS country,
+        0 AS previous_close, 0 AS dividend, 0 AS dividend_yield,
         '' AS logo_url, 'EQUITY' AS quote_type,
         NULL AS ex_dividend_date
     FROM unlisted_stocks

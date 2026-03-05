@@ -8,6 +8,9 @@ from models.Position import Position
 
 MOCK_PRICE = {
     "currentPrice": 100.0,
+    "previousClose": 98.0,
+    "dividendRate": 0.96,
+    "dividendYield": 0.0098,
     "longName": "Apple Inc.",
     "symbol": "AAPL",
     "currency": "USD",
@@ -40,8 +43,8 @@ def test_addStock(mock_fetch_stock, mock_fetch_price, mock_connect, setup_databa
 
     mock_fetch_price.assert_called_once_with("AAPL")
     mock_cursor.execute.assert_called_once_with('''
-            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country, logo_url, quote_type, ex_dividend_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country, previous_close, dividend, dividend_yield, logo_url, quote_type, ex_dividend_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(symbol) DO UPDATE SET
                 name=excluded.name,
                 price=excluded.price,
@@ -50,10 +53,13 @@ def test_addStock(mock_fetch_stock, mock_fetch_price, mock_connect, setup_databa
                 sector=excluded.sector,
                 industry=excluded.industry,
                 country=excluded.country,
+                previous_close=excluded.previous_close,
+                dividend=excluded.dividend,
+                dividend_yield=excluded.dividend_yield,
                 logo_url=excluded.logo_url,
                 quote_type=excluded.quote_type,
                 ex_dividend_date=excluded.ex_dividend_date
-            ''', ("AAPL", "Apple Inc.", 100.0, "USD", 1000000000000, "Technology", "Consumer Electronics", "US", "", "EQUITY", None))
+            ''', ("AAPL", "Apple Inc.", 100.0, "USD", 1000000000000, "Technology", "Consumer Electronics", "US", 98.0, 0.96, 0.0098, "", "EQUITY", None))
 
     mock_cursor.commit.assert_called_once()
     mock_fetch_stock.assert_called_once_with(symbol="AAPL")
@@ -132,9 +138,14 @@ def test_updateStocksPrice(mock_fetch_price, mock_connect, setup_database_servic
     DatabaseService.updateStocksPrice()
 
     mock_fetch_price.assert_called_once_with('AAPL')
-    mock_cursor.execute.assert_called_once_with('UPDATE stocks SET price = ? WHERE stockid = ?', (100.0, 1))
+    mock_cursor.execute.assert_called_once_with(
+        'UPDATE stocks SET price=?, previous_close=?, dividend=?, dividend_yield=?, logo_url=? WHERE stockid=?',
+        (100.0, 98.0, 0.96, 0.0098, '', 1,)
+    )
     mock_cursor.commit.assert_called_once()
     assert DatabaseService.stocks[1].price == 100.0
+    assert DatabaseService.stocks[1].previous_close == 98.0
+    assert DatabaseService.stocks[1].dividend == 0.96
     
 @patch('services.stock_api.StockAPI.get_current_price', return_value=MOCK_PRICE)
 @patch('sqlite3.connect')
@@ -166,8 +177,8 @@ def test_updatePortfolioPositionsPrice(mock_logger_warning, mock_sqlite_connect,
     assert position2.stock.price == 100.0
     
     # Check if the database update was called with correct values
-    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=?,ex_dividend_date=? WHERE stockid=?", (100.0, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", "", "EQUITY", None, 1))
-    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=?,ex_dividend_date=? WHERE stockid=?", (100.0, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", "", "EQUITY", None, 2))
+    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,previous_close=?,dividend=?,dividend_yield=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=?,ex_dividend_date=? WHERE stockid=?", (100.0, 98.0, 0.96, 0.0098, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", "", "EQUITY", None, 1))
+    mock_conn.execute.assert_any_call("UPDATE stocks SET price=?,previous_close=?,dividend=?,dividend_yield=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=?,ex_dividend_date=? WHERE stockid=?", (100.0, 98.0, 0.96, 0.0098, "Apple Inc.", "USD", 1000000000000, "Technology", "Consumer Electronics", "US", "", "EQUITY", None, 2))
     assert mock_conn.execute.call_count == 2
     
     # Check if commit was called

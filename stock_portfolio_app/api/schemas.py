@@ -44,6 +44,7 @@ class StockBase(BaseModel):
 
 class StockResponse(StockBase):
     stockid: int = Field(..., description="Unique stock identifier")
+    previous_close: Optional[float] = Field(default=0.0, description="Previous closing price")
     model_config = ConfigDict(from_attributes=True)
 
 class StockCreate(BaseModel):
@@ -61,6 +62,9 @@ class PositionResponse(PositionBase):
     stock: Optional[StockResponse] = Field(None, description="Associated stock information")
     delta: float = Field(..., description="Difference between target and real distribution")
     portfolio_id: int = Field(default=1, description="Portfolio identifier")
+    daily_change_percent: Optional[float] = Field(default=None, description="Last trading day performance (%)")
+    daily_change_amount: Optional[float] = Field(default=None, description="Last trading day change per share ($)")
+    estimated_annual_dividend: Optional[float] = Field(default=None, description="Estimated annual dividend for this position")
     model_config = ConfigDict(from_attributes=True)
 
 class PositionCreate(BaseModel):
@@ -124,6 +128,7 @@ class TransactionType(str, Enum):
     BUY = "BUY"
     SELL = "SELL"
     DIVIDEND = "DIVIDEND"
+    STAKING = "STAKING"
 
 class TransactionBase(BaseModel):
     symbol: str = Field(..., description="Stock symbol")
@@ -317,3 +322,101 @@ class EquityValueHistoryItem(BaseModel):
 
 class EquityValueHistoryResponse(BaseModel):
     data: List[EquityValueHistoryItem] = Field(..., description="Historical equity value data points")
+
+# Savings Account Schemas
+class SavingsTransactionType(str, Enum):
+    DEPOSIT = "DEPOSIT"
+    WITHDRAWAL = "WITHDRAWAL"
+    INTEREST = "INTEREST"
+
+class SavingsAccountCreate(BaseModel):
+    name: str = Field(..., description="Account name (e.g. 'Livret A')")
+    bank: str = Field(..., description="Bank name (e.g. 'BoursoBank')")
+    currency: str = Field(default="EUR", description="Account currency")
+    balance: float = Field(default=0.0, description="Initial balance", ge=0)
+    interest_rate: float = Field(default=0.0, description="Annual interest rate (%)", ge=0)
+
+class SavingsAccountUpdate(BaseModel):
+    name: Optional[str] = Field(None, description="New account name")
+    bank: Optional[str] = Field(None, description="New bank name")
+    interest_rate: Optional[float] = Field(None, description="New interest rate (%)", ge=0)
+
+class SavingsAccountResponse(BaseModel):
+    id: int = Field(..., description="Account ID")
+    name: str = Field(..., description="Account name")
+    bank: str = Field(..., description="Bank name")
+    currency: str = Field(..., description="Account currency")
+    balance: float = Field(..., description="Current balance")
+    interest_rate: float = Field(..., description="Annual interest rate (%)")
+    created_at: str = Field(..., description="Creation date (YYYY-MM-DD)")
+    updated_at: str = Field(..., description="Last update date (YYYY-MM-DD)")
+
+class SavingsTransactionCreate(BaseModel):
+    type: SavingsTransactionType = Field(..., description="Transaction type")
+    amount: float = Field(..., description="Transaction amount", gt=0)
+    datestamp: str = Field(..., description="Transaction date (YYYY-MM-DD)")
+    note: Optional[str] = Field(default="", description="Optional note")
+
+class SavingsTransactionUpdate(BaseModel):
+    amount: Optional[float] = Field(None, description="New amount", gt=0)
+    datestamp: Optional[str] = Field(None, description="New date (YYYY-MM-DD)")
+    note: Optional[str] = Field(None, description="New note")
+
+class SavingsTransactionResponse(BaseModel):
+    id: int = Field(..., description="Transaction ID")
+    account_id: int = Field(..., description="Account ID")
+    type: str = Field(..., description="Transaction type")
+    amount: float = Field(..., description="Transaction amount")
+    datestamp: str = Field(..., description="Transaction date")
+    note: str = Field(default="", description="Note")
+
+class SavingsSummaryResponse(BaseModel):
+    total_balance: float = Field(..., description="Total balance across all accounts in EUR")
+    accounts_count: int = Field(..., description="Number of savings accounts")
+    accounts: List[SavingsAccountResponse] = Field(..., description="All savings accounts")
+
+class SavingsBalanceHistoryItem(BaseModel):
+    date: str = Field(..., description="Date (YYYY-MM-DD)")
+    balance: float = Field(..., description="Total savings balance in EUR")
+
+class SavingsBalanceHistoryResponse(BaseModel):
+    data: List[SavingsBalanceHistoryItem] = Field(..., description="Historical balance data points")
+
+# Crypto Schemas
+class CryptoHoldingResponse(BaseModel):
+    symbol: str = Field(..., description="Crypto ticker (e.g. BTC-USD)")
+    name: str = Field(default="", description="Cryptocurrency name")
+    quantity: float = Field(..., description="Amount held")
+    average_cost_basis: Optional[float] = Field(None, description="Average cost per unit")
+    current_price: float = Field(..., description="Current price in native currency")
+    currency: str = Field(default="USD", description="Price currency")
+    value: float = Field(..., description="Total value in native currency")
+    value_eur: float = Field(..., description="Total value in EUR")
+    gain_loss: Optional[float] = Field(None, description="Gain/loss in native currency")
+    gain_loss_pct: Optional[float] = Field(None, description="Gain/loss percentage")
+
+class CryptoHoldingCreate(BaseModel):
+    symbol: str = Field(..., description="Crypto ticker (e.g. BTC-USD)")
+    quantity: float = Field(..., description="Amount held", gt=0)
+    average_cost_basis: Optional[float] = Field(None, description="Average cost per unit", ge=0)
+
+class CryptoTransactionCreate(BaseModel):
+    symbol: str = Field(..., description="Crypto ticker (e.g. BTC-USD)")
+    quantity: float = Field(..., description="Amount", gt=0)
+    price: float = Field(..., description="Price per unit", gt=0)
+    type: TransactionType = Field(..., description="Transaction type (BUY/SELL/STAKING)")
+    date: str = Field(..., description="Transaction date (YYYY-MM-DD)")
+
+class CryptoSummaryResponse(BaseModel):
+    total_value: float = Field(..., description="Total crypto value in EUR")
+    total_cost_basis: float = Field(..., description="Total cost basis in EUR")
+    total_gain_loss: float = Field(..., description="Total gain/loss in EUR")
+    total_gain_loss_pct: float = Field(..., description="Overall gain/loss percentage")
+    holdings_count: int = Field(..., description="Number of crypto holdings")
+
+class CryptoValueHistoryItem(BaseModel):
+    date: str = Field(..., description="Date (YYYY-MM-DD)")
+    value: float = Field(..., description="Total crypto value in EUR")
+
+class CryptoValueHistoryResponse(BaseModel):
+    data: List[CryptoValueHistoryItem] = Field(..., description="Historical crypto value data")

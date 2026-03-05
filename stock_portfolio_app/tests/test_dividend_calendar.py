@@ -191,7 +191,9 @@ def test_getDividendCalendar_historical_only(mock_connect):
         [(1,)],
         # 3. yfinance historicaldividends in range (skipped: stock has transactions)
         [("2024-03-15", 0.50, 1, "AAPL", "Apple Inc.")],
-        # 4. _projectDividends query for stockid=1 (returns empty = insufficient data)
+        # 4. _projectDividends: historicaldividends query (empty = insufficient)
+        [],
+        # 5. _projectDividends: transaction fallback query (also insufficient)
         [],
     ]
 
@@ -220,7 +222,9 @@ def test_getDividendCalendar_skips_yfinance_when_transactions_exist(mock_connect
         [(1,)],
         # 3. yfinance: ex-div date 2026-02-09 (skipped: stock has transactions)
         [("2026-02-09", 1.60, 1, "ASML.AS", "ASML Holding N.V.")],
-        # 4. _projectDividends
+        # 4. _projectDividends: historicaldividends query (empty)
+        [],
+        # 5. _projectDividends: transaction fallback query (also insufficient)
         [],
     ]
 
@@ -320,7 +324,9 @@ def test_getDividendCalendar_yfinance_fallback_no_transactions(mock_connect):
         [],
         # 3. yfinance historicaldividends in range (used as fallback)
         [("2025-06-15", 1.00, 1, "NEW.PA", "New Stock SA")],
-        # 4. _projectDividends
+        # 4. _projectDividends: historicaldividends query (empty)
+        [],
+        # 5. _projectDividends: transaction fallback query (also insufficient)
         [],
     ]
 
@@ -370,7 +376,9 @@ def test_getDividendCalendar_transaction_not_in_yfinance(mock_connect):
         [(1,)],
         # 3. yfinance has no record for this date
         [],
-        # 4. _projectDividends: insufficient data
+        # 4. _projectDividends: historicaldividends query (empty)
+        [],
+        # 5. _projectDividends: transaction fallback query (also insufficient)
         [],
     ]
 

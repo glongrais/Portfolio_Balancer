@@ -88,6 +88,9 @@ class StockAPI:
 
         return {
             "currentPrice": info.get("currentPrice", info.get("previousClose")),
+            "previousClose": info.get("previousClose", 0) or 0,
+            "dividendRate": info.get("dividendRate", 0) or 0,
+            "dividendYield": info.get("dividendYield", 0) or 0,
             "longName": info.get("longName", ""),
             "symbol": symbol,
             "currency": info.get("currency", ""),

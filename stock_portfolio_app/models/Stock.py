@@ -12,6 +12,7 @@ class Stock:
     sector: str = field(default="")
     industry: str = field(default="")
     country: str = field(default="")
+    previous_close: float = field(default=0.0)
     dividend: float = field(default=0.0)
     dividend_yield: float = field(default=0.0)
     logo_url: str = field(default="")

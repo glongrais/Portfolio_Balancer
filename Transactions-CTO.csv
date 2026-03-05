@@ -1,0 +1,303 @@
+Date;Type;Symbol;Name;Quantity;Price;Amount
+2022/02/02;BUY;AAPL;Apple Inc.;0,0257909;174,87 US$;-4,51 US$
+2022/02/02;BUY;AGNC;AGNC Investment Corp.;0,344589;14,51 US$;-5,00 US$
+2022/02/03;BUY;KO;Coca-Cola Company (The);0,127739;61,14 US$;-7,81 US$
+2022/02/15;DIVIDEND;AAPL;Apple Inc.;;;0,03 US$
+2022/02/16;BUY;KO;Coca-Cola Company (The);0,233060;61,10 US$;-14,24 US$
+2022/03/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2022/04/04;DIVIDEND;KO;Coca-Cola Company (The);;;0,14 US$
+2022/04/13;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2022/05/11;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2022/05/16;DIVIDEND;AAPL;Apple Inc.;;;0,03 US$
+2022/06/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2022/07/05;DIVIDEND;KO;Coca-Cola Company (The);;;0,14 US$
+2022/07/13;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2022/08/16;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2022/08/16;DIVIDEND;AAPL;Apple Inc.;;;0,03 US$
+2022/09/13;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2022/10/04;DIVIDEND;KO;Coca-Cola Company (The);;;0,14 US$
+2022/10/13;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2022/11/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2022/11/11;DIVIDEND;AAPL;Apple Inc.;;;0,03 US$
+2022/12/12;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2022/12/16;DIVIDEND;KO;Coca-Cola Company (The);;;0,14 US$
+2023/01/13;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2023/02/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2023/02/17;DIVIDEND;AAPL;Apple Inc.;;;0,03 US$
+2023/03/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2023/03/10;BUY;AAPL;Apple Inc.;0,013252;150,16 US$;-1,99 US$
+2023/04/04;DIVIDEND;KO;Coca-Cola Company (The);;;0,14 US$
+2023/04/11;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2023/05/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2023/05/18;DIVIDEND;AAPL;Apple Inc.;;;0,03 US$
+2023/06/12;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2023/06/12;BUY;O;Realty Income Corporation;0,164230;60,89 US$;-10,00 US$
+2023/07/13;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,11 US$
+2023/07/17;DIVIDEND;KO;Coca-Cola Company (The);;;0,14 US$
+2023/07/17;BUY;O;Realty Income Corporation;0,347349;61,12 US$;-21,23 US$
+2023/07/17;DIVIDEND;O;Realty Income Corporation;;;0,03 US$
+2023/08/11;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,09 US$
+2023/08/16;DIVIDEND;O;Realty Income Corporation;;;0,09 US$
+2023/08/18;DIVIDEND;AAPL;Apple Inc.;;;0,03 US$
+2023/09/05;SELL;AAPL;Apple Inc.;0,175483;188,11 US$;33,01 US$
+2023/09/05;SELL;O;Realty Income Corporation;0,51158;55,89 US$;28,59 US$
+2023/09/05;SELL;KO;Coca-Cola Company (The);0,3608;59,01 US$;21,29 US$
+2023/09/05;SELL;AGNC;AGNC Investment Corp.;1,109009;9,88 US$;10,96 US$
+2023/09/05;BUY;MO;Altria Group, Inc.;0,104265;44,43 US$;-4,63 US$
+2023/09/05;BUY;MNST;Monster Beverage Corporation;0,041479;55,84 US$;-2,32 US$
+2023/09/05;BUY;RACE;Ferrari N.V.;0,0120827;306,18 US$;-3,70 US$
+2023/09/05;BUY;AGNC;AGNC Investment Corp.;0,46935;9,87 US$;-4,63 US$
+2023/09/05;BUY;NVDA;NVIDIA Corporation;0,0096209;451,50 US$;-4,34 US$
+2023/09/05;BUY;MCD;McDonald's Corporation;0,46935;9,87 US$;-4,63 US$
+2023/09/05;BUY;MSFT;Microsoft Corporation;0,0140818;328,97 US$;-4,63 US$
+2023/09/05;BUY;O;Realty Income Corporation;0,091201;55,85 US$;-5,09 US$
+2023/09/05;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,077879;66,64 US$;-5,19 US$
+2023/09/05;BUY;AAPL;Apple Inc.;0,0344553;188,29 US$;-6,49 US$
+2023/09/07;BUY;MSFT;Microsoft Corporation;0,019272;331,34 US$;-6,39 US$
+2023/09/07;BUY;O;Realty Income Corporation;0,184475;55,14 US$;-10,17 US$
+2023/09/07;BUY;MNST;Monster Beverage Corporation;0,081631;56,08 US$;-4,58 US$
+2023/09/07;BUY;NVDA;NVIDIA Corporation;0,0176222;456,44 US$;-8,04 US$
+2023/09/07;BUY;AAPL;Apple Inc.;0,0750594;176,56 US$;-13,25 US$
+2023/09/07;BUY;MO;Altria Group, Inc.;0,213089;43,57 US$;-9,28 US$
+2023/09/07;BUY;KO;Coca-Cola Company (The);0,188175;58,66 US$;-11,04 US$
+2023/09/07;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,158438;65,64 US$;-10,40 US$
+2023/09/07;BUY;RACE;Ferrari N.V.;0,0203315;298,29 US$;-6,06 US$
+2023/09/07;BUY;MCD;McDonald's Corporation;0,028166;277,98 US$;-7,83 US$
+2023/09/07;BUY;AGNC;AGNC Investment Corp.;0,53369;9,64 US$;-5,14 US$
+2023/09/13;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,09 US$
+2023/09/18;DIVIDEND;O;Realty Income Corporation;;;0,09 US$
+2023/09/21;BUY;RACE;Ferrari N.V.;0,013882;293,27 US$;-4,07 US$
+2023/09/21;BUY;AGNC;AGNC Investment Corp.;0,40852;9,97 US$;-4,07 US$
+2023/09/21;BUY;MNST;Monster Beverage Corporation;0,053106;55,01 US$;-2,92 US$
+2023/09/21;BUY;O;Realty Income Corporation;0,121153;52,98 US$;-6,42 US$
+2023/09/21;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,097422;67,54 US$;-6,58 US$
+2023/09/21;BUY;MO;Altria Group, Inc.;0,136046;42,87 US$;-5,83 US$
+2023/09/21;BUY;KO;Coca-Cola Company (The);0,08071;57,73 US$;-4,66 US$
+2023/09/21;BUY;MSFT;Microsoft Corporation;0,0144209;323,10 US$;-4,66 US$
+2023/09/21;BUY;NVDA;NVIDIA Corporation;0,0125886;416,71 US$;-5,25 US$
+2023/09/21;BUY;AAPL;Apple Inc.;0,0464764;175,73 US$;-8,17 US$
+2023/09/21;BUY;MCD;McDonald's Corporation;0,0190777;274,97 US$;-5,25 US$
+2023/10/02;DIVIDEND;KO;Coca-Cola Company (The);;;0,07 US$
+2023/10/10;DIVIDEND;MO;Altria Group, Inc.;;;0,26 US$
+2023/10/11;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,14 US$
+2023/10/13;DIVIDEND;O;Realty Income Corporation;;;0,09 US$
+2023/11/03;BUY;MSFT;Microsoft Corporation;0,01305;350,71 US$;-4,58 US$
+2023/11/03;BUY;KO;Coca-Cola Company (The);0,149506;57,29 US$;-8,57 US$
+2023/11/03;BUY;AAPL;Apple Inc.;0,0565911;175,57 US$;-9,94 US$
+2023/11/03;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,179084;58,24 US$;-10,43 US$
+2023/11/03;BUY;NVDA;NVIDIA Corporation;0,0083496;442,38 US$;-3,69 US$
+2023/11/03;BUY;MO;Altria Group, Inc.;0,199943;40,75 US$;-8,15 US$
+2023/11/03;BUY;MCD;McDonald's Corporation;0,0257011;267,86 US$;-6,88 US$
+2023/11/03;BUY;O;Realty Income Corporation;0,178338;50,97 US$;-9,09 US$
+2023/11/03;BUY;AGNC;AGNC Investment Corp.;0,79129;8,47 US$;-6,70 US$
+2023/11/03;BUY;RACE;Ferrari N.V.;0,010047;331,41 US$;-3,33 US$
+2023/11/03;BUY;MNST;Monster Beverage Corporation;0,059564;56,44 US$;-3,36 US$
+2023/11/09;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,14 US$
+2023/11/15;DIVIDEND;O;Realty Income Corporation;;;0,09 US$
+2023/11/16;DIVIDEND;AAPL;Apple Inc.;;;0,04 US$
+2023/11/24;BUY;MCD;McDonald's Corporation;0,0312102;281,77 US$;-8,79 US$
+2023/11/24;BUY;MO;Altria Group, Inc.;0,260691;41,37 US$;-10,78 US$
+2023/11/24;BUY;RACE;Ferrari N.V.;0,0157756;366,78 US$;-5,79 US$
+2023/11/24;BUY;KO;Coca-Cola Company (The);0,228038;58,47 US$;-13,33 US$
+2023/11/24;BUY;O;Realty Income Corporation;0,201639;53,54 US$;-10,80 US$
+2023/11/24;BUY;MNST;Monster Beverage Corporation;0,106523;55,14 US$;-5,87 US$
+2023/11/24;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,197875;58,42 US$;-11,56 US$
+2023/11/24;BUY;MSFT;Microsoft Corporation;0,0293699;377,26 US$;-11,08 US$
+2023/11/24;BUY;NVDA;NVIDIA Corporation;0,0143395;483,60 US$;-6,93 US$
+2023/11/24;BUY;AAPL;Apple Inc.;0,0661771;189,91 US$;-12,57 US$
+2023/12/11;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,22 US$
+2023/12/14;DIVIDEND;MSFT;Microsoft Corporation;;;0,04 US$
+2023/12/15;DIVIDEND;MCD;McDonald's Corporation;;;0,17 US$
+2023/12/15;DIVIDEND;O;Realty Income Corporation;;;0,17 US$
+2023/12/15;DIVIDEND;KO;Coca-Cola Company (The);;;0,25 US$
+2023/12/21;BUY;NVDA;NVIDIA Corporation;0,0496215;487,19 US$;-24,18 US$
+2023/12/21;BUY;AGNC;AGNC Investment Corp.;1,27022;9,84 US$;-12,50 US$
+2023/12/21;BUY;AAPL;Apple Inc.;0,2121494;194,75 US$;-41,32 US$
+2023/12/21;BUY;RACE;Ferrari N.V.;0,0114313;337,74 US$;-3,86 US$
+2023/12/21;BUY;MO;Altria Group, Inc.;0,779018;40,33 US$;-31,42 US$
+2023/12/21;BUY;KO;Coca-Cola Company (The);0,533247;57,93 US$;-30,89 US$
+2023/12/21;BUY;O;Realty Income Corporation;0,537264;57,17 US$;-30,72 US$
+2023/12/21;BUY;MNST;Monster Beverage Corporation;0,278732;55,00 US$;-15,33 US$
+2023/12/21;BUY;MSFT;Microsoft Corporation;0,0752988;371,48 US$;-27,97 US$
+2023/12/21;BUY;MCD;McDonald's Corporation;0,0912362;289,99 US$;-26,46 US$
+2023/12/21;BUY;RACE;Ferrari N.V.;0,0579383;337,74 US$;-19,57 US$
+2023/12/22;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,472754;62,95 US$;-29,76 US$
+2024/01/10;DIVIDEND;MO;Altria Group, Inc.;;;0,76 US$
+2024/01/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,35 US$
+2024/01/12;DIVIDEND;O;Realty Income Corporation;;;0,29 US$
+2024/01/24;BUY;RACE;Ferrari N.V.;0,0441504;337,29 US$;-14,89 US$
+2024/01/24;BUY;AGNC;AGNC Investment Corp.;1,06537;9,86 US$;-10,50 US$
+2024/01/24;BUY;O;Realty Income Corporation;0,454482;55,64 US$;-25,29 US$
+2024/01/24;BUY;MNST;Monster Beverage Corporation;0,186767;55,37 US$;-10,34 US$
+2024/01/24;BUY;MCD;McDonald's Corporation;0,0551071;301,44 US$;-16,61 US$
+2024/01/24;BUY;AAPL;Apple Inc.;0,1491259;195,63 US$;-29,17 US$
+2024/01/24;BUY;KO;Coca-Cola Company (The);0,326917;59,37 US$;-19,41 US$
+2024/01/24;BUY;NVDA;NVIDIA Corporation;0,0032949;621,11 US$;-2,05 US$
+2024/01/24;BUY;MO;Altria Group, Inc.;0,533311;40,19 US$;-21,43 US$
+2024/01/24;BUY;MNST;Monster Beverage Corporation;0,0334209;404,86 US$;-13,53 US$
+2024/01/25;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,438922;60,58 US$;-26,59 US$
+2024/02/09;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,46 US$
+2024/02/16;DIVIDEND;O;Realty Income Corporation;;;0,38 US$
+2024/02/16;DIVIDEND;AAPL;Apple Inc.;;;0,13 US$
+2024/02/23;BUY;NVDA;NVIDIA Corporation;0,0189496;821,35 US$;-15,56 US$
+2024/02/23;BUY;AAPL;Apple Inc.;0,1476326;184,55 US$;-27,25 US$
+2024/02/23;BUY;KO;Coca-Cola Company (The);0,318358;61,12 US$;-19,46 US$
+2024/02/23;BUY;MO;Altria Group, Inc.;0,477265;40,77 US$;-19,46 US$
+2024/02/23;BUY;O;Realty Income Corporation;0,405474;52,79 US$;-21,40 US$
+2024/02/23;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,299818;72,01 US$;-21,59 US$
+2024/02/23;BUY;RACE;Ferrari N.V.;0,0326611;416,93 US$;-13,62 US$
+2024/02/23;BUY;MSFT;Microsoft Corporation;0,0421763;415,19 US$;-17,51 US$
+2024/02/23;BUY;MNST;Monster Beverage Corporation;0,17676;55,01 US$;-9,72 US$
+2024/02/23;BUY;AGNC;AGNC Investment Corp.;1,03004;9,44 US$;-9,72 US$
+2024/02/23;BUY;MCD;McDonald's Corporation;0,0589841;296,88 US$;-17,51 US$
+2024/03/11;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,57 US$
+2024/03/14;DIVIDEND;MSFT;Microsoft Corporation;;;0,13 US$
+2024/03/15;DIVIDEND;MCD;McDonald's Corporation;;;0,46 US$
+2024/03/15;DIVIDEND;O;Realty Income Corporation;;;0,47 US$
+2024/04/01;DIVIDEND;KO;Coca-Cola Company (The);;;0,75 US$
+2024/04/01;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,57 US$
+2024/04/15;DIVIDEND;O;Realty Income Corporation;;;0,47 US$
+2024/04/30;DIVIDEND;MO;Altria Group, Inc.;;;2,25 US$
+2024/05/03;DIVIDEND;RACE;Ferrari N.V.;;;0,33 US$
+2024/05/09;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,57 US$
+2024/05/15;DIVIDEND;MBG.DE;Mercedes-Benz Group AG        N;;;7,50 US$
+2024/05/15;DIVIDEND;O;Realty Income Corporation;;;0,47 US$
+2024/05/16;DIVIDEND;AAPL;Apple Inc.;;;0,17 US$
+2024/06/05;BUY;MSFT;Microsoft Corporation;0,0059273;417,35 US$;-2,47 US$
+2024/06/05;BUY;NVDA;NVIDIA Corporation;0,00184312;1194,87 US$;-2,20 US$
+2024/06/05;BUY;MNST;Monster Beverage Corporation;0,026241;52,09 US$;-1,37 US$
+2024/06/05;BUY;KO;Coca-Cola Company (The);0,043164;63,59 US$;-2,74 US$
+2024/06/05;BUY;AAPL;Apple Inc.;0,0197189;195,32 US$;-3,85 US$
+2024/06/05;BUY;O;Realty Income Corporation;0,055968;54,08 US$;-3,03 US$
+2024/06/05;BUY;AGNC;AGNC Investment Corp.;0,14107;9,69 US$;-1,37 US$
+2024/06/05;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,046361;65,57 US$;-3,04 US$
+2024/06/05;BUY;MO;Altria Group, Inc.;0,058992;46,53 US$;-2,74 US$
+2024/06/05;BUY;MCD;McDonald's Corporation;0,0095147;259,97 US$;-2,47 US$
+2024/06/05;BUY;RACE;Ferrari N.V.;0,0045855;418,77 US$;-1,92 US$
+2024/06/13;DIVIDEND;MSFT;Microsoft Corporation;;;0,15 US$
+2024/06/13;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,57 US$
+2024/06/14;DIVIDEND;O;Realty Income Corporation;;;0,49 US$
+2024/06/17;DIVIDEND;MCD;McDonald's Corporation;;;0,46 US$
+2024/06/28;DIVIDEND;NVDA;NVIDIA Corporation;;;0,01 US$
+2024/07/01;DIVIDEND;KO;Coca-Cola Company (The);;;0,77 US$
+2024/07/10;DIVIDEND;MO;Altria Group, Inc.;;;2,30 US$
+2024/07/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,58 US$
+2024/07/15;DIVIDEND;O;Realty Income Corporation;;;0,50 US$
+2024/08/09;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,58 US$
+2024/08/15;DIVIDEND;O;Realty Income Corporation;;;0,50 US$
+2024/08/15;DIVIDEND;AAPL;Apple Inc.;;;0,17 US$
+2024/09/11;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,58 US$
+2024/09/12;DIVIDEND;MSFT;Microsoft Corporation;;;0,15 US$
+2024/09/13;DIVIDEND;O;Realty Income Corporation;;;0,50 US$
+2024/09/17;DIVIDEND;MCD;McDonald's Corporation;;;0,48 US$
+2024/10/01;DIVIDEND;KO;Coca-Cola Company (The);;;0,77 US$
+2024/10/03;DIVIDEND;NVDA;NVIDIA Corporation;;;0,01 US$
+2024/10/09;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,58 US$
+2024/10/10;DIVIDEND;MO;Altria Group, Inc.;;;2,40 US$
+2024/10/15;DIVIDEND;O;Realty Income Corporation;;;0,50 US$
+2024/11/12;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,58 US$
+2024/11/14;DIVIDEND;AAPL;Apple Inc.;;;0,17 US$
+2024/11/15;DIVIDEND;O;Realty Income Corporation;;;0,50 US$
+2024/11/25;BUY;MSFT;Microsoft Corporation;0,0285917;416,18 US$;-11,90 US$
+2024/11/25;BUY;NVDA;NVIDIA Corporation;0,0767656;137,80 US$;-10,58 US$
+2024/11/25;BUY;O;Realty Income Corporation;0,25267;57,55 US$;-14,54 US$
+2024/11/25;BUY;RACE;Ferrari N.V.;0,02099110;440,51 US$;-9,25 US$
+2024/11/25;BUY;KO;Coca-Cola Company (The);0,205442;64,35 US$;-13,22 US$
+2024/11/25;BUY;AAPL;Apple Inc.;0,0795948;232,48 US$;-18,50 US$
+2024/11/25;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,286551;52,80 US$;-15,13 US$
+2024/11/25;BUY;MO;Altria Group, Inc.;0,233085;56,72 US$;-13,22 US$
+2024/11/25;BUY;MCD;McDonald's Corporation;0,0402567;295,59 US$;-11,90 US$
+2024/11/25;BUY;AGNC;AGNC Investment Corp.;0,67195;9,83 US$;-6,61 US$
+2024/11/25;BUY;MNST;Monster Beverage Corporation;0,119894;55,09 US$;-6,60 US$
+2024/12/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,65 US$
+2024/12/12;DIVIDEND;MSFT;Microsoft Corporation;;;0,17 US$
+2024/12/13;DIVIDEND;O;Realty Income Corporation;;;0,28 US$
+2024/12/13;DIVIDEND;O;Realty Income Corporation;;;0,27 US$
+2024/12/16;DIVIDEND;MCD;McDonald's Corporation;;;0,57 US$
+2024/12/16;DIVIDEND;KO;Coca-Cola Company (The);;;0,85 US$
+2024/12/27;DIVIDEND;NVDA;NVIDIA Corporation;;;0,01 US$
+2025/01/10;DIVIDEND;MO;Altria Group, Inc.;;;2,60 US$
+2025/01/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,65 US$
+2025/01/15;DIVIDEND;O;Realty Income Corporation;;;0,56 US$
+2025/02/11;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,65 US$
+2025/02/13;DIVIDEND;AAPL;Apple Inc.;;;0,19 US$
+2025/02/14;DIVIDEND;O;Realty Income Corporation;;;0,56 US$
+2025/03/11;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,65 US$
+2025/03/13;DIVIDEND;MSFT;Microsoft Corporation;;;0,19 US$
+2025/03/14;DIVIDEND;O;Realty Income Corporation;;;0,57 US$
+2025/03/17;DIVIDEND;MCD;McDonald's Corporation;;;0,57 US$
+2025/04/01;DIVIDEND;KO;Coca-Cola Company (The);;;0,89 US$
+2025/04/02;DIVIDEND;NVDA;NVIDIA Corporation;;;0,01 US$
+2025/04/09;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,65 US$
+2025/04/15;DIVIDEND;O;Realty Income Corporation;;;0,56 US$
+2025/04/30;DIVIDEND;MO;Altria Group, Inc.;;;2,60 US$
+2025/05/06;DIVIDEND;RACE;Ferrari N.V.;;;0,49 US$
+2025/05/06;DIVIDEND;RACE;Ferrari N.V.;;;0,12 US$
+2025/05/09;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,65 US$
+2025/05/12;DIVIDEND;MBG.DE;Mercedes-Benz Group AG        N;;;7,14 US$
+2025/05/12;BUY;MSFT;Microsoft Corporation;0,004966;442,67 US$;-2,20 US$
+2025/05/12;BUY;KO;Coca-Cola Company (The);0,035277;69,24 US$;-2,44 US$
+2025/05/12;BUY;NVDA;NVIDIA Corporation;0,0160897;121,45 US$;-1,95 US$
+2025/05/12;BUY;MNST;Monster Beverage Corporation;0,02012;60,70 US$;-1,22 US$
+2025/05/12;BUY;O;Realty Income Corporation;0,048038;55,93 US$;-2,69 US$
+2025/05/12;BUY;MO;Altria Group, Inc.;0,042546;57,41 US$;-2,44 US$
+2025/05/12;BUY;MCD;McDonald's Corporation;0,0070993;309,66 US$;-2,20 US$
+2025/05/12;BUY;AAPL;Apple Inc.;0,0164211;208,25 US$;-3,42 US$
+2025/05/12;BUY;AGNC;AGNC Investment Corp.;0,13585;8,99 US$;-1,22 US$
+2025/05/12;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,049894;52,91 US$;-2,64 US$
+2025/05/12;BUY;RACE;Ferrari N.V.;0,0035137;486,58 US$;-1,71 US$
+2025/05/15;DIVIDEND;AAPL;Apple Inc.;;;0,20 US$
+2025/05/15;DIVIDEND;O;Realty Income Corporation;;;0,57 US$
+2025/06/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,67 US$
+2025/06/13;DIVIDEND;O;Realty Income Corporation;;;0,57 US$
+2025/06/12;DIVIDEND;MSFT;Microsoft Corporation;;;0,20 US$
+2025/06/16;DIVIDEND;MCD;McDonald's Corporation;;;0,57 US$
+2025/07/03;DIVIDEND;NVDA;NVIDIA Corporation;;;0,01 US$
+2025/07/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,67 US$
+2025/07/10;DIVIDEND;MO;Altria Group, Inc.;;;2,64 US$
+2025/07/15;DIVIDEND;O;Realty Income Corporation;;;0,58 US$
+2025/08/13;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,67 US$
+2025/08/14;DIVIDEND;AAPL;Apple Inc.;;;0,20 US$
+2025/08/15;DIVIDEND;O;Realty Income Corporation;;;0,58 US$
+2025/09/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,67 US$
+2025/09/11;DIVIDEND;MSFT;Microsoft Corporation;;;0,20 US$
+2025/09/15;DIVIDEND;O;Realty Income Corporation;;;0,58 US$
+2025/09/16;DIVIDEND;MCD;McDonald's Corporation;;;0,57 US$
+2025/10/01;DIVIDEND;KO;Coca-Cola Company (The);;;0,89 US$
+2025/10/01;BUY;MSFT;Microsoft Corporation;0,00266578;519,25 US$;-1,38 US$
+2025/10/01;BUY;NVDA;NVIDIA Corporation;0,00737616;187,66 US$;-1,38 US$
+2025/10/01;BUY;KO;Coca-Cola Company (The);0,01890892;66,38 US$;-1,26 US$
+2025/10/01;BUY;MO;Altria Group, Inc.;0,01907849;65,79 US$;-1,26 US$
+2025/10/01;BUY;O;Realty Income Corporation;0,02698698;60,42 US$;-1,63 US$
+2025/10/01;BUY;AAPL;Apple Inc.;0,00737376;256,13 US$;-1,89 US$
+2025/10/01;BUY;MCD;McDonald's Corporation;0,00419454;299,24 US$;-1,26 US$
+2025/10/01;BUY;RACE;Ferrari N.V.;0,00257239;487,94 US$;-1,26 US$
+2025/10/02;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,01957913;54,65 US$;-1,07 US$
+2025/10/02;DIVIDEND;NVDA;NVIDIA Corporation;;;0,01 US$
+2025/10/09;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,67 US$
+2025/10/10;DIVIDEND;MO;Altria Group, Inc.;;;2,74 US$
+2025/10/15;DIVIDEND;O;Realty Income Corporation;;;0,58 US$
+2025/11/12;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,67 US$
+2025/11/13;DIVIDEND;AAPL;Apple Inc.;;;0,20 US$
+2025/11/14;DIVIDEND;O;Realty Income Corporation;;;0,58 US$
+2025/12/09;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,66 US$
+2025/12/11;DIVIDEND;MSFT;Microsoft Corporation;;;0,22 US$
+2025/12/15;DIVIDEND;MCD;McDonald's Corporation;;;0,61 US$
+2025/12/15;DIVIDEND;O;Realty Income Corporation;;;0,59 US$
+2025/12/15;DIVIDEND;KO;Coca-Cola Company (The);;;0,93 US$
+2025/12/26;DIVIDEND;NVDA;NVIDIA Corporation;;;0,01 US$
+2026/01/09;DIVIDEND;MO;Altria Group, Inc.;;;2,75 US$
+2026/01/12;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,66 US$
+2026/01/15;BUY;KO;Coca-Cola Company (The);0,017473;71,05 US$;-1,24 US$
+2026/01/15;BUY;MSFT;Microsoft Corporation;0,00298093;429,28 US$;-1,28 US$
+2026/01/15;BUY;NVDA;NVIDIA Corporation;0,00729082;187,78 US$;-1,37 US$
+2026/01/15;BUY;O;Realty Income Corporation;0,02681284;60,58 US$;-1,62 US$
+2026/01/15;BUY;MCD;McDonald's Corporation;0,00403945;307,33 US$;-1,24 US$
+2026/01/15;BUY;MO;Altria Group, Inc.;0,02015334;61,60 US$;-1,24 US$
+2026/01/15;BUY;AAPL;Apple Inc.;0,00718892;259,84 US$;-1,87 US$
+2026/01/15;BUY;MBG.DE;Mercedes-Benz Group AG        N;0,01799226;59,47 US$;-1,07 US$
+2026/01/15;BUY;RACE;Ferrari N.V.;0,00349669;355,04 US$;-1,24 US$
+2026/01/15;DIVIDEND;O;Realty Income Corporation;;;0,59 US$
+2026/02/10;DIVIDEND;AGNC;AGNC Investment Corp.;;;0,66 US$
+2026/02/12;DIVIDEND;AAPL;Apple Inc.;;;0,20 US$
+2026/02/13;DIVIDEND;O;Realty Income Corporation;;;0,60 US$

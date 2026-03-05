@@ -37,8 +37,8 @@ class DatabaseService:
         ticker_info = StockAPI.get_current_price(symbol)
         with get_connection(DB_PATH) as connection:
             connection.execute('''
-            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country, logo_url, quote_type, ex_dividend_date)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country, previous_close, dividend, dividend_yield, logo_url, quote_type, ex_dividend_date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(symbol) DO UPDATE SET
                 name=excluded.name,
                 price=excluded.price,
@@ -47,6 +47,9 @@ class DatabaseService:
                 sector=excluded.sector,
                 industry=excluded.industry,
                 country=excluded.country,
+                previous_close=excluded.previous_close,
+                dividend=excluded.dividend,
+                dividend_yield=excluded.dividend_yield,
                 logo_url=excluded.logo_url,
                 quote_type=excluded.quote_type,
                 ex_dividend_date=excluded.ex_dividend_date
@@ -59,6 +62,9 @@ class DatabaseService:
                 ticker_info.get("sector", ""),
                 ticker_info.get("industry", ""),
                 ticker_info.get("country", ""),
+                ticker_info.get("previousClose", 0),
+                ticker_info.get("dividendRate", 0),
+                ticker_info.get("dividendYield", 0),
                 ticker_info.get("logo_url", ""),
                 ticker_info.get("quoteType", "EQUITY"),
                 ticker_info.get("exDividendDate"),
@@ -80,15 +86,16 @@ class DatabaseService:
                 stock = cls.stocks[stockid]
                 info = StockAPI.get_current_price(stock.symbol)
                 stock.price = info["currentPrice"]
+                stock.previous_close = info.get("previousClose", 0)
+                stock.dividend = info.get("dividendRate", 0)
+                stock.dividend_yield = info.get("dividendYield", 0)
                 logo_url = info.get("logo_url", "")
                 if logo_url and not stock.logo_url:
                     stock.logo_url = logo_url
-                    connection.execute(
-                        'UPDATE stocks SET price = ?, logo_url = ? WHERE stockid = ?',
-                        (info["currentPrice"], logo_url, stockid,)
-                    )
-                else:
-                    connection.execute('UPDATE stocks SET price = ? WHERE stockid = ?', (info["currentPrice"], stockid,))
+                connection.execute(
+                    'UPDATE stocks SET price=?, previous_close=?, dividend=?, dividend_yield=?, logo_url=? WHERE stockid=?',
+                    (info["currentPrice"], stock.previous_close, stock.dividend, stock.dividend_yield, stock.logo_url, stockid,)
+                )
                 log_count += 1
             connection.commit()
         logger.info("updateStocksPrice(): Price updated for %d stock(s)", log_count)
@@ -167,6 +174,9 @@ class DatabaseService:
 
             info = StockAPI.get_current_price(position.stock.symbol)
             position.stock.price = info["currentPrice"]
+            position.stock.previous_close = info.get("previousClose", 0)
+            position.stock.dividend = info.get("dividendRate", 0)
+            position.stock.dividend_yield = info.get("dividendYield", 0)
             position.stock.logo_url = info.get("logo_url", "")
             position.stock.quote_type = info.get("quoteType", "EQUITY")
             position.stock.ex_dividend_date = info.get("exDividendDate")
@@ -185,8 +195,9 @@ class DatabaseService:
                     if result:
                         stockid, info = result
                         connection.execute(
-                            "UPDATE stocks SET price=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=?,ex_dividend_date=? WHERE stockid=?",
-                            (info["currentPrice"], info["longName"], info["currency"], info["marketCap"],
+                            "UPDATE stocks SET price=?,previous_close=?,dividend=?,dividend_yield=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=?,ex_dividend_date=? WHERE stockid=?",
+                            (info["currentPrice"], info.get("previousClose", 0), info.get("dividendRate", 0), info.get("dividendYield", 0),
+                             info["longName"], info["currency"], info["marketCap"],
                              info["sector"], info["industry"], info["country"],
                              info.get("logo_url", ""), info.get("quoteType", "EQUITY"),
                              info.get("exDividendDate"), stockid,)
@@ -426,12 +437,12 @@ class DatabaseService:
                     "upsertTransactions(): Sold %d shares of %s. Position quantity: %d -> %d",
                     quantity, symbol, old_qty, new_qty
                 )
-            elif type == 'BUY':
+            elif type in ('BUY', 'STAKING'):
                 new_qty = old_qty + quantity
                 cls.updatePosition(symbol, quantity=new_qty, portfolio_id=portfolio_id)
                 logger.info(
-                    "upsertTransactions(): Bought %d shares of %s. Position quantity: %d -> %d",
-                    quantity, symbol, old_qty, new_qty
+                    "upsertTransactions(): %s %d shares of %s. Position quantity: %d -> %d",
+                    type.capitalize(), quantity, symbol, old_qty, new_qty
                 )
 
     @classmethod
@@ -1510,27 +1521,47 @@ class DatabaseService:
                            SUM(daily_quantity) OVER (PARTITION BY stockid ORDER BY datestamp) AS cumulative_quantity
                     FROM daily_transactions
                 ),
-                filled_cumulative_datestamp AS (
-                    SELECT
-                        hs.datestamp, hs.stockid, hs.closeprice,
-                        cp.cumulative_quantity,
-                        MAX(hs.datestamp) FILTER (WHERE cp.cumulative_quantity > 0)
-                            OVER (PARTITION BY hs.stockid ORDER BY hs.datestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
-                            AS last_updated_datestamp
-                    FROM historicalstocks hs
-                    LEFT JOIN cumulative_positions cp
-                        ON hs.datestamp = cp.datestamp AND hs.stockid = cp.stockid
-                    WHERE hs.datestamp >= (SELECT MIN(datestamp) FROM cumulative_positions)
+                portfolio_stocks AS (
+                    SELECT DISTINCT stockid FROM cumulative_positions
                 ),
-                filled_cumulative_quantity AS (
-                    SELECT fcd.closeprice, fcd.datestamp, fcd.stockid,
-                           cp2.cumulative_quantity AS filled_cumulative_quantity
-                    FROM filled_cumulative_datestamp fcd
-                    LEFT JOIN cumulative_positions cp2
-                        ON fcd.last_updated_datestamp = cp2.datestamp AND fcd.stockid = cp2.stockid
+                date_range AS (
+                    SELECT DISTINCT datestamp FROM historicalstocks
+                    WHERE datestamp >= (SELECT MIN(datestamp) FROM cumulative_positions)
+                ),
+                all_combos AS (
+                    SELECT dr.datestamp, ps.stockid
+                    FROM date_range dr
+                    CROSS JOIN portfolio_stocks ps
+                ),
+                with_raw_data AS (
+                    SELECT
+                        ac.datestamp,
+                        ac.stockid,
+                        hs.closeprice,
+                        cp.cumulative_quantity,
+                        MAX(CASE WHEN hs.closeprice IS NOT NULL THEN ac.datestamp END)
+                            OVER (PARTITION BY ac.stockid ORDER BY ac.datestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+                            AS last_price_date,
+                        MAX(CASE WHEN cp.cumulative_quantity IS NOT NULL THEN ac.datestamp END)
+                            OVER (PARTITION BY ac.stockid ORDER BY ac.datestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
+                            AS last_qty_date
+                    FROM all_combos ac
+                    LEFT JOIN historicalstocks hs ON ac.datestamp = hs.datestamp AND ac.stockid = hs.stockid
+                    LEFT JOIN cumulative_positions cp ON ac.datestamp = cp.datestamp AND ac.stockid = cp.stockid
+                ),
+                filled AS (
+                    SELECT
+                        wrd.datestamp,
+                        wrd.stockid,
+                        COALESCE(wrd.closeprice, hs2.closeprice) AS closeprice,
+                        COALESCE(wrd.cumulative_quantity, cp2.cumulative_quantity) AS filled_quantity
+                    FROM with_raw_data wrd
+                    LEFT JOIN historicalstocks hs2 ON wrd.last_price_date = hs2.datestamp AND wrd.stockid = hs2.stockid
+                    LEFT JOIN cumulative_positions cp2 ON wrd.last_qty_date = cp2.datestamp AND wrd.stockid = cp2.stockid
                 )
-                SELECT datestamp, ROUND(SUM(filled_cumulative_quantity * closeprice), 2) AS portfolio_value
-                FROM filled_cumulative_quantity
+                SELECT datestamp, ROUND(SUM(filled_quantity * closeprice), 2) AS portfolio_value
+                FROM filled
+                WHERE filled_quantity > 0
                 GROUP BY datestamp
                 ORDER BY datestamp
             ''', (portfolio_id, portfolio_id))
@@ -1750,6 +1781,16 @@ class DatabaseService:
             )
             rows = cursor.fetchall()
 
+        # Fall back to dividend transactions when historicaldividends has no data
+        if len(rows) < 2:
+            with get_connection(DB_PATH) as connection:
+                cursor = connection.execute(
+                    "SELECT DATE(datestamp) as d, price FROM transactions "
+                    "WHERE type = 'DIVIDEND' AND stockid = ? ORDER BY d ASC",
+                    (stockid,)
+                )
+                rows = cursor.fetchall()
+
         if len(rows) < 2:
             return []
 
@@ -1796,3 +1837,406 @@ class DatabaseService:
             current += timedelta(days=frequency_days)
 
         return projected
+
+    # ── Savings Accounts ──────────────────────────────────────────────
+
+    @classmethod
+    def getSavingsAccounts(cls) -> list:
+        """Returns all savings accounts."""
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id, name, bank, currency, balance, interest_rate, created_at, updated_at "
+                "FROM savings_accounts ORDER BY id"
+            )
+            rows = cursor.fetchall()
+        return [
+            {
+                "id": r[0], "name": r[1], "bank": r[2], "currency": r[3],
+                "balance": r[4], "interest_rate": r[5],
+                "created_at": r[6], "updated_at": r[7],
+            }
+            for r in rows
+        ]
+
+    @classmethod
+    def getSavingsAccount(cls, account_id: int) -> dict:
+        """Returns a single savings account. Raises KeyError if not found."""
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id, name, bank, currency, balance, interest_rate, created_at, updated_at "
+                "FROM savings_accounts WHERE id = ?", (account_id,)
+            )
+            row = cursor.fetchone()
+        if not row:
+            raise KeyError(f"Savings account with id {account_id} not found")
+        return {
+            "id": row[0], "name": row[1], "bank": row[2], "currency": row[3],
+            "balance": row[4], "interest_rate": row[5],
+            "created_at": row[6], "updated_at": row[7],
+        }
+
+    @classmethod
+    def addSavingsAccount(cls, name: str, bank: str, currency: str = "EUR",
+                          balance: float = 0.0, interest_rate: float = 0.0) -> dict:
+        """Creates a savings account. If balance > 0, auto-inserts an initial DEPOSIT transaction."""
+        now = datetime.datetime.now().strftime('%Y-%m-%d')
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "INSERT INTO savings_accounts (name, bank, currency, balance, interest_rate, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (name, bank, currency, balance, interest_rate, now, now)
+            )
+            account_id = cursor.lastrowid
+            if balance > 0:
+                connection.execute(
+                    "INSERT INTO savings_transactions (account_id, type, amount, datestamp, note) "
+                    "VALUES (?, 'DEPOSIT', ?, ?, 'Initial balance')",
+                    (account_id, balance, now)
+                )
+            connection.commit()
+        return cls.getSavingsAccount(account_id)
+
+    @classmethod
+    def updateSavingsAccount(cls, account_id: int, name: str = None,
+                             bank: str = None, interest_rate: float = None) -> dict:
+        """Updates savings account metadata (not balance)."""
+        account = cls.getSavingsAccount(account_id)  # raises KeyError if missing
+        now = datetime.datetime.now().strftime('%Y-%m-%d')
+        new_name = name if name is not None else account["name"]
+        new_bank = bank if bank is not None else account["bank"]
+        new_rate = interest_rate if interest_rate is not None else account["interest_rate"]
+        with get_connection(DB_PATH) as connection:
+            connection.execute(
+                "UPDATE savings_accounts SET name = ?, bank = ?, interest_rate = ?, updated_at = ? WHERE id = ?",
+                (new_name, new_bank, new_rate, now, account_id)
+            )
+            connection.commit()
+        return cls.getSavingsAccount(account_id)
+
+    @classmethod
+    def deleteSavingsAccount(cls, account_id: int) -> None:
+        """Deletes a savings account and its transactions."""
+        cls.getSavingsAccount(account_id)  # raises KeyError if missing
+        with get_connection(DB_PATH) as connection:
+            connection.execute("DELETE FROM savings_transactions WHERE account_id = ?", (account_id,))
+            connection.execute("DELETE FROM savings_accounts WHERE id = ?", (account_id,))
+            connection.commit()
+
+    @classmethod
+    def getSavingsTransactions(cls, account_id: int) -> list:
+        """Returns transactions for a savings account, ordered by date desc."""
+        cls.getSavingsAccount(account_id)  # raises KeyError if missing
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id, account_id, type, amount, datestamp, note "
+                "FROM savings_transactions WHERE account_id = ? ORDER BY datestamp DESC, id DESC",
+                (account_id,)
+            )
+            rows = cursor.fetchall()
+        return [
+            {
+                "id": r[0], "account_id": r[1], "type": r[2],
+                "amount": r[3], "datestamp": r[4], "note": r[5] or "",
+            }
+            for r in rows
+        ]
+
+    @classmethod
+    def addSavingsTransaction(cls, account_id: int, type: str, amount: float,
+                              datestamp: str, note: str = "") -> dict:
+        """Adds a transaction and updates account balance. Validates withdrawal <= balance."""
+        account = cls.getSavingsAccount(account_id)
+        if type == "WITHDRAWAL" and amount > account["balance"]:
+            raise ValueError(
+                f"Cannot withdraw {amount}: only {account['balance']} available"
+            )
+        balance_delta = amount if type in ("DEPOSIT", "INTEREST") else -amount
+        now = datetime.datetime.now().strftime('%Y-%m-%d')
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "INSERT INTO savings_transactions (account_id, type, amount, datestamp, note) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (account_id, type, amount, datestamp, note)
+            )
+            txn_id = cursor.lastrowid
+            connection.execute(
+                "UPDATE savings_accounts SET balance = balance + ?, updated_at = ? WHERE id = ?",
+                (balance_delta, now, account_id)
+            )
+            connection.commit()
+        return {
+            "id": txn_id, "account_id": account_id, "type": type,
+            "amount": amount, "datestamp": datestamp, "note": note or "",
+        }
+
+    @classmethod
+    def updateSavingsTransaction(cls, txn_id: int, amount: float = None,
+                                 datestamp: str = None, note: str = None) -> dict:
+        """Updates a savings transaction and recalculates account balance from all transactions."""
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT id, account_id, type, amount, datestamp, note "
+                "FROM savings_transactions WHERE id = ?", (txn_id,)
+            )
+            row = cursor.fetchone()
+        if not row:
+            raise KeyError(f"Savings transaction with id {txn_id} not found")
+
+        account_id = row[1]
+        new_amount = amount if amount is not None else row[3]
+        new_datestamp = datestamp if datestamp is not None else row[4]
+        new_note = note if note is not None else (row[5] or "")
+
+        now = datetime.datetime.now().strftime('%Y-%m-%d')
+        with get_connection(DB_PATH) as connection:
+            connection.execute(
+                "UPDATE savings_transactions SET amount = ?, datestamp = ?, note = ? WHERE id = ?",
+                (new_amount, new_datestamp, new_note, txn_id)
+            )
+            # Recalculate balance from all transactions
+            cursor = connection.execute(
+                "SELECT type, amount FROM savings_transactions WHERE account_id = ?",
+                (account_id,)
+            )
+            balance = 0.0
+            for txn_row in cursor.fetchall():
+                if txn_row[0] in ("DEPOSIT", "INTEREST"):
+                    balance += txn_row[1]
+                else:
+                    balance -= txn_row[1]
+            connection.execute(
+                "UPDATE savings_accounts SET balance = ?, updated_at = ? WHERE id = ?",
+                (balance, now, account_id)
+            )
+            connection.commit()
+        return {
+            "id": txn_id, "account_id": account_id, "type": row[2],
+            "amount": new_amount, "datestamp": new_datestamp, "note": new_note,
+        }
+
+    @classmethod
+    def deleteSavingsTransaction(cls, txn_id: int) -> None:
+        """Deletes a savings transaction and recalculates account balance."""
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT account_id FROM savings_transactions WHERE id = ?", (txn_id,)
+            )
+            row = cursor.fetchone()
+        if not row:
+            raise KeyError(f"Savings transaction with id {txn_id} not found")
+
+        account_id = row[0]
+        now = datetime.datetime.now().strftime('%Y-%m-%d')
+        with get_connection(DB_PATH) as connection:
+            connection.execute("DELETE FROM savings_transactions WHERE id = ?", (txn_id,))
+            cursor = connection.execute(
+                "SELECT type, amount FROM savings_transactions WHERE account_id = ?",
+                (account_id,)
+            )
+            balance = 0.0
+            for txn_row in cursor.fetchall():
+                if txn_row[0] in ("DEPOSIT", "INTEREST"):
+                    balance += txn_row[1]
+                else:
+                    balance -= txn_row[1]
+            connection.execute(
+                "UPDATE savings_accounts SET balance = ?, updated_at = ? WHERE id = ?",
+                (balance, now, account_id)
+            )
+            connection.commit()
+
+    @classmethod
+    def getSavingsAccountsTotal(cls) -> float:
+        """Returns total savings balance across all accounts, converted to EUR."""
+        accounts = cls.getSavingsAccounts()
+        total = 0.0
+        for acc in accounts:
+            balance = acc["balance"]
+            if acc["currency"] != "EUR":
+                fx_rate = StockAPI.get_fx_rate(acc["currency"], "EUR")
+                balance = balance * fx_rate
+            total += balance
+        return round(total, 2)
+
+    @classmethod
+    def getSavingsBalanceHistory(cls, start_date: str, end_date: str,
+                                target_dates: list = None) -> list:
+        """
+        Computes running savings balance per date, FX-converted to EUR.
+        Returns list of (date_str, balance_eur) tuples for dates in target_dates.
+        """
+        accounts = cls.getSavingsAccounts()
+        if not accounts:
+            return []
+
+        # Build per-account transaction timelines
+        result = {}  # date -> total EUR balance
+
+        for acc in accounts:
+            account_id = acc["id"]
+            currency = acc["currency"]
+
+            with get_connection(DB_PATH) as connection:
+                cursor = connection.execute(
+                    "SELECT type, amount, datestamp FROM savings_transactions "
+                    "WHERE account_id = ? ORDER BY datestamp ASC",
+                    (account_id,)
+                )
+                txns = cursor.fetchall()
+
+            if not txns:
+                continue
+
+            # Build FX lookup for non-EUR accounts
+            fx_lookup = {}
+            if currency != "EUR":
+                pair = f"{currency}EUR"
+                fx_lookup = cls.getFxRateLookup(pair, start_date, end_date)
+
+            # Build running balance timeline
+            balance_timeline = []  # (date, running_balance)
+            running = 0.0
+            for txn in txns:
+                txn_type, txn_amount, txn_date = txn[0], txn[1], txn[2]
+                if txn_type in ("DEPOSIT", "INTEREST"):
+                    running += txn_amount
+                else:
+                    running -= txn_amount
+                balance_timeline.append((txn_date, running))
+
+            if not balance_timeline:
+                continue
+
+            dates_to_process = target_dates if target_dates else sorted(
+                set(d for d, _ in balance_timeline if start_date <= d <= end_date)
+            )
+
+            # Walk through target dates with forward-filled balance
+            bal_idx = 0
+            last_bal = 0.0
+            last_fx = 1.0
+
+            # Pre-fill balance before first target date
+            first_date = dates_to_process[0] if dates_to_process else start_date
+            for bd, bv in balance_timeline:
+                if bd < first_date:
+                    last_bal = bv
+                    bal_idx += 1
+                else:
+                    break
+
+            # Pre-fill FX before first target date
+            if currency != "EUR":
+                for fx_date in sorted(fx_lookup.keys()):
+                    if fx_date < first_date:
+                        last_fx = fx_lookup[fx_date]
+                    else:
+                        break
+
+            for date_str in dates_to_process:
+                if date_str < start_date or date_str > end_date:
+                    continue
+
+                # Forward-fill balance
+                while bal_idx < len(balance_timeline) and balance_timeline[bal_idx][0] <= date_str:
+                    last_bal = balance_timeline[bal_idx][1]
+                    bal_idx += 1
+
+                # Forward-fill FX rate
+                if currency != "EUR" and date_str in fx_lookup:
+                    last_fx = fx_lookup[date_str]
+
+                value = last_bal * (last_fx if currency != "EUR" else 1.0)
+                result[date_str] = result.get(date_str, 0.0) + value
+
+        return sorted(result.items())
+
+    # ── Crypto ────────────────────────────────────────────────────────
+
+    _crypto_portfolio_id: int = None
+
+    @classmethod
+    def getCryptoPortfolioId(cls) -> int:
+        """Returns (or lazily creates) the Crypto portfolio row. Cached after first call."""
+        if cls._crypto_portfolio_id is not None:
+            return cls._crypto_portfolio_id
+
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                "SELECT portfolioid FROM portfolios WHERE name = 'Crypto'"
+            )
+            row = cursor.fetchone()
+            if row:
+                cls._crypto_portfolio_id = row[0]
+            else:
+                cursor = connection.execute(
+                    "INSERT INTO portfolios (name, currency) VALUES ('Crypto', 'USD')"
+                )
+                cls._crypto_portfolio_id = cursor.lastrowid
+                connection.commit()
+
+        return cls._crypto_portfolio_id
+
+    @classmethod
+    def getCryptoPositions(cls) -> list:
+        """Returns crypto positions with live prices, filtered by quote_type=CRYPTOCURRENCY."""
+        portfolio_id = cls.getCryptoPortfolioId()
+        positions = cls.getPositionsForPortfolio(portfolio_id)
+        result = []
+        for stockid, pos in positions.items():
+            stock = cls.stocks.get(stockid)
+            if stock is None or stock.quote_type != "CRYPTOCURRENCY":
+                continue
+            result.append({
+                "stockid": stockid,
+                "symbol": stock.symbol,
+                "name": stock.name,
+                "quantity": pos.quantity,
+                "average_cost_basis": pos.average_cost_basis,
+                "current_price": stock.price or 0.0,
+                "currency": stock.currency or "USD",
+            })
+        return result
+
+    @classmethod
+    def getCryptoValue(cls) -> float:
+        """Returns total crypto value in EUR using live prices + FX."""
+        positions = cls.getCryptoPositions()
+        total = 0.0
+        for p in positions:
+            value = p["quantity"] * p["current_price"]
+            if p["currency"] != "EUR":
+                fx_rate = StockAPI.get_fx_rate(p["currency"], "EUR")
+                value *= fx_rate
+            total += value
+        return round(total, 2)
+
+    @classmethod
+    def getCryptoSummary(cls) -> dict:
+        """Returns aggregated crypto summary: total value, cost basis, gain/loss."""
+        positions = cls.getCryptoPositions()
+        total_value = 0.0
+        total_cost = 0.0
+        for p in positions:
+            price = p["current_price"]
+            qty = p["quantity"]
+            cost_basis = p["average_cost_basis"] or 0.0
+            currency = p["currency"]
+
+            fx_rate = 1.0
+            if currency != "EUR":
+                fx_rate = StockAPI.get_fx_rate(currency, "EUR")
+
+            total_value += qty * price * fx_rate
+            total_cost += qty * cost_basis * fx_rate
+
+        gain_loss = total_value - total_cost
+        gain_loss_pct = round(gain_loss / total_cost * 100, 2) if total_cost > 0 else 0.0
+
+        return {
+            "total_value": round(total_value, 2),
+            "total_cost_basis": round(total_cost, 2),
+            "total_gain_loss": round(gain_loss, 2),
+            "total_gain_loss_pct": gain_loss_pct,
+            "holdings_count": len(positions),
+        }

@@ -51,6 +51,13 @@ async def get_current_net_worth():
             assets.append(NetWorthAssetItem(
                 id="equity", label="Equity", value=equity_vested_total
             ))
+
+        savings_total = DatabaseService.getSavingsAccountsTotal()
+        if savings_total > 0:
+            assets.append(NetWorthAssetItem(
+                id="savings", label="Savings", value=savings_total
+            ))
+
         for asset in stored_assets:
             assets.append(NetWorthAssetItem(
                 id=asset["id"],
@@ -139,6 +146,14 @@ async def get_net_worth_history(
         for date_str, value in equity_history:
             if value > 0:
                 monthly_data[date_str]["equity"] = round(value, 2)
+
+        # Savings history
+        savings_history = DatabaseService.getSavingsBalanceHistory(
+            start_date, end_date, target_dates=sorted(set(all_dates))
+        )
+        for date_str, value in savings_history:
+            if value > 0:
+                monthly_data[date_str]["savings"] = round(value, 2)
 
         # Other asset snapshots
         snapshots = DatabaseService.getNetWorthSnapshots(start_date, end_date)

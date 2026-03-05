@@ -89,6 +89,9 @@ async def get_portfolio_positions(portfolio_id: int = Path(..., description="Por
         for position in DatabaseService.getPositionsForPortfolio(portfolio_id).values():
             # Convert Stock dataclass to dict for Pydantic
             stock_dict = None
+            daily_change_percent = None
+            daily_change_amount = None
+            estimated_annual_dividend = None
             if position.stock:
                 logger.debug(f"Position: {position.stock}")
                 stock_dict = {
@@ -101,12 +104,18 @@ async def get_portfolio_positions(portfolio_id: int = Path(..., description="Por
                     "sector": position.stock.sector,
                     "industry": position.stock.industry,
                     "country": position.stock.country,
+                    "previous_close": position.stock.previous_close,
                     "dividend": position.stock.dividend,
                     "dividend_yield": position.stock.dividend_yield,
                     "logo_url": position.stock.logo_url,
                     "quote_type": position.stock.quote_type,
                     "ex_dividend_date": position.stock.ex_dividend_date,
                 }
+                if position.stock.previous_close and position.stock.previous_close > 0:
+                    daily_change_amount = round(position.stock.price - position.stock.previous_close, 4)
+                    daily_change_percent = round(daily_change_amount / position.stock.previous_close * 100, 2)
+                if position.stock.dividend:
+                    estimated_annual_dividend = round(position.stock.dividend * position.quantity, 2)
             positions.append(PositionResponse(
                 stockid=position.stockid,
                 quantity=position.quantity,
@@ -116,6 +125,9 @@ async def get_portfolio_positions(portfolio_id: int = Path(..., description="Por
                 stock=stock_dict,
                 delta=position.delta(),
                 portfolio_id=position.portfolio_id,
+                daily_change_percent=daily_change_percent,
+                daily_change_amount=daily_change_amount,
+                estimated_annual_dividend=estimated_annual_dividend,
             ))
         return positions
     except Exception as e:
@@ -170,6 +182,7 @@ async def add_position(
                 "sector": position.stock.sector,
                 "industry": position.stock.industry,
                 "country": position.stock.country,
+                "previous_close": position.stock.previous_close,
                 "dividend": position.stock.dividend,
                 "dividend_yield": position.stock.dividend_yield,
                 "ex_dividend_date": position.stock.ex_dividend_date,
@@ -243,6 +256,7 @@ async def update_position(
                 "sector": position.stock.sector,
                 "industry": position.stock.industry,
                 "country": position.stock.country,
+                "previous_close": position.stock.previous_close,
                 "dividend": position.stock.dividend,
                 "dividend_yield": position.stock.dividend_yield,
                 "ex_dividend_date": position.stock.ex_dividend_date,

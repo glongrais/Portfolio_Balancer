@@ -19,7 +19,7 @@ from api.middleware import (
     http_exception_handler,
     general_exception_handler
 )
-from api.routers import portfolio, stocks, transactions, deposits, dev, net_worth, equity
+from api.routers import portfolio, stocks, transactions, deposits, dev, net_worth, equity, savings, crypto
 from utils.file_utils import FileUtils
 
 # Configure structured JSON logging
@@ -118,6 +118,8 @@ app.include_router(stocks.router, prefix="/api/v1/stocks", tags=["stocks"])
 app.include_router(dev.router, prefix="/api/v1/dev", tags=["dev"])
 app.include_router(net_worth.router, prefix="/api/v1/net-worth", tags=["net-worth"])
 app.include_router(equity.router, prefix="/api/v1/equity", tags=["equity"])
+app.include_router(savings.router, prefix="/api/v1/savings", tags=["savings"])
+app.include_router(crypto.router, prefix="/api/v1/crypto", tags=["crypto"])
 
 @app.get("/")
 async def root():
