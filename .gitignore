@@ -20,3 +20,4 @@ stock_portfolio_app/data/portfolio.db
 workbench/*
 stock_portfolio_app/.claude/settings.local.json
 /docs
+/external_data
