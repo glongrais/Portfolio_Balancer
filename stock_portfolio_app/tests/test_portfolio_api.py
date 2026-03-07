@@ -244,7 +244,10 @@ def test_get_dividends_breakdown(monkeypatch):
     position2 = Position(stockid=2, quantity=5, stock=stock2)
     DatabaseService.positions = {1: {1: position1, 2: position2}}
 
+    calls = []
+
     def fake_fetch_dividends(symbols):
+        calls.append(symbols)
         return {'AAPL': 0.92, 'MSFT': 2.72}
 
     monkeypatch.setattr('services.stock_api.StockAPI.get_current_year_dividends', fake_fetch_dividends)
@@ -262,6 +265,8 @@ def test_get_dividends_breakdown(monkeypatch):
     assert 'total_dividend' in data['dividends'][0]
     # Sorted by total_dividend descending, so MSFT should be first (2.72*5=13.6 > 0.92*10=9.2)
     assert data['dividends'][0]['symbol'] == 'MSFT'
+    assert len(calls) == 1
+    assert set(calls[0]) == {'AAPL', 'MSFT'}
 
 
 def test_update_positions_prices(monkeypatch):

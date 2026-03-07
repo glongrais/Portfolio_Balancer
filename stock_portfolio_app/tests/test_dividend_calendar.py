@@ -179,6 +179,36 @@ def test_projectDividends_only_within_range(mock_connect):
         assert item["date"] <= "2025-12-31"
 
 
+@patch('sqlite3.connect')
+def test_projectDividendsBatch_uses_batched_queries(mock_connect):
+    """Batch projection should query historical and fallback data once each."""
+    mock_conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value.fetchall.side_effect = [
+        # 1. historicaldividends for both stockids
+        [
+            (1, "2024-01-15", 0.50),
+            (1, "2024-04-15", 0.50),
+            (1, "2024-07-15", 0.50),
+            (1, "2024-10-15", 0.50),
+        ],
+        # 2. fallback transactions for stockid=2 only
+        [
+            (2, "2025-01-07", 0.005, "STAKING"),
+            (2, "2025-01-14", 0.005, "STAKING"),
+            (2, "2025-01-21", 0.005, "STAKING"),
+        ],
+    ]
+
+    result = DatabaseService._projectDividendsBatch([1, 2], "2025-01-01", "2025-12-31")
+
+    assert set(result.keys()) == {1, 2}
+    assert len(result[1]) > 0
+    assert len(result[2]) > 0
+    assert result[2][0]["is_total_amount"] is True
+    assert mock_conn.execute.call_count == 2
+
+
 # ── getDividendCalendar tests ────────────────────────────────────────
 
 @patch('sqlite3.connect')

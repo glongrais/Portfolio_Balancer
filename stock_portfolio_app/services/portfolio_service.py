@@ -28,9 +28,10 @@ class PortfolioService:
         """
         Balances the portfolio by buying stocks according to their target distribution.
         """
-        total_value = cls.calculatePortfolioValue(portfolio_id) + amount_to_buy
+        current_total = cls.calculatePortfolioValue(portfolio_id)
+        total_value = current_total + amount_to_buy
 
-        cls.updateRealDistribution(portfolio_id)
+        cls.updateRealDistribution(portfolio_id, total_value=current_total)
 
         portfolio_positions = DatabaseService.getPositionsForPortfolio(portfolio_id)
         sorted_positions = dict(sorted(portfolio_positions.items(), key=lambda item: item[1].delta(), reverse=True))
@@ -48,12 +49,18 @@ class PortfolioService:
         print("Leftover: ", math.floor(amount_to_buy))
 
     @classmethod
-    def updateRealDistribution(cls, portfolio_id: int = 1):
-        total_value = cls.calculatePortfolioValue(portfolio_id)
+    def updateRealDistribution(cls, portfolio_id: int = 1, total_value: float = None):
+        if total_value is None:
+            total_value = cls.calculatePortfolioValue(portfolio_id)
+        if total_value <= 0:
+            return
 
-        for position in DatabaseService.getPositionsForPortfolio(portfolio_id).values():
-            position.distribution_real = round((position.stock.price * position.quantity)/total_value*100, 2)
-            DatabaseService.updatePosition(symbol=position.stock.symbol, distribution_real=position.distribution_real, portfolio_id=portfolio_id)
+        updates = []
+        for stockid, position in DatabaseService.getPositionsForPortfolio(portfolio_id).items():
+            position.distribution_real = round((position.stock.price * position.quantity) / total_value * 100, 2)
+            updates.append((stockid, position.distribution_real))
+
+        DatabaseService.batchUpdatePositionDistribution(portfolio_id, updates)
 
     @classmethod
     def getDividendCalendar(cls):
@@ -62,8 +69,14 @@ class PortfolioService:
     @classmethod
     def getTotalYearlyDividend(cls, portfolio_id: int = 1):
         total_dividend = 0
-        for position in DatabaseService.getPositionsForPortfolio(portfolio_id).values():
-            dividend_rate = StockAPI.get_current_year_dividends([position.stock.symbol])[position.stock.symbol]
+        positions = list(DatabaseService.getPositionsForPortfolio(portfolio_id).values())
+        symbols = [position.stock.symbol for position in positions if position.stock]
+        dividends_by_symbol = StockAPI.get_current_year_dividends(symbols) if symbols else {}
+
+        for position in positions:
+            if not position.stock:
+                continue
+            dividend_rate = dividends_by_symbol.get(position.stock.symbol, 0.0)
             total_dividend += dividend_rate * position.quantity
         return total_dividend
 
@@ -123,10 +136,14 @@ class PortfolioService:
         - float: Forecasted yearly dividends
         """
         total_forecast = 0.0
-        for position in DatabaseService.getPositionsForPortfolio(portfolio_id).values():
-            dividend_rate = StockAPI.get_current_year_dividends(
-                [position.stock.symbol]
-            )[position.stock.symbol]
+        positions = list(DatabaseService.getPositionsForPortfolio(portfolio_id).values())
+        symbols = [position.stock.symbol for position in positions if position.stock]
+        dividends_by_symbol = StockAPI.get_current_year_dividends(symbols) if symbols else {}
+
+        for position in positions:
+            if not position.stock:
+                continue
+            dividend_rate = dividends_by_symbol.get(position.stock.symbol, 0.0)
             total_forecast += dividend_rate * position.quantity
         return round(total_forecast, 2)
 

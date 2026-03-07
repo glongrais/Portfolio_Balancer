@@ -1,5 +1,6 @@
 import datetime
-from typing import Dict
+from collections import defaultdict
+from typing import Dict, List
 import sqlite3
 import logging
 from models.Stock import Stock
@@ -314,6 +315,30 @@ class DatabaseService:
         )
 
     @classmethod
+    def batchUpdatePositionDistribution(cls, portfolio_id: int, updates: List[tuple]) -> None:
+        """
+        Batch updates `distribution_real` for multiple positions in one transaction.
+
+        :param portfolio_id: Portfolio to update.
+        :param updates: List of (stockid, distribution_real) tuples.
+        """
+        if not updates:
+            return
+
+        with get_connection(DB_PATH) as connection:
+            for stockid, distribution_real in updates:
+                connection.execute(
+                    "UPDATE positions SET distribution_real = ? WHERE stockid = ? AND portfolio_id = ?",
+                    (distribution_real, stockid, portfolio_id)
+                )
+            connection.commit()
+
+        logger.debug(
+            "batchUpdatePositionDistribution(): Updated %d position(s) in portfolio %d",
+            len(updates), portfolio_id
+        )
+
+    @classmethod
     def removePosition(cls, symbol: str, portfolio_id: int = 1) -> None:
         """
         Remove a position from the portfolio. Requires quantity to be 0.
@@ -470,7 +495,7 @@ class DatabaseService:
 
         if transaction_type:
             conditions.append("t.type = ?")
-            params.append(transaction_type.lower())
+            params.append(transaction_type.upper())
 
         query += " WHERE " + " AND ".join(conditions)
 
@@ -509,10 +534,10 @@ class DatabaseService:
                 s.symbol,
                 s.name,
                 COUNT(*) as transaction_count,
-                SUM(CASE WHEN t.type = 'buy' THEN t.quantity ELSE 0 END) as total_bought,
-                SUM(CASE WHEN t.type = 'sell' THEN t.quantity ELSE 0 END) as total_sold,
-                SUM(CASE WHEN t.type = 'buy' THEN t.quantity * t.price ELSE 0 END) as total_invested,
-                SUM(CASE WHEN t.type = 'sell' THEN t.quantity * t.price ELSE 0 END) as total_divested
+                SUM(CASE WHEN t.type = 'BUY' THEN t.quantity ELSE 0 END) as total_bought,
+                SUM(CASE WHEN t.type = 'SELL' THEN t.quantity ELSE 0 END) as total_sold,
+                SUM(CASE WHEN t.type = 'BUY' THEN t.quantity * t.price ELSE 0 END) as total_invested,
+                SUM(CASE WHEN t.type = 'SELL' THEN t.quantity * t.price ELSE 0 END) as total_divested
             FROM transactions t
             JOIN stocks s ON t.stockid = s.stockid
             WHERE t.portfolioid = ?
@@ -774,13 +799,97 @@ class DatabaseService:
             )
             grants = cursor.fetchall()
 
+        if not grants:
+            return []
+
+        grant_ids = [grant[0] for grant in grants]
+        stockids = {grant[2] for grant in grants}
+        events_by_grant = cls._getEquityVestingEventsByGrantIds(grant_ids)
+        market_data = cls._getEquityMarketDataByStockId(stockids)
+
         result = []
         for grant in grants:
             grant_id, name, stockid, total_shares, grant_date, grant_price = grant
             result.append(cls._buildEquityGrantDict(
-                grant_id, name, stockid, total_shares, grant_date, grant_price, today
+                grant_id,
+                name,
+                stockid,
+                total_shares,
+                grant_date,
+                grant_price,
+                today,
+                vesting_events=events_by_grant.get(grant_id),
+                market_data=market_data.get(stockid),
             ))
         return result
+
+    @classmethod
+    def _getEquityVestingEventsByGrantIds(cls, grant_ids: List[int]) -> Dict[int, list]:
+        """
+        Loads vesting events for multiple grants in one query.
+        """
+        if not grant_ids:
+            return {}
+
+        placeholders = ",".join(["?"] * len(grant_ids))
+        events_by_grant = defaultdict(list)
+        with get_connection(DB_PATH) as connection:
+            rows = connection.execute(
+                f"SELECT id, grant_id, date, shares, taxed_shares FROM equity_vesting_events "
+                f"WHERE grant_id IN ({placeholders}) ORDER BY grant_id ASC, date ASC",
+                grant_ids
+            ).fetchall()
+
+        for row in rows:
+            events_by_grant[row[1]].append(row)
+        return events_by_grant
+
+    @classmethod
+    def _getEquityMarketDataByStockId(cls, stockids: set) -> Dict[int, dict]:
+        """
+        Loads live price and FX data once per unique stock/currency.
+        """
+        if not stockids:
+            return {}
+
+        market_data_by_stockid = {}
+        symbols = {}
+        currencies = set()
+
+        for stockid in stockids:
+            stock = cls.stocks.get(stockid)
+            if stock is None:
+                cls.getStock(stockid=stockid)
+                stock = cls.stocks.get(stockid)
+            if stock is None:
+                continue
+            symbols[stockid] = stock.symbol
+            currencies.add(stock.currency or "USD")
+
+        prices_by_symbol = {}
+        for symbol in set(symbols.values()):
+            try:
+                price_info = StockAPI.get_current_price(symbol)
+                prices_by_symbol[symbol] = price_info.get("currentPrice", 0.0) or 0.0
+            except Exception:
+                prices_by_symbol[symbol] = None
+
+        fx_by_currency = {}
+        for currency in currencies:
+            fx_by_currency[currency] = StockAPI.get_fx_rate(currency, "EUR")
+
+        for stockid, symbol in symbols.items():
+            stock = cls.stocks.get(stockid)
+            share_price = prices_by_symbol.get(symbol)
+            if share_price is None:
+                share_price = stock.price if stock else 0.0
+            currency = (stock.currency if stock else "USD") or "USD"
+            market_data_by_stockid[stockid] = {
+                "share_price": share_price,
+                "fx_rate": fx_by_currency.get(currency, 1.0),
+            }
+
+        return market_data_by_stockid
 
     @classmethod
     def getEquityGrant(cls, grant_id: int) -> dict:
@@ -809,7 +918,18 @@ class DatabaseService:
         )
 
     @classmethod
-    def _buildEquityGrantDict(cls, grant_id: int, name: str, stockid: int, total_shares: int, grant_date: str, grant_price: float, today: str) -> dict:
+    def _buildEquityGrantDict(
+        cls,
+        grant_id: int,
+        name: str,
+        stockid: int,
+        total_shares: int,
+        grant_date: str,
+        grant_price: float,
+        today: str,
+        vesting_events: list = None,
+        market_data: dict = None,
+    ) -> dict:
         """
         Builds a grant response dict with live price, FX rate, vested/unvested computation, and gain/loss.
         """
@@ -824,22 +944,27 @@ class DatabaseService:
         currency = stock.currency if stock else "USD"
 
         # Fetch live price and FX rate
-        try:
-            price_info = StockAPI.get_current_price(symbol)
-            share_price = price_info.get("currentPrice", 0.0) or 0.0
-        except Exception:
-            share_price = stock.price if stock else 0.0
-
-        fx_rate = StockAPI.get_fx_rate(currency, "EUR")
+        if market_data is None:
+            try:
+                price_info = StockAPI.get_current_price(symbol)
+                share_price = price_info.get("currentPrice", 0.0) or 0.0
+            except Exception:
+                share_price = stock.price if stock else 0.0
+            fx_rate = StockAPI.get_fx_rate(currency, "EUR")
+        else:
+            share_price = market_data.get("share_price", stock.price if stock else 0.0)
+            fx_rate = market_data.get("fx_rate", 1.0)
 
         # Fetch vesting events
-        with get_connection(DB_PATH) as connection:
-            cursor = connection.execute(
-                "SELECT id, grant_id, date, shares, taxed_shares FROM equity_vesting_events "
-                "WHERE grant_id = ? ORDER BY date ASC",
-                (grant_id,)
-            )
-            events = cursor.fetchall()
+        events = vesting_events
+        if events is None:
+            with get_connection(DB_PATH) as connection:
+                cursor = connection.execute(
+                    "SELECT id, grant_id, date, shares, taxed_shares FROM equity_vesting_events "
+                    "WHERE grant_id = ? ORDER BY date ASC",
+                    (grant_id,)
+                )
+                events = cursor.fetchall()
 
         vesting_events = []
         vested_shares = 0
@@ -1122,35 +1247,31 @@ class DatabaseService:
         total = 0.0
 
         with get_connection(DB_PATH) as connection:
-            cursor = connection.execute(
-                "SELECT id, stockid, total_shares FROM equity_grants"
-            )
-            grants = cursor.fetchall()
+            grants = connection.execute(
+                "SELECT id, stockid FROM equity_grants"
+            ).fetchall()
 
-        for grant in grants:
-            grant_id, stockid, total_shares = grant
+        if not grants:
+            return 0.0
 
-            stock = cls.stocks.get(stockid)
-            if stock is None:
+        grant_ids = [grant[0] for grant in grants]
+        stockids = {grant[1] for grant in grants}
+        events_by_grant = cls._getEquityVestingEventsByGrantIds(grant_ids)
+        market_data = cls._getEquityMarketDataByStockId(stockids)
+
+        for grant_id, stockid in grants:
+            events = events_by_grant.get(grant_id, [])
+            vested_shares = 0
+            for event in events:
+                taxed = event[4] if event[4] else 0
+                if event[2] <= today:
+                    vested_shares += event[3] - taxed
+
+            data = market_data.get(stockid)
+            if data is None:
                 continue
 
-            try:
-                price_info = StockAPI.get_current_price(stock.symbol)
-                share_price = price_info.get("currentPrice", 0.0) or 0.0
-            except Exception:
-                share_price = stock.price or 0.0
-
-            fx_rate = StockAPI.get_fx_rate(stock.currency or "EUR", "EUR")
-
-            with get_connection(DB_PATH) as connection:
-                cursor = connection.execute(
-                    "SELECT COALESCE(SUM(shares - taxed_shares), 0) FROM equity_vesting_events "
-                    "WHERE grant_id = ? AND date <= ?",
-                    (grant_id, today)
-                )
-                vested_shares = cursor.fetchone()[0]
-
-            total += vested_shares * share_price * fx_rate
+            total += vested_shares * data["share_price"] * data["fx_rate"]
 
         return round(total, 2)
 
@@ -1212,30 +1333,55 @@ class DatabaseService:
             return []
 
         result = {}  # date -> total equity value
+        grant_ids = [g[0] for g in grants]
+        stockids = sorted({g[1] for g in grants})
+        events_by_grant = cls._getEquityVestingEventsByGrantIds(grant_ids)
+
+        # Preload all prices by stockid once.
+        prices_by_stockid = defaultdict(list)
+        if stockids:
+            placeholders = ",".join(["?"] * len(stockids))
+            params = stockids + [end_date]
+            with get_connection(DB_PATH) as connection:
+                rows = connection.execute(
+                    f"SELECT stockid, datestamp, closeprice FROM historicalstocks "
+                    f"WHERE stockid IN ({placeholders}) AND datestamp <= ? "
+                    f"ORDER BY stockid ASC, datestamp ASC",
+                    params
+                ).fetchall()
+            for row in rows:
+                prices_by_stockid[row[0]].append((row[1], row[2]))
+
+        # Preload FX rates by pair once (only for convert_to_eur mode).
+        fx_by_pair = {}
+        if convert_to_eur:
+            pairs = sorted({f"{currency}EUR" for _, _, currency in grants if currency and currency != "EUR"})
+            if pairs:
+                placeholders = ",".join(["?"] * len(pairs))
+                params = pairs + [end_date]
+                with get_connection(DB_PATH) as connection:
+                    rows = connection.execute(
+                        f"SELECT pair, date, rate FROM fx_rates_history "
+                        f"WHERE pair IN ({placeholders}) AND date <= ? "
+                        f"ORDER BY pair ASC, date ASC",
+                        params
+                    ).fetchall()
+                tmp = defaultdict(dict)
+                for pair, date, rate in rows:
+                    tmp[pair][date] = rate
+                fx_by_pair = dict(tmp)
 
         for grant_id, stockid, currency in grants:
             # Get vesting events sorted by date
-            with get_connection(DB_PATH) as connection:
-                cursor = connection.execute(
-                    "SELECT date, (shares - taxed_shares) as net "
-                    "FROM equity_vesting_events WHERE grant_id = ? ORDER BY date ASC",
-                    (grant_id,)
-                )
-                events = cursor.fetchall()
+            raw_events = events_by_grant.get(grant_id, [])
+            events = [(row[2], row[3] - (row[4] or 0)) for row in raw_events]
 
             if not events:
                 continue
 
             # Get ALL historical prices up to end_date (including before start_date
             # so we can carry forward the latest price)
-            with get_connection(DB_PATH) as connection:
-                cursor = connection.execute(
-                    "SELECT datestamp, closeprice FROM historicalstocks "
-                    "WHERE stockid = ? AND datestamp <= ? "
-                    "ORDER BY datestamp ASC",
-                    (stockid, end_date)
-                )
-                all_prices = cursor.fetchall()
+            all_prices = prices_by_stockid.get(stockid, [])
 
             # Build price lookup dict for forward-fill
             price_by_date = {row[0]: row[1] for row in all_prices}
@@ -1248,14 +1394,7 @@ class DatabaseService:
             fx_lookup = {}
             if convert_to_eur and currency and currency != "EUR":
                 pair = f"{currency}EUR"
-                with get_connection(DB_PATH) as connection:
-                    cursor = connection.execute(
-                        "SELECT date, rate FROM fx_rates_history "
-                        "WHERE pair = ? AND date <= ? "
-                        "ORDER BY date ASC",
-                        (pair, end_date)
-                    )
-                    fx_lookup = {row[0]: row[1] for row in cursor.fetchall()}
+                fx_lookup = fx_by_pair.get(pair, {})
 
             # Determine which dates to iterate over
             if target_dates is not None:
@@ -1268,8 +1407,6 @@ class DatabaseService:
             event_idx = 0
             last_price = None
             last_fx = 1.0
-            price_idx = 0
-
             # Pre-accumulate vesting events before first target date
             first_date = dates_to_process[0] if dates_to_process else start_date
             while event_idx < len(events) and events[event_idx][0] < first_date:
@@ -1425,21 +1562,30 @@ class DatabaseService:
                 if stock:
                     all_symbols.add(stock.symbol)
 
-        # For each stock, find its last known date
-        # Group symbols by start date to minimize API calls
-        from collections import defaultdict
-        by_start = defaultdict(list)  # start_date -> [symbols]
+        # For each stock, find its last known date in a single grouped query.
+        # Group symbols by start date to minimize API calls.
+        symbol_to_stockid = {}
         for symbol in all_symbols:
             stockid = cls.symbol_map.get(symbol)
-            if stockid is None:
-                continue
+            if stockid is not None:
+                symbol_to_stockid[symbol] = stockid
+
+        by_start = defaultdict(list)  # start_date -> [symbols]
+        if symbol_to_stockid:
+            stockids = sorted(set(symbol_to_stockid.values()))
+            placeholders = ",".join(["?"] * len(stockids))
+            last_date_by_stockid = {}
             with get_connection(DB_PATH) as connection:
-                row = connection.execute(
-                    "SELECT MAX(datestamp) FROM historicalstocks WHERE stockid = ?",
-                    (stockid,)
-                ).fetchone()
-                last_date = row[0]
-            by_start[last_date].append(symbol)
+                rows = connection.execute(
+                    f"SELECT stockid, MAX(datestamp) FROM historicalstocks "
+                    f"WHERE stockid IN ({placeholders}) GROUP BY stockid",
+                    stockids
+                ).fetchall()
+                for stockid, last_date in rows:
+                    last_date_by_stockid[stockid] = last_date
+
+            for symbol, stockid in symbol_to_stockid.items():
+                by_start[last_date_by_stockid.get(stockid)].append(symbol)
 
         # Fetch and insert for each group
         total = 0
@@ -1631,8 +1777,9 @@ class DatabaseService:
         portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
         earliest = None
         try:
+            projected_by_stock = cls._projectDividendsBatch(list(portfolio_positions.keys()), today, end_date)
             for stockid in portfolio_positions:
-                projected = cls._projectDividends(stockid, today, end_date)
+                projected = projected_by_stock.get(stockid, [])
                 if projected:
                     first = projected[0]
                     if earliest is None or first["date"] < earliest["date"]:
@@ -1735,10 +1882,11 @@ class DatabaseService:
             })
 
         # Generate projected dividends for each position
+        projected_by_stock = cls._projectDividendsBatch(list(portfolio_positions.keys()), start_date, end_date)
         for stockid, position in portfolio_positions.items():
             if position.stock is None:
                 continue
-            projected = cls._projectDividends(stockid, start_date, end_date)
+            projected = projected_by_stock.get(stockid, [])
             for proj in projected:
                 amt = proj["amount_per_share"]
                 total = amt if proj.get("is_total_amount") else amt * position.quantity
@@ -1755,55 +1903,76 @@ class DatabaseService:
         return events
 
     @classmethod
-    def _projectDividends(cls, stockid: int, start_date: str, end_date: str) -> list:
+    def _projectDividendsBatch(cls, stockids: list, start_date: str, end_date: str) -> Dict[int, list]:
         """
-        Projects future dividend dates for a single stock based on historical payment patterns.
+        Projects dividends for multiple stocks with batched DB reads.
+        """
+        if not stockids:
+            return {}
 
-        Algorithm:
-        1. Fetch all historical dividend dates for this stock, sorted ascending.
-        2. If fewer than 2 records, return empty (cannot detect frequency).
-        3. Calculate intervals (in days) between consecutive payments.
-        4. Determine the median interval and classify frequency:
-           - 80-100 days  -> quarterly (91 days)
-           - 160-200 days -> semi-annual (182 days)
-           - 330-400 days -> annual (365 days)
-           - else         -> use the median interval directly
-        5. Step forward from the last known dividend date by the frequency interval.
-        6. Return projected dates within [start_date, end_date] that don't overlap historical dates.
-        7. Use the most recent dividend amount as the projected amount.
-        8. Cap projections at 12 months from the last known date.
+        stockids = sorted(set(stockids))
+        placeholders = ",".join(["?"] * len(stockids))
 
-        :return: List of dicts with "date" and "amount_per_share" keys.
+        historical_rows_by_stockid = defaultdict(list)
+        with get_connection(DB_PATH) as connection:
+            rows = connection.execute(
+                f"SELECT stockid, datestamp, dividendvalue FROM historicaldividends "
+                f"WHERE stockid IN ({placeholders}) ORDER BY stockid ASC, datestamp ASC",
+                stockids
+            ).fetchall()
+        for row in rows:
+            if len(row) == 3:
+                stockid, datestamp, dividendvalue = row
+            elif len(row) == 2 and len(stockids) == 1:
+                # Backward-compatible with unit tests that mock old 2-column rows.
+                stockid = stockids[0]
+                datestamp, dividendvalue = row
+            else:
+                continue
+            historical_rows_by_stockid[stockid].append((datestamp, dividendvalue))
+
+        fallback_stockids = [stockid for stockid in stockids if len(historical_rows_by_stockid.get(stockid, [])) < 2]
+        tx_rows_by_stockid = defaultdict(list)
+        if fallback_stockids:
+            fallback_placeholders = ",".join(["?"] * len(fallback_stockids))
+            with get_connection(DB_PATH) as connection:
+                tx_rows = connection.execute(
+                    f"SELECT stockid, DATE(datestamp) as d, "
+                    f"CASE WHEN type = 'STAKING' THEN quantity * price ELSE price END as amount, "
+                    f"type FROM transactions "
+                    f"WHERE type IN ('DIVIDEND', 'STAKING') AND stockid IN ({fallback_placeholders}) "
+                    f"ORDER BY stockid ASC, d ASC",
+                    fallback_stockids
+                ).fetchall()
+            for stockid, date_str, amount, tx_type in tx_rows:
+                tx_rows_by_stockid[stockid].append((date_str, amount, tx_type))
+
+        projected_by_stockid = {}
+        for stockid in stockids:
+            rows = historical_rows_by_stockid.get(stockid, [])
+            is_total_amount = False
+
+            if len(rows) < 2:
+                rows = tx_rows_by_stockid.get(stockid, [])
+                if rows and rows[0][2] == 'STAKING':
+                    is_total_amount = True
+
+            projected_by_stockid[stockid] = cls._projectDividendsFromRows(
+                rows=rows,
+                start_date=start_date,
+                end_date=end_date,
+                is_total_amount=is_total_amount,
+            )
+
+        return projected_by_stockid
+
+    @classmethod
+    def _projectDividendsFromRows(cls, rows: list, start_date: str, end_date: str, is_total_amount: bool = False) -> list:
+        """
+        Shared projection logic used by single-stock and batch paths.
         """
         from datetime import datetime as dt, timedelta
         from statistics import median
-
-        with get_connection(DB_PATH) as connection:
-            cursor = connection.execute(
-                'SELECT datestamp, dividendvalue FROM historicaldividends '
-                'WHERE stockid = ? ORDER BY datestamp ASC',
-                (stockid,)
-            )
-            rows = cursor.fetchall()
-
-        # Fall back to dividend/staking transactions when historicaldividends has no data.
-        # For STAKING, the "price" is the token market price and "quantity" is tokens
-        # received, so the actual reward is quantity*price (a flat total, not per-share).
-        # For DIVIDEND, "price" is the per-share amount which the caller multiplies by
-        # position quantity, so we return it as-is.
-        is_total_amount = False
-        if len(rows) < 2:
-            with get_connection(DB_PATH) as connection:
-                cursor = connection.execute(
-                    "SELECT DATE(datestamp) as d, "
-                    "CASE WHEN type = 'STAKING' THEN quantity * price ELSE price END as amount, "
-                    "type FROM transactions "
-                    "WHERE type IN ('DIVIDEND', 'STAKING') AND stockid = ? ORDER BY d ASC",
-                    (stockid,)
-                )
-                rows = cursor.fetchall()
-            if rows and rows[0][2] == 'STAKING':
-                is_total_amount = True
 
         if len(rows) < 2:
             return []
@@ -1852,6 +2021,56 @@ class DatabaseService:
             current += timedelta(days=frequency_days)
 
         return projected
+
+    @classmethod
+    def _projectDividends(cls, stockid: int, start_date: str, end_date: str) -> list:
+        """
+        Projects future dividend dates for a single stock based on historical payment patterns.
+
+        Algorithm:
+        1. Fetch all historical dividend dates for this stock, sorted ascending.
+        2. If fewer than 2 records, return empty (cannot detect frequency).
+        3. Calculate intervals (in days) between consecutive payments.
+        4. Determine the median interval and classify frequency:
+           - 80-100 days  -> quarterly (91 days)
+           - 160-200 days -> semi-annual (182 days)
+           - 330-400 days -> annual (365 days)
+           - else         -> use the median interval directly
+        5. Step forward from the last known dividend date by the frequency interval.
+        6. Return projected dates within [start_date, end_date] that don't overlap historical dates.
+        7. Use the most recent dividend amount as the projected amount.
+        8. Cap projections at 12 months from the last known date.
+
+        :return: List of dicts with "date" and "amount_per_share" keys.
+        """
+        with get_connection(DB_PATH) as connection:
+            cursor = connection.execute(
+                'SELECT datestamp, dividendvalue FROM historicaldividends '
+                'WHERE stockid = ? ORDER BY datestamp ASC',
+                (stockid,)
+            )
+            rows = cursor.fetchall()
+
+        # Fall back to dividend/staking transactions when historicaldividends has no data.
+        # For STAKING, the "price" is the token market price and "quantity" is tokens
+        # received, so the actual reward is quantity*price (a flat total, not per-share).
+        # For DIVIDEND, "price" is the per-share amount which the caller multiplies by
+        # position quantity, so we return it as-is.
+        is_total_amount = False
+        if len(rows) < 2:
+            with get_connection(DB_PATH) as connection:
+                cursor = connection.execute(
+                    "SELECT DATE(datestamp) as d, "
+                    "CASE WHEN type = 'STAKING' THEN quantity * price ELSE price END as amount, "
+                    "type FROM transactions "
+                    "WHERE type IN ('DIVIDEND', 'STAKING') AND stockid = ? ORDER BY d ASC",
+                    (stockid,)
+                )
+                rows = cursor.fetchall()
+            if rows and rows[0][2] == 'STAKING':
+                is_total_amount = True
+
+        return cls._projectDividendsFromRows(rows, start_date, end_date, is_total_amount=is_total_amount)
 
     # ── Savings Accounts ──────────────────────────────────────────────
 

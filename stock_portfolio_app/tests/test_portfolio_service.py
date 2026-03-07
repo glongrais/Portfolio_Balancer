@@ -58,7 +58,7 @@ def test_balancePortfolio(mock_print, mock_update_real_distribution, mock_calcul
     PortfolioService.balancePortfolio(amount_to_buy=1000, min_amount_to_buy=50)
 
     # Assertions
-    mock_update_real_distribution.assert_called_once_with(1)
+    mock_update_real_distribution.assert_called_once_with(1, total_value=10000)
     mock_calculate_portfolio_value.assert_called_once_with(1)
 
     # Check the printed output
@@ -156,3 +156,49 @@ def test_updateRealDistribution_updated_prices(setup_portfolio_service):
     stock.price = 200.0
     PortfolioService.updateRealDistribution()
     assert position.distribution_real == 100.0
+
+
+@patch('services.database_service.DatabaseService.batchUpdatePositionDistribution')
+def test_updateRealDistribution_uses_batch_update(mock_batch_update, setup_portfolio_service):
+    stock1 = Stock(stockid=1, symbol="AAPL", price=100.0)
+    stock2 = Stock(stockid=2, symbol="MSFT", price=200.0)
+    position1 = Position(stockid=1, stock=stock1, quantity=1)
+    position2 = Position(stockid=2, stock=stock2, quantity=1)
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
+
+    PortfolioService.updateRealDistribution(portfolio_id=1, total_value=300.0)
+
+    mock_batch_update.assert_called_once()
+    args = mock_batch_update.call_args[0]
+    assert args[0] == 1
+    assert len(args[1]) == 2
+
+
+@patch('services.stock_api.StockAPI.get_current_year_dividends')
+def test_getTotalYearlyDividend_batches_dividend_lookup(mock_get_dividends, setup_portfolio_service):
+    stock1 = Stock(stockid=1, symbol="AAPL", price=100.0)
+    stock2 = Stock(stockid=2, symbol="MSFT", price=200.0)
+    position1 = Position(stockid=1, stock=stock1, quantity=10)
+    position2 = Position(stockid=2, stock=stock2, quantity=5)
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
+    mock_get_dividends.return_value = {"AAPL": 1.0, "MSFT": 2.0}
+
+    total = PortfolioService.getTotalYearlyDividend(portfolio_id=1)
+
+    mock_get_dividends.assert_called_once_with(["AAPL", "MSFT"])
+    assert total == 20.0
+
+
+@patch('services.stock_api.StockAPI.get_current_year_dividends')
+def test_getDividendYearlyForecast_batches_dividend_lookup(mock_get_dividends, setup_portfolio_service):
+    stock1 = Stock(stockid=1, symbol="AAPL", price=100.0)
+    stock2 = Stock(stockid=2, symbol="MSFT", price=200.0)
+    position1 = Position(stockid=1, stock=stock1, quantity=10)
+    position2 = Position(stockid=2, stock=stock2, quantity=5)
+    DatabaseService.positions = {1: {1: position1, 2: position2}}
+    mock_get_dividends.return_value = {"AAPL": 1.0, "MSFT": 2.0}
+
+    total = PortfolioService.getDividendYearlyForecast(portfolio_id=1)
+
+    mock_get_dividends.assert_called_once_with(["AAPL", "MSFT"])
+    assert total == 20.0

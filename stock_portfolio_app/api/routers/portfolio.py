@@ -324,7 +324,8 @@ async def balance_portfolio(
         min_amount_to_buy = balance_request.min_amount_to_buy
         strategy = balance_request.strategy
 
-        PortfolioService.updateRealDistribution(portfolio_id)
+        current_total = PortfolioService.calculatePortfolioValue(portfolio_id)
+        PortfolioService.updateRealDistribution(portfolio_id, total_value=current_total)
 
         portfolio_positions = DatabaseService.getPositionsForPortfolio(portfolio_id)
         recommendations = []
@@ -370,7 +371,7 @@ async def balance_portfolio(
             leftover = amount_to_buy - total_invested
         else:
             # Rebalance: allocate new money to fix current imbalances
-            total_value = PortfolioService.calculatePortfolioValue(portfolio_id) + amount_to_buy
+            total_value = current_total + amount_to_buy
             remaining = amount_to_buy
 
             sorted_positions = dict(sorted(
@@ -423,8 +424,8 @@ async def get_distribution(portfolio_id: int = Path(..., description="Portfolio 
     Get current portfolio distribution vs target distribution
     """
     try:
-        PortfolioService.updateRealDistribution(portfolio_id)
         total_value = PortfolioService.calculatePortfolioValue(portfolio_id)
+        PortfolioService.updateRealDistribution(portfolio_id, total_value=total_value)
 
         distributions = []
         for position in DatabaseService.getPositionsForPortfolio(portfolio_id).values():
@@ -521,11 +522,14 @@ async def get_dividends_breakdown(portfolio_id: int = Path(..., description="Por
     try:
         dividends = []
         total_dividend = 0.0
+        positions = list(DatabaseService.getPositionsForPortfolio(portfolio_id).values())
+        symbols = [position.stock.symbol for position in positions if position.stock]
+        dividends_by_symbol = StockAPI.get_current_year_dividends(symbols) if symbols else {}
 
-        for position in DatabaseService.getPositionsForPortfolio(portfolio_id).values():
-            dividend_rate = StockAPI.get_current_year_dividends(
-                [position.stock.symbol]
-            )[position.stock.symbol]
+        for position in positions:
+            if not position.stock:
+                continue
+            dividend_rate = dividends_by_symbol.get(position.stock.symbol, 0.0)
             stock_dividend = dividend_rate * position.quantity
             total_dividend += stock_dividend
 

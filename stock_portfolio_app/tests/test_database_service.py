@@ -425,6 +425,34 @@ def test_update_position_no_fields_to_update(mock_logger_warning, mock_sqlite_co
     mock_sqlite_connect.assert_not_called()
 
 
+@patch('sqlite3.connect')
+def test_batchUpdatePositionDistribution(mock_connect, setup_database_service):
+    mock_conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+
+    DatabaseService.batchUpdatePositionDistribution(
+        portfolio_id=1,
+        updates=[(1, 40.0), (2, 60.0)],
+    )
+
+    mock_conn.execute.assert_any_call(
+        "UPDATE positions SET distribution_real = ? WHERE stockid = ? AND portfolio_id = ?",
+        (40.0, 1, 1),
+    )
+    mock_conn.execute.assert_any_call(
+        "UPDATE positions SET distribution_real = ? WHERE stockid = ? AND portfolio_id = ?",
+        (60.0, 2, 1),
+    )
+    assert mock_conn.execute.call_count == 2
+    mock_conn.commit.assert_called_once()
+
+
+@patch('sqlite3.connect')
+def test_batchUpdatePositionDistribution_empty(mock_connect, setup_database_service):
+    DatabaseService.batchUpdatePositionDistribution(portfolio_id=1, updates=[])
+    mock_connect.assert_not_called()
+
+
 # --- getTransactions tests ---
 
 @patch('sqlite3.connect')
@@ -486,7 +514,7 @@ def test_getTransactions_filter_by_type(mock_connect, setup_database_service):
     params = mock_conn.execute.call_args[0][1]
     assert 't.type = ?' in query
     assert params[0] == 1  # portfolio_id
-    assert 'sell' in params
+    assert 'SELL' in params
 
 
 @patch('sqlite3.connect')
@@ -502,7 +530,7 @@ def test_getTransactions_filter_both(mock_connect, setup_database_service):
     query = mock_conn.execute.call_args[0][0]
     params = mock_conn.execute.call_args[0][1]
     assert query.count('AND') == 2
-    assert params == [1, 'AAPL', 'buy', 10]
+    assert params == [1, 'AAPL', 'BUY', 10]
 
 
 @patch('sqlite3.connect')
@@ -543,6 +571,8 @@ def test_getTransactionSummary_all(mock_connect, setup_database_service):
 
     query = mock_conn.execute.call_args[0][0]
     assert 'WHERE' in query
+    assert "t.type = 'BUY'" in query
+    assert "t.type = 'SELL'" in query
     params = mock_conn.execute.call_args[0][1]
     assert params[0] == 1  # portfolio_id
 
@@ -854,3 +884,73 @@ def test_getStockPriceHistory_case_insensitive(mock_connect, setup_database_serv
 
     params = mock_conn.execute.call_args[0][1]
     assert params[0] == 1
+
+
+@patch('services.stock_api.StockAPI.get_fx_rate', return_value=1.0)
+@patch('services.stock_api.StockAPI.get_current_price', return_value={"currentPrice": 10.0})
+@patch('sqlite3.connect')
+def test_getEquityVestedTotal_batches_events_query(mock_connect, mock_price, mock_fx, setup_database_service):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.side_effect = [
+        # 1) grants query
+        [(1, 1), (2, 2)],
+        # 2) batched vesting events query
+        [
+            (1, 1, "2024-01-15", 10, 0),
+            (2, 2, "2024-01-15", 5, 0),
+        ],
+    ]
+
+    DatabaseService.stocks = {
+        1: Stock(stockid=1, symbol='AAPL', currency='USD', price=100.0),
+        2: Stock(stockid=2, symbol='MSFT', currency='USD', price=200.0),
+    }
+
+    total = DatabaseService.getEquityVestedTotal()
+
+    assert total == 150.0
+    assert mock_conn.execute.call_count == 2
+    mock_price.assert_any_call('AAPL')
+    mock_price.assert_any_call('MSFT')
+
+
+@patch('services.database_service.DatabaseService._insertHistoricalData')
+@patch('services.stock_api.StockAPI.get_historical_data', return_value=[])
+@patch('sqlite3.connect')
+def test_updateHistoricalStocksPortfolio_batches_last_date_query(
+    mock_connect, mock_get_historical, mock_insert_historical, setup_database_service
+):
+    mock_conn = MagicMock()
+    mock_cursor = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value = mock_cursor
+    mock_cursor.fetchall.side_effect = [
+        # 1) equity_grants stock ids
+        [(3,)],
+        # 2) grouped MAX(datestamp) by stockid
+        [(1, "2024-01-01"), (2, None), (3, "2024-02-01")],
+    ]
+
+    DatabaseService.stocks = {
+        1: Stock(stockid=1, symbol='AAPL', name='Apple', price=100.0),
+        2: Stock(stockid=2, symbol='MSFT', name='Microsoft', price=200.0),
+        3: Stock(stockid=3, symbol='GOOGL', name='Google', price=300.0),
+    }
+    DatabaseService.symbol_map = {'AAPL': 1, 'MSFT': 2, 'GOOGL': 3}
+    DatabaseService.positions = {
+        1: {
+            1: Position(stockid=1, quantity=1, stock=DatabaseService.stocks[1]),
+            2: Position(stockid=2, quantity=1, stock=DatabaseService.stocks[2]),
+        }
+    }
+
+    DatabaseService.updateHistoricalStocksPortfolio("", "2025-01-01")
+
+    grouped_query = mock_conn.execute.call_args_list[1][0][0]
+    assert "GROUP BY stockid" in grouped_query
+    assert mock_conn.execute.call_count == 2
+    assert mock_get_historical.call_count >= 1
+    assert mock_insert_historical.call_count >= 1
