@@ -4,9 +4,47 @@ A comprehensive portfolio management application that reads stock portfolios, tr
 
 ## Benchmark
 
-`locust` is used to benchmark the API:
+Use the safe benchmark runner so heavy tests never mutate your production DB.
+
+### Safe heavy benchmark workflow
+
+- The runner clones `data/portfolio.db` into `data/benchmark/portfolio_benchmark_<timestamp>.db`
+- It starts an isolated API process with `PORTFOLIO_DB_PATH` set to the clone
+- It runs Locust in headless mode against that isolated API
+- It writes CSV/HTML artifacts and appends a summary to `stock_portfolio_app/benchmark/results/results.md`
+
+### Read-heavy profile (no write endpoints)
+
+```bash
+.venv/bin/python stock_portfolio_app/benchmark/run_benchmark.py \
+  --profile read_heavy \
+  --users 80 \
+  --spawn-rate 20 \
+  --duration 3m
 ```
-locust -f ./stock_portfolio_app/benchmark/locustfile.py
+
+### Mixed profile (includes writes, safe on cloned DB only)
+
+```bash
+.venv/bin/python stock_portfolio_app/benchmark/run_benchmark.py \
+  --profile mixed \
+  --users 50 \
+  --spawn-rate 10 \
+  --duration 2m
+```
+
+### Artifacts and trend history
+
+- Run artifacts: `stock_portfolio_app/benchmark/results/run_<timestamp>_<profile>_*.csv`
+- HTML report: `stock_portfolio_app/benchmark/results/run_<timestamp>_<profile>.html`
+- Historical summary: `stock_portfolio_app/benchmark/results/results.md`
+
+### Optional docker-compose note
+
+If you run the API through Docker Compose for benchmarks, use a DB override and avoid the default `data/portfolio.db`:
+
+```bash
+PORTFOLIO_DB_PATH=/app/data/benchmark.db docker compose up -d
 ```
 
 ## Features
