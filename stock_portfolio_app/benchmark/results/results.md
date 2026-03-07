@@ -48,3 +48,26 @@ This file is append-only and tracks benchmark outcomes over time.
 | `GET /api/v1/crypto/history` | 1500 | 0 |
 | `POST /api/v1/portfolios/{portfolio_id}/transactions/` | 1400 | 0 |
 
+## 2026-03-07 19:06:14 - mixed
+
+- **Config:** users=100, spawn_rate=20/s, duration=5m, api_port=8013
+- **DB Clone:** `/Users/guillaumel/Personal/GitHub/Portfolio_Balancer/data/benchmark/portfolio_benchmark_20260307_190111.db`
+- **Artifacts:** `/Users/guillaumel/Personal/GitHub/Portfolio_Balancer/stock_portfolio_app/benchmark/results/run_20260307_190111_mixed_stats.csv`, `/Users/guillaumel/Personal/GitHub/Portfolio_Balancer/stock_portfolio_app/benchmark/results/run_20260307_190111_mixed_failures.csv`, `/Users/guillaumel/Personal/GitHub/Portfolio_Balancer/stock_portfolio_app/benchmark/results/run_20260307_190111_mixed_stats_history.csv`, `/Users/guillaumel/Personal/GitHub/Portfolio_Balancer/stock_portfolio_app/benchmark/results/run_20260307_190111_mixed.html`
+
+| Metric | Value |
+|---|---|
+| Requests | 11549 |
+| Failures | 0 (0.00%) |
+| RPS | 38.798235686249754 |
+| p50 (ms) | 2100 |
+| p95 (ms) | 4000 |
+| p99 (ms) | 5300 |
+
+| Slow Endpoints (p95) | p95 (ms) | Failures |
+|---|---|---|
+| `POST /api/v1/portfolios/{portfolio_id}/deposits/` | 5300 | 0 |
+| `POST /api/v1/portfolios/{portfolio_id}/transactions/` | 4800 | 0 |
+| `GET /api/v1/net-worth/history` | 4600 | 0 |
+| `GET /api/v1/portfolios/{portfolio_id}/deposits/total` | 4400 | 0 |
+| `GET /api/v1/portfolios/{portfolio_id}/transactions/summary` | 4100 | 0 |
+
