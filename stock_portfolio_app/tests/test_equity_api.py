@@ -343,16 +343,24 @@ def test_get_history_invalid_dates():
     assert 'start_date must be before' in resp.json()['detail']
 
 
+@patch('services.database_service.DatabaseService.getSavingsAccountsTotal')
 @patch('services.database_service.DatabaseService.getEquityVestedTotal')
 @patch('services.database_service.DatabaseService.getNetWorthAssets')
 @patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
 @patch('services.database_service.DatabaseService.getPortfolios')
-def test_net_worth_includes_vested_equity(mock_get_portfolios, mock_pea_value, mock_get_assets, mock_vested_total):
+def test_net_worth_includes_vested_equity(
+    mock_get_portfolios,
+    mock_pea_value,
+    mock_get_assets,
+    mock_vested_total,
+    mock_savings_total,
+):
     """Test that GET /net-worth/current includes equity when equity exists."""
     mock_get_portfolios.return_value = [{"portfolio_id": 1, "name": "PEA", "currency": "EUR"}]
     mock_pea_value.return_value = 50000.0
     mock_get_assets.return_value = []
     mock_vested_total.return_value = 4140.0
+    mock_savings_total.return_value = 0.0
 
     client = create_net_worth_client()
     resp = client.get('/api/net-worth/current')

@@ -33,15 +33,24 @@ SAMPLE_PORTFOLIOS = [
 
 
 @patch('services.database_service.DatabaseService.getEquityVestedTotal')
+@patch('services.database_service.DatabaseService.getSavingsAccountsTotal')
 @patch('services.stock_api.StockAPI.get_fx_rate')
 @patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
 @patch('services.database_service.DatabaseService.getNetWorthAssets')
 @patch('services.database_service.DatabaseService.getPortfolios')
-def test_get_current_net_worth(mock_get_portfolios, mock_get_assets, mock_portfolio_value, mock_fx_rate, mock_equity_total):
+def test_get_current_net_worth(
+    mock_get_portfolios,
+    mock_get_assets,
+    mock_portfolio_value,
+    mock_fx_rate,
+    mock_savings_total,
+    mock_equity_total,
+):
     """Test getting current net worth with multiple portfolios + stored assets."""
     mock_get_portfolios.return_value = SAMPLE_PORTFOLIOS
     mock_portfolio_value.side_effect = lambda pid: {1: 89000.0, 2: 50000.0}[pid]
     mock_fx_rate.return_value = 0.09  # SEK to EUR
+    mock_savings_total.return_value = 0.0
     mock_equity_total.return_value = 0.0
     mock_get_assets.return_value = [
         {"id": "savings", "label": "Savings", "current_value": 10000.0, "updated_at": "2026-02-26"},
@@ -66,13 +75,21 @@ def test_get_current_net_worth(mock_get_portfolios, mock_get_assets, mock_portfo
 
 
 @patch('services.database_service.DatabaseService.getEquityVestedTotal')
+@patch('services.database_service.DatabaseService.getSavingsAccountsTotal')
 @patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
 @patch('services.database_service.DatabaseService.getNetWorthAssets')
 @patch('services.database_service.DatabaseService.getPortfolios')
-def test_get_current_net_worth_no_assets(mock_get_portfolios, mock_get_assets, mock_portfolio_value, mock_equity_total):
+def test_get_current_net_worth_no_assets(
+    mock_get_portfolios,
+    mock_get_assets,
+    mock_portfolio_value,
+    mock_savings_total,
+    mock_equity_total,
+):
     """Test getting current net worth with only portfolios (no stored assets)."""
     mock_get_portfolios.return_value = [{"portfolio_id": 1, "name": "PEA", "currency": "EUR"}]
     mock_portfolio_value.return_value = 50000.0
+    mock_savings_total.return_value = 0.0
     mock_equity_total.return_value = 0.0
     mock_get_assets.return_value = []
 
