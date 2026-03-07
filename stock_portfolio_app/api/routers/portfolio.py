@@ -486,14 +486,16 @@ async def get_dividends_summary(portfolio_id: int = Path(..., description="Portf
             # Get the position for the next dividend
             position = PortfolioService.getPositionById(next_dividend_info['stockid'], portfolio_id)
             dividend_rate = next_dividend_info.get('dividend_rate', 0.0)
+            is_total = next_dividend_info.get('is_total_amount', False)
 
             if position and position.stock:
+                total = dividend_rate if is_total else position.quantity * dividend_rate
                 next_dividend_item = DividendByStockItem(
                     symbol=position.stock.symbol,
                     name=position.stock.name,
                     quantity=position.quantity,
                     dividend_rate=round(dividend_rate, 2),
-                    total_dividend=round(position.quantity * dividend_rate, 2),
+                    total_dividend=round(total, 2),
                     expected_date=next_dividend_info.get('date'),
                 )
 

@@ -97,8 +97,11 @@ def test_projectDividends_insufficient_data(mock_connect):
     """With fewer than 2 historical records, no projection is possible."""
     mock_conn = MagicMock()
     mock_connect.return_value.__enter__.return_value = mock_conn
-    mock_conn.execute.return_value.fetchall.return_value = [
-        ("2024-06-15", 0.50),
+    mock_conn.execute.return_value.fetchall.side_effect = [
+        # 1. historicaldividends: only one record
+        [("2024-06-15", 0.50)],
+        # 2. Transaction fallback: also only one record
+        [("2024-06-15", 0.50, "DIVIDEND")],
     ]
 
     result = DatabaseService._projectDividends(1, "2025-01-01", "2025-12-31")
@@ -464,3 +467,94 @@ def test_calendar_endpoint_empty(mock_get_calendar):
     assert data["events"] == []
     assert data["total_historical"] == 0
     assert data["total_projected"] == 0
+
+
+# ── Staking rewards included in dividend calculations ─────────────────
+
+@patch('sqlite3.connect')
+def test_getDividendTotal_includes_staking(mock_connect):
+    """getDividendTotal should sum both DIVIDEND and STAKING transactions."""
+    mock_conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    # The query uses SUM so the DB returns one row with the combined total
+    mock_conn.execute.return_value.fetchone.return_value = (25.0,)
+
+    result = DatabaseService.getDividendTotal(portfolio_id=4)
+
+    sql = mock_conn.execute.call_args[0][0]
+    assert "IN ('DIVIDEND', 'STAKING')" in sql
+    assert result == 25.0
+
+
+@patch('sqlite3.connect')
+def test_getDividendYearToDate_includes_staking(mock_connect):
+    """getDividendYearToDate should sum both DIVIDEND and STAKING transactions."""
+    mock_conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+    mock_conn.execute.return_value.fetchone.return_value = (12.5,)
+
+    result = DatabaseService.getDividendYearToDate("2025", portfolio_id=4)
+
+    sql = mock_conn.execute.call_args[0][0]
+    assert "IN ('DIVIDEND', 'STAKING')" in sql
+    assert result == 12.5
+
+
+@patch('sqlite3.connect')
+def test_getDividendCalendar_includes_staking_events(mock_connect):
+    """Staking transactions should appear as historical events in the calendar."""
+    mock_conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+
+    mock_conn.execute.return_value.fetchall.side_effect = [
+        # 1. Income transactions in range (includes a STAKING reward)
+        [("2025-03-01", 0.005, 2, "SOL", "Solana", 100)],
+        # 2. Stocks with income transactions
+        [(2,)],
+        # 3. yfinance historicaldividends (skipped: stock has transactions)
+        [],
+        # 4. _projectDividends: historicaldividends (empty)
+        [],
+        # 5. _projectDividends: transaction fallback (insufficient)
+        [],
+    ]
+
+    stock = Stock(stockid=2, symbol='SOL', name='Solana', price=150.0)
+    position = Position(stockid=2, quantity=100, stock=stock)
+    DatabaseService.positions = {4: {2: position}}
+
+    result = DatabaseService.getDividendCalendar("2025-01-01", "2025-06-30", portfolio_id=4)
+
+    assert len(result) == 1
+    assert result[0]["symbol"] == "SOL"
+    assert result[0]["type"] == "historical"
+    assert result[0]["total_amount"] == 0.5
+
+
+@patch('sqlite3.connect')
+def test_projectDividends_falls_back_to_staking_transactions(mock_connect):
+    """_projectDividends should use STAKING transactions as fallback history."""
+    mock_conn = MagicMock()
+    mock_connect.return_value.__enter__.return_value = mock_conn
+
+    mock_conn.execute.return_value.fetchall.side_effect = [
+        # 1. historicaldividends: empty
+        [],
+        # 2. Transaction fallback: weekly staking rewards (3-tuple with type)
+        [
+            ("2025-01-07", 0.005, "STAKING"),
+            ("2025-01-14", 0.005, "STAKING"),
+            ("2025-01-21", 0.005, "STAKING"),
+            ("2025-01-28", 0.005, "STAKING"),
+        ],
+    ]
+
+    result = DatabaseService._projectDividends(2, "2025-02-01", "2025-03-31")
+
+    # Verify the fallback query uses IN ('DIVIDEND', 'STAKING')
+    fallback_sql = mock_conn.execute.call_args_list[1][0][0]
+    assert "IN ('DIVIDEND', 'STAKING')" in fallback_sql
+    assert len(result) > 0
+    for item in result:
+        assert item["amount_per_share"] == 0.005
+        assert item["is_total_amount"] is True

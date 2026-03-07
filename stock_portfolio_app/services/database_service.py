@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 class DatabaseService:
 
+    INCOME_TYPES = ('DIVIDEND', 'STAKING')
+
     symbol_map: Dict[str, int] = {}
     stocks: Dict[int, Stock] = {}
     positions: Dict[int, Dict[int, Position]] = {}
@@ -1580,7 +1582,7 @@ class DatabaseService:
         total_dividend = 0.0
         with get_connection(DB_PATH) as connection:
             answers = connection.execute(
-                "SELECT COALESCE(SUM(quantity * price), 0) FROM transactions WHERE type = 'DIVIDEND' AND portfolioid = ?",
+                "SELECT COALESCE(SUM(quantity * price), 0) FROM transactions WHERE type IN ('DIVIDEND', 'STAKING') AND portfolioid = ?",
                 (portfolio_id,)
             )
             total_dividend = float(answers.fetchone()[0])
@@ -1602,7 +1604,7 @@ class DatabaseService:
             result = connection.execute(
                 '''SELECT COALESCE(SUM(quantity * price), 0)
                    FROM transactions
-                   WHERE type = 'DIVIDEND' AND portfolioid = ? AND strftime('%Y', datestamp) = ?''',
+                   WHERE type IN ('DIVIDEND', 'STAKING') AND portfolioid = ? AND strftime('%Y', datestamp) = ?''',
                 (portfolio_id, year,)
             )
             row = result.fetchone()
@@ -1622,7 +1624,7 @@ class DatabaseService:
         """
         from datetime import datetime as dt, timedelta
 
-        default_result = {'stockid': None, 'dividend_rate': 0.0, 'date': None}
+        default_result = {'stockid': None, 'dividend_rate': 0.0, 'date': None, 'is_total_amount': False}
         today = dt.now().strftime('%Y-%m-%d')
         end_date = (dt.now() + timedelta(days=365)).strftime('%Y-%m-%d')
 
@@ -1638,6 +1640,7 @@ class DatabaseService:
                             'stockid': stockid,
                             'dividend_rate': first["amount_per_share"],
                             'date': first["date"],
+                            'is_total_amount': first.get("is_total_amount", False),
                         }
         except Exception as e:
             logger.error(f"getNextDividendInfo(): Error projecting next dividend: {e}")
@@ -1670,7 +1673,7 @@ class DatabaseService:
                        s.symbol, s.name, t.quantity
                 FROM transactions t
                 JOIN stocks s ON t.stockid = s.stockid
-                WHERE t.type = 'DIVIDEND'
+                WHERE t.type IN ('DIVIDEND', 'STAKING')
                   AND t.portfolioid = ?
                   AND DATE(t.datestamp) >= ? AND DATE(t.datestamp) <= ?
                 ORDER BY d ASC
@@ -1697,7 +1700,7 @@ class DatabaseService:
         # dates regardless of whether the user held the stock.
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
-                "SELECT DISTINCT stockid FROM transactions WHERE type = 'DIVIDEND' AND portfolioid = ?",
+                "SELECT DISTINCT stockid FROM transactions WHERE type IN ('DIVIDEND', 'STAKING') AND portfolioid = ?",
                 (portfolio_id,)
             )
             stocks_with_transactions = {row[0] for row in cursor.fetchall()}
@@ -1737,12 +1740,14 @@ class DatabaseService:
                 continue
             projected = cls._projectDividends(stockid, start_date, end_date)
             for proj in projected:
+                amt = proj["amount_per_share"]
+                total = amt if proj.get("is_total_amount") else amt * position.quantity
                 events.append({
                     "date": proj["date"],
                     "symbol": position.stock.symbol,
                     "name": position.stock.name,
-                    "amount_per_share": round(proj["amount_per_share"], 4),
-                    "total_amount": round(proj["amount_per_share"] * position.quantity, 2),
+                    "amount_per_share": round(amt, 4),
+                    "total_amount": round(total, 2),
                     "type": "projected",
                 })
 
@@ -1781,15 +1786,24 @@ class DatabaseService:
             )
             rows = cursor.fetchall()
 
-        # Fall back to dividend transactions when historicaldividends has no data
+        # Fall back to dividend/staking transactions when historicaldividends has no data.
+        # For STAKING, the "price" is the token market price and "quantity" is tokens
+        # received, so the actual reward is quantity*price (a flat total, not per-share).
+        # For DIVIDEND, "price" is the per-share amount which the caller multiplies by
+        # position quantity, so we return it as-is.
+        is_total_amount = False
         if len(rows) < 2:
             with get_connection(DB_PATH) as connection:
                 cursor = connection.execute(
-                    "SELECT DATE(datestamp) as d, price FROM transactions "
-                    "WHERE type = 'DIVIDEND' AND stockid = ? ORDER BY d ASC",
+                    "SELECT DATE(datestamp) as d, "
+                    "CASE WHEN type = 'STAKING' THEN quantity * price ELSE price END as amount, "
+                    "type FROM transactions "
+                    "WHERE type IN ('DIVIDEND', 'STAKING') AND stockid = ? ORDER BY d ASC",
                     (stockid,)
                 )
                 rows = cursor.fetchall()
+            if rows and rows[0][2] == 'STAKING':
+                is_total_amount = True
 
         if len(rows) < 2:
             return []
@@ -1833,6 +1847,7 @@ class DatabaseService:
                 projected.append({
                     "date": date_str,
                     "amount_per_share": last_amount,
+                    "is_total_amount": is_total_amount,
                 })
             current += timedelta(days=frequency_days)
 
