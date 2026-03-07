@@ -104,6 +104,71 @@ def test_get_current_net_worth_no_assets(
     assert data['assets'][0]['value'] == 50000.0
 
 
+@patch('services.database_service.DatabaseService.getEquityVestedTotal')
+@patch('services.database_service.DatabaseService.getSavingsAccountsTotal')
+@patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
+@patch('services.database_service.DatabaseService.getNetWorthAssets')
+@patch('services.database_service.DatabaseService.getPortfolios')
+def test_get_current_net_worth_prefers_computed_savings_over_stored_asset(
+    mock_get_portfolios,
+    mock_get_assets,
+    mock_portfolio_value,
+    mock_savings_total,
+    mock_equity_total,
+):
+    """Computed savings should win when a stored asset uses the same id."""
+    mock_get_portfolios.return_value = [{"portfolio_id": 1, "name": "PEA", "currency": "EUR"}]
+    mock_portfolio_value.return_value = 50000.0
+    mock_savings_total.return_value = 3000.0
+    mock_equity_total.return_value = 0.0
+    mock_get_assets.return_value = [
+        {"id": "savings", "label": "Savings (legacy)", "current_value": 10000.0, "updated_at": "2026-02-26"},
+        {"id": "cto", "label": "CTO", "current_value": 7000.0, "updated_at": "2026-02-26"},
+    ]
+
+    client = create_test_client()
+    resp = client.get('/api/net-worth/current')
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [a['id'] for a in data['assets']] == ['pea', 'savings', 'cto']
+    savings_asset = next(a for a in data['assets'] if a['id'] == 'savings')
+    assert savings_asset['value'] == 3000.0
+    assert data['total'] == 60000.0
+
+
+@patch('services.database_service.DatabaseService.getEquityVestedTotal')
+@patch('services.database_service.DatabaseService.getSavingsAccountsTotal')
+@patch('services.portfolio_service.PortfolioService.calculatePortfolioValue')
+@patch('services.database_service.DatabaseService.getNetWorthAssets')
+@patch('services.database_service.DatabaseService.getPortfolios')
+def test_get_current_net_worth_ignores_stored_asset_colliding_with_portfolio_id(
+    mock_get_portfolios,
+    mock_get_assets,
+    mock_portfolio_value,
+    mock_savings_total,
+    mock_equity_total,
+):
+    """Stored assets should not override computed portfolio categories."""
+    mock_get_portfolios.return_value = [{"portfolio_id": 1, "name": "PEA", "currency": "EUR"}]
+    mock_portfolio_value.return_value = 50000.0
+    mock_savings_total.return_value = 0.0
+    mock_equity_total.return_value = 0.0
+    mock_get_assets.return_value = [
+        {"id": "PEA", "label": "PEA (manual)", "current_value": 99999.0, "updated_at": "2026-02-26"},
+        {"id": "cto", "label": "CTO", "current_value": 1000.0, "updated_at": "2026-02-26"},
+    ]
+
+    client = create_test_client()
+    resp = client.get('/api/net-worth/current')
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert [a['id'] for a in data['assets']] == ['pea', 'cto']
+    assert data['assets'][0]['value'] == 50000.0
+    assert data['total'] == 51000.0
+
+
 @patch('services.database_service.DatabaseService.getPortfolios')
 def test_get_current_net_worth_error(mock_get_portfolios):
     """Test error handling when fetching current net worth fails."""

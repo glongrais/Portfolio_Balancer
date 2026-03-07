@@ -37,6 +37,16 @@ async def get_current_net_worth():
         equity_vested_total = DatabaseService.getEquityVestedTotal()
 
         assets = []
+        seen_asset_ids = set()
+
+        def append_unique_asset(asset_id: str, label: str, value: float):
+            """Append asset once, preserving first-seen order."""
+            normalized_id = asset_id.lower()
+            if normalized_id in seen_asset_ids:
+                return
+            seen_asset_ids.add(normalized_id)
+            assets.append(NetWorthAssetItem(id=asset_id, label=label, value=value))
+
         for p in portfolios:
             pid = p["portfolio_id"]
             name = p["name"]
@@ -45,25 +55,17 @@ async def get_current_net_worth():
             if currency != "EUR":
                 fx_rate = StockAPI.get_fx_rate(currency, "EUR")
                 value = round(value * fx_rate, 2)
-            assets.append(NetWorthAssetItem(id=name.lower(), label=name, value=value))
+            append_unique_asset(name.lower(), name, value)
 
         if equity_vested_total > 0:
-            assets.append(NetWorthAssetItem(
-                id="equity", label="Equity", value=equity_vested_total
-            ))
+            append_unique_asset("equity", "Equity", equity_vested_total)
 
         savings_total = DatabaseService.getSavingsAccountsTotal()
         if savings_total > 0:
-            assets.append(NetWorthAssetItem(
-                id="savings", label="Savings", value=savings_total
-            ))
+            append_unique_asset("savings", "Savings", savings_total)
 
         for asset in stored_assets:
-            assets.append(NetWorthAssetItem(
-                id=asset["id"],
-                label=asset["label"],
-                value=asset["current_value"],
-            ))
+            append_unique_asset(asset["id"], asset["label"], asset["current_value"])
 
         total = sum(a.value for a in assets)
         last_updated = datetime.now().strftime('%Y-%m-%d')

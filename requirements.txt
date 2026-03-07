@@ -15,6 +15,7 @@ dbt-sqlite
 
 # Testing
 pytest
+pytest-cov
 httpx
 
 # Benchmark
