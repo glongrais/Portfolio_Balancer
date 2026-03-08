@@ -1,6 +1,7 @@
 """
 FastAPI application for Portfolio Balancer API
 """
+import asyncio
 import logging
 import sqlite3
 from fastapi import FastAPI, HTTPException
@@ -33,6 +34,31 @@ log_handler.setFormatter(
 logging.basicConfig(level=logging.INFO, handlers=[log_handler])
 
 logger = logging.getLogger(__name__)
+
+UPDATE_INTERVAL_SECONDS = 86400  # 24 hours
+
+async def _periodic_historical_update():
+    """Background task that refreshes historical prices, FX rates, and dividends daily."""
+    while True:
+        await asyncio.sleep(UPDATE_INTERVAL_SECONDS)
+        logger.info("Starting periodic historical data update...")
+        loop = asyncio.get_event_loop()
+        try:
+            await loop.run_in_executor(None, DatabaseService.updateHistoricalStocksPortfolio, "", "")
+            logger.info("Historical stock prices updated")
+        except Exception as e:
+            logger.error("Historical stock prices update failed: %s", e)
+        try:
+            await loop.run_in_executor(None, DatabaseService.updateFxRatesHistory, ["USDEUR", "SEKEUR"])
+            logger.info("FX rates history updated")
+        except Exception as e:
+            logger.error("FX rates history update failed: %s", e)
+        try:
+            await loop.run_in_executor(None, DatabaseService.updateHistoricalDividendsPortfolio)
+            logger.info("Historical dividends updated")
+        except Exception as e:
+            logger.error("Historical dividends update failed: %s", e)
+        logger.info("Periodic historical data update complete")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -73,9 +99,17 @@ async def lifespan(app: FastAPI):
         logger.error(f"Failed to initialize application: {e}")
         raise
 
+    update_task = asyncio.create_task(_periodic_historical_update())
+    logger.info("Scheduled periodic historical data update every %ds", UPDATE_INTERVAL_SECONDS)
+
     yield
 
     # Shutdown
+    update_task.cancel()
+    try:
+        await update_task
+    except asyncio.CancelledError:
+        pass
     logger.info("Shutting down Portfolio Balancer API...")
 
 # Create FastAPI application
