@@ -277,6 +277,16 @@ def initialize_database(db_path: str):
                     FOREIGN KEY (account_id) REFERENCES savings_accounts (id)
     )
     ''')
+    # Create indexes for query performance
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS idx_transactions_portfolio_type
+      ON transactions(portfolioid, type, stockid, datestamp)
+    ''')
+    cursor.execute('''
+    CREATE INDEX IF NOT EXISTS idx_historicalstocks_datestamp_stockid
+      ON historicalstocks(datestamp, stockid)
+    ''')
+
     connection.commit()
 
     # Migrate existing tables: add columns that may not exist yet

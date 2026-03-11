@@ -1644,24 +1644,15 @@ class DatabaseService:
         with get_connection(DB_PATH) as connection:
             answers = connection.execute('''
                 WITH
-                transactions_buy AS (
-                    SELECT stockid, strftime('%Y-%m-%d', datestamp) AS datestamp, quantity
+                transactions_all AS (
+                    SELECT stockid, strftime('%Y-%m-%d', datestamp) AS datestamp,
+                           CASE WHEN type = 'SELL' THEN -quantity ELSE quantity END AS quantity
                     FROM transactions
-                    WHERE type = 'BUY' AND portfolioid = ?
-                ),
-                transactions_sell AS (
-                    SELECT stockid, strftime('%Y-%m-%d', datestamp) AS datestamp, -quantity as quantity
-                    FROM transactions
-                    WHERE type = 'SELL' AND portfolioid = ?
-                ),
-                transactions_union AS (
-                    SELECT * FROM transactions_buy
-                    UNION ALL
-                    SELECT * FROM transactions_sell
+                    WHERE type IN ('BUY', 'SELL') AND portfolioid = ?
                 ),
                 daily_transactions AS (
                     SELECT stockid, datestamp, SUM(quantity) AS daily_quantity
-                    FROM transactions_union
+                    FROM transactions_all
                     GROUP BY stockid, datestamp
                 ),
                 cumulative_positions AS (
@@ -1712,7 +1703,7 @@ class DatabaseService:
                 WHERE filled_quantity > 0
                 GROUP BY datestamp
                 ORDER BY datestamp
-            ''', (portfolio_id, portfolio_id))
+            ''', (portfolio_id,))
             rows = answers.fetchall()
         return rows
     
