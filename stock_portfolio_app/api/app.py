@@ -58,6 +58,11 @@ async def _periodic_historical_update():
             logger.info("Historical dividends updated")
         except Exception as e:
             logger.error("Historical dividends update failed: %s", e)
+        try:
+            await loop.run_in_executor(None, DatabaseService.updatePortfolioPositionsPrice)
+            logger.info("Current portfolio prices updated")
+        except Exception as e:
+            logger.error("Current portfolio prices update failed: %s", e)
         logger.info("Periodic historical data update complete")
 
 @asynccontextmanager
