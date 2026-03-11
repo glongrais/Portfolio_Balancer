@@ -146,7 +146,7 @@ class TransactionCreate(BaseModel):
     symbol: str = Field(..., description="Stock symbol")
     quantity: float = Field(..., description="Number of shares", gt=0)
     price: float = Field(..., description="Price per share", gt=0)
-    type: TransactionType = Field(..., description="Transaction type (buy/sell)")
+    type: TransactionType = Field(..., description="Transaction type (buy/sell/dividend)")
     date: datetime = Field(..., description="Transaction date")
     rowid: Optional[int] = Field(default=None, description="External row identifier (auto-generated if omitted)")
 
