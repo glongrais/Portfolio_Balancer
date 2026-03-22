@@ -54,6 +54,8 @@ All routes are prefixed with `/api/v1/`. Portfolio-scoped routes use `/{portfoli
 - `/api/v1/portfolios/{portfolio_id}/transactions/`, `/api/v1/portfolios/{portfolio_id}/deposits/`
 - `/api/v1/stocks`, `/api/v1/net-worth`, `/api/v1/equity` — not portfolio-scoped
 
+**Route ordering in `stocks.py`:** Fixed-path routes (`/search`, `/intraday`) must be defined before `/{symbol}` or FastAPI will match the path parameter first.
+
 ### Database
 
 SQLite at `data/portfolio.db`. Key tables: `stocks`, `positions`, `transactions`, `deposits`, `portfolios`, `historicalstocks`, `fx_rates_history`, `net_worth_assets`, `net_worth_snapshots`, `equity_grants`, `equity_vesting_events`. Views are managed by dbt (in `dbt/` at repo root).
@@ -71,3 +73,7 @@ Test files: `test_portfolio_api.py`, `test_stocks_api.py`, `test_transactions_ap
 - `PORTFOLIO_DB_PATH` — Override default DB path (default: `data/portfolio.db`)
 - `NUMBERS_FILE_PATH` — Apple Numbers spreadsheet for data import
 - `SLOW_QUERY_THRESHOLD_MS` — TimedCursor logging threshold (default: 100ms)
+
+## Companion Frontend
+
+The frontend lives at `../Portfolio_Dashboard` (React 18, TypeScript, Vite, Recharts, shadcn/ui, React Query). Cross-repo features (new API endpoints) require changes in both repos: backend schemas/routes here, then Zod schemas + API client + React Query hooks there.
