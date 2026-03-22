@@ -218,6 +218,19 @@ class StockPriceHistoryResponse(BaseModel):
     currency: str = Field(default="", description="Currency")
     data: List[StockPriceHistoryItem] = Field(..., description="Historical price data points")
 
+# Intraday Sparkline Schemas
+class IntradayPricePoint(BaseModel):
+    timestamp: str = Field(..., description="Time (HH:MM)")
+    price: float = Field(..., description="Price at this interval")
+
+class IntradaySparklineItem(BaseModel):
+    symbol: str = Field(..., description="Stock symbol")
+    data: List[IntradayPricePoint] = Field(..., description="Intra-day price points")
+    previous_close: Optional[float] = Field(None, description="Previous trading day closing price")
+
+class IntradaySparklineResponse(BaseModel):
+    sparklines: List[IntradaySparklineItem] = Field(..., description="Intra-day data per symbol")
+
 # Update Stock Prices Request
 class UpdatePricesResponse(BaseModel):
     message: str = Field(..., description="Status message")

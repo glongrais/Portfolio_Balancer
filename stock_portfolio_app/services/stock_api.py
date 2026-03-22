@@ -199,6 +199,52 @@ class StockAPI:
             return []
 
     @classmethod
+    @cached(cache=TTLCache(maxsize=64, ttl=300))
+    def get_intraday_data(cls, symbols_tuple: tuple) -> dict:
+        """
+        Fetches intra-day price data (5-min intervals) for the given symbols.
+        Returns dict of symbol -> {"data": [...], "previous_close": float|None}.
+        When market is closed, yfinance returns the last trading day's data.
+        """
+        result = {}
+        with ThreadPoolExecutor() as executor:
+            def fetch_intraday(symbol):
+                try:
+                    # Use 5d period to ensure we get the last trading day even on weekends
+                    hist = cls._get_ticker(symbol).history(period="5d", interval="5m")
+                    if hist.empty:
+                        return symbol, {"data": [], "previous_close": None}
+                    # Find trading days present in the data
+                    trading_dates = sorted(hist.index.date)
+                    unique_dates = sorted(set(trading_dates))
+                    last_date = unique_dates[-1]
+                    # Get previous trading day's close if available
+                    previous_close = None
+                    if len(unique_dates) >= 2:
+                        prev_date = unique_dates[-2]
+                        prev_day_data = hist[hist.index.date == prev_date]
+                        if not prev_day_data.empty:
+                            previous_close = round(prev_day_data["Close"].iloc[-1], 4)
+                    # Keep only the last trading day's data
+                    last_day = hist[hist.index.date == last_date]
+                    points = []
+                    for ts, row in last_day.iterrows():
+                        points.append({
+                            "timestamp": ts.strftime("%H:%M"),
+                            "price": round(row["Close"], 4),
+                        })
+                    return symbol, {"data": points, "previous_close": previous_close}
+                except Exception as e:
+                    cls.logger.warning(f"Failed to fetch intraday data for {symbol}: {e}")
+                    return symbol, {"data": [], "previous_close": None}
+
+            futures = [executor.submit(fetch_intraday, s) for s in symbols_tuple]
+            for future in as_completed(futures):
+                symbol, payload = future.result()
+                result[symbol] = payload
+        return result
+
+    @classmethod
     def get_current_year_dividends(cls, symbols: list):
         data = {}
         for symbol in symbols:

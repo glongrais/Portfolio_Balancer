@@ -13,6 +13,9 @@ from api.schemas import (
     UpdatePricesResponse,
     StockPriceHistoryResponse,
     StockPriceHistoryItem,
+    IntradayPricePoint,
+    IntradaySparklineItem,
+    IntradaySparklineResponse,
 )
 from services.database_service import DatabaseService
 from services.stock_api import StockAPI
@@ -66,6 +69,36 @@ async def get_all_stocks():
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch stocks: {str(e)}"
+        )
+
+@router.get("/intraday", response_model=IntradaySparklineResponse)
+async def get_intraday_sparklines(
+    symbols: str = Query(..., description="Comma-separated stock symbols"),
+):
+    """
+    Get intra-day price data (5-min intervals) for multiple stocks.
+    Returns sparkline data suitable for mini charts.
+    """
+    try:
+        symbol_list = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+        if not symbol_list:
+            return IntradaySparklineResponse(sparklines=[])
+
+        data = StockAPI.get_intraday_data(tuple(sorted(symbol_list)))
+        sparklines = [
+            IntradaySparklineItem(
+                symbol=sym,
+                data=[IntradayPricePoint(**pt) for pt in payload["data"]],
+                previous_close=payload.get("previous_close"),
+            )
+            for sym, payload in data.items()
+        ]
+        return IntradaySparklineResponse(sparklines=sparklines)
+    except Exception as e:
+        logger.error(f"Error fetching intraday data: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch intraday data: {str(e)}",
         )
 
 @router.get("/{symbol}", response_model=StockResponse)
