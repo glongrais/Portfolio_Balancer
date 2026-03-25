@@ -47,6 +47,8 @@ FastAPI app serving a stock portfolio tracker with SQLite storage. All applicati
 
 **Naming convention:** Python methods use camelCase (e.g., `calculatePortfolioValue`, `getPortfolioValueHistory`), not snake_case.
 
+**Schema field naming:** Pydantic schemas in `schemas.py` use `datestamp` for date fields, but the frontend may send `date`. When adding or modifying schemas, use Pydantic `alias` + `populate_by_name=True` to accept both names if needed. Check the frontend's API client (`../Portfolio_Dashboard`) for the actual field names it sends.
+
 ### API Routes
 
 All routes are prefixed with `/api/v1/`. Portfolio-scoped routes use `/{portfolio_id}/` path parameter:
