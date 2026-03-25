@@ -193,7 +193,8 @@ class DividendCalendarResponse(BaseModel):
 
 # Deposit Schemas
 class DepositCreate(BaseModel):
-    datestamp: datetime = Field(..., description="Deposit date")
+    model_config = {"populate_by_name": True}
+    datestamp: datetime = Field(..., alias="date", description="Deposit date")
     amount: float = Field(..., description="Deposit amount", gt=0)
 
 class DepositResponse(BaseModel):
