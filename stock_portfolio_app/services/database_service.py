@@ -768,6 +768,45 @@ class DatabaseService:
         ]
 
     @classmethod
+    def getNetWorthSnapshotBoundaries(cls, start_date: str, end_date: str) -> dict:
+        """
+        For each asset in net_worth_snapshots, fetches:
+        - The latest snapshot on or before start_date (seed for forward-fill)
+        - The earliest snapshot on or after end_date (to know if asset is still active)
+
+        :return: Dict of asset_id -> {"before": (date, value) or None, "after": (date, value) or None}
+        """
+        result = {}
+        with get_connection(DB_PATH) as connection:
+            # Latest snapshot before or on start_date per asset
+            cursor = connection.execute(
+                "SELECT asset_id, date, value FROM net_worth_snapshots s1 "
+                "WHERE date <= ? AND date = ("
+                "  SELECT MAX(date) FROM net_worth_snapshots s2 "
+                "  WHERE s2.asset_id = s1.asset_id AND s2.date <= ?"
+                ") ORDER BY asset_id",
+                (start_date, start_date)
+            )
+            for row in cursor.fetchall():
+                result.setdefault(row[0], {"before": None, "after": None})
+                result[row[0]]["before"] = (row[1], row[2])
+
+            # Earliest snapshot after or on end_date per asset
+            cursor = connection.execute(
+                "SELECT asset_id, date, value FROM net_worth_snapshots s1 "
+                "WHERE date >= ? AND date = ("
+                "  SELECT MIN(date) FROM net_worth_snapshots s2 "
+                "  WHERE s2.asset_id = s1.asset_id AND s2.date >= ?"
+                ") ORDER BY asset_id",
+                (end_date, end_date)
+            )
+            for row in cursor.fetchall():
+                result.setdefault(row[0], {"before": None, "after": None})
+                result[row[0]]["after"] = (row[1], row[2])
+
+        return result
+
+    @classmethod
     def addNetWorthSnapshot(cls, date: str, asset_id: str, value: float) -> None:
         """
         Adds or updates a net worth snapshot for a given date and asset.
@@ -923,7 +962,7 @@ class DatabaseService:
         grant_id: int,
         name: str,
         stockid: int,
-        total_shares: int,
+        total_shares: float,
         grant_date: str,
         grant_price: float,
         today: str,
@@ -970,7 +1009,7 @@ class DatabaseService:
         vested_shares = 0
         for event in events:
             taxed = event[4] if event[4] else 0
-            net = event[3] - taxed
+            net = round(event[3] - taxed, 10)
             is_vested = event[2] <= today
             vesting_events.append({
                 "id": event[0],
@@ -1013,7 +1052,7 @@ class DatabaseService:
         }
 
     @classmethod
-    def addEquityGrant(cls, name: str, symbol: str, total_shares: int, grant_date: str, grant_price: float, vesting_events: list) -> dict:
+    def addEquityGrant(cls, name: str, symbol: str, total_shares: float, grant_date: str, grant_price: float, vesting_events: list) -> dict:
         """
         Creates a new equity grant with optional vesting events.
 
@@ -1100,7 +1139,7 @@ class DatabaseService:
             connection.commit()
 
     @classmethod
-    def addEquityVestingEvent(cls, grant_id: int, date: str, shares: int, taxed_shares: int = 0) -> dict:
+    def addEquityVestingEvent(cls, grant_id: int, date: str, shares: float, taxed_shares: float = 0) -> dict:
         """
         Adds a vesting event to a grant.
 
@@ -1148,12 +1187,12 @@ class DatabaseService:
             "date": date,
             "shares": shares,
             "taxed_shares": taxed_shares,
-            "net_shares": shares - taxed_shares,
+            "net_shares": round(shares - taxed_shares, 10),
             "vested": date <= today,
         }
 
     @classmethod
-    def updateEquityVestingEvent(cls, event_id: int, date: str = None, shares: int = None, taxed_shares: int = None) -> dict:
+    def updateEquityVestingEvent(cls, event_id: int, date: str = None, shares: float = None, taxed_shares: float = None) -> dict:
         """
         Updates a vesting event.
 
@@ -1212,7 +1251,7 @@ class DatabaseService:
             "date": new_date,
             "shares": new_shares,
             "taxed_shares": new_taxed,
-            "net_shares": new_shares - new_taxed,
+            "net_shares": round(new_shares - new_taxed, 10),
             "vested": new_date <= today,
         }
 

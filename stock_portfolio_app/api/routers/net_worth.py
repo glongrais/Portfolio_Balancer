@@ -157,10 +157,43 @@ async def get_net_worth_history(
             if value > 0:
                 monthly_data[date_str]["savings"] = round(value, 2)
 
-        # Other asset snapshots
+        # Other asset snapshots — forward-fill values across all dates
         snapshots = DatabaseService.getNetWorthSnapshots(start_date, end_date)
+        boundaries = DatabaseService.getNetWorthSnapshotBoundaries(start_date, end_date)
+
+        # Group snapshots by asset_id; include the "before" boundary as a seed
+        snapshot_by_asset = defaultdict(list)
+        for asset_id, bounds in boundaries.items():
+            if bounds["before"] and bounds["before"][0] < start_date:
+                snapshot_by_asset[asset_id].append(bounds["before"])
         for snap in snapshots:
-            monthly_data[snap["date"]][snap["asset_id"]] = snap["value"]
+            snapshot_by_asset[snap["asset_id"]].append((snap["date"], snap["value"]))
+
+        # Get all dates we have data for (from portfolios, equity, savings)
+        all_sorted_dates = sorted(monthly_data.keys())
+
+        # Forward-fill each snapshot asset across all existing dates
+        for asset_id, asset_snapshots in snapshot_by_asset.items():
+            asset_snapshots.sort(key=lambda x: x[0])
+            snap_idx = 0
+            current_value = None
+
+            # Determine the last date we should fill to: the last snapshot
+            # overall (including after end_date) or end of range
+            bounds = boundaries.get(asset_id, {"before": None, "after": None})
+            last_snap_ever = asset_snapshots[-1][0]
+            if bounds["after"]:
+                last_snap_ever = max(last_snap_ever, bounds["after"][0])
+
+            for date in all_sorted_dates:
+                # Advance to the latest snapshot on or before this date
+                while snap_idx < len(asset_snapshots) and asset_snapshots[snap_idx][0] <= date:
+                    current_value = asset_snapshots[snap_idx][1]
+                    snap_idx += 1
+
+                # Fill if we have a value and haven't passed the asset's last known date
+                if current_value is not None and date <= last_snap_ever:
+                    monthly_data[date][asset_id] = current_value
 
         # Build response entries sorted by date
         data = []

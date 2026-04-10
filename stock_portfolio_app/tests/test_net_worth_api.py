@@ -181,11 +181,13 @@ def test_get_current_net_worth_error(mock_get_portfolios):
     assert 'Failed to fetch current net worth' in resp.json()['detail']
 
 
+@patch('services.database_service.DatabaseService.getNetWorthSnapshotBoundaries')
 @patch('services.database_service.DatabaseService.getNetWorthSnapshots')
+@patch('services.database_service.DatabaseService.getSavingsBalanceHistory')
 @patch('services.database_service.DatabaseService.getEquityValueHistory')
 @patch('services.database_service.DatabaseService.getPortfolioValueHistory')
 @patch('services.database_service.DatabaseService.getPortfolios')
-def test_get_history(mock_get_portfolios, mock_portfolio_history, mock_equity_history, mock_snapshots):
+def test_get_history(mock_get_portfolios, mock_portfolio_history, mock_equity_history, mock_savings_history, mock_snapshots, mock_boundaries):
     """Test getting net worth history with multiple portfolios + stored asset snapshots."""
     mock_get_portfolios.return_value = [{"portfolio_id": 1, "name": "PEA", "currency": "EUR"}]
     mock_portfolio_history.return_value = [
@@ -193,10 +195,12 @@ def test_get_history(mock_get_portfolios, mock_portfolio_history, mock_equity_hi
         ("2024-02-28", 62000.0),
     ]
     mock_equity_history.return_value = []
+    mock_savings_history.return_value = []
     mock_snapshots.return_value = [
         {"date": "2024-01-31", "asset_id": "savings", "value": 15000.0},
         {"date": "2024-02-28", "asset_id": "savings", "value": 15500.0},
     ]
+    mock_boundaries.return_value = {}
 
     client = create_test_client()
     resp = client.get('/api/net-worth/history?start_date=2024-01-01&end_date=2024-12-31')
@@ -212,13 +216,17 @@ def test_get_history(mock_get_portfolios, mock_portfolio_history, mock_equity_hi
     assert data['data'][1]['total'] == 77500.0
 
 
+@patch('services.database_service.DatabaseService.getNetWorthSnapshotBoundaries')
 @patch('services.database_service.DatabaseService.getNetWorthSnapshots')
+@patch('services.database_service.DatabaseService.getSavingsBalanceHistory')
 @patch('services.database_service.DatabaseService.getEquityValueHistory')
 @patch('services.database_service.DatabaseService.getPortfolioValueHistory')
 @patch('services.database_service.DatabaseService.getPortfolios')
-def test_get_history_includes_equity(mock_get_portfolios, mock_portfolio_history, mock_equity_history, mock_snapshots):
+def test_get_history_includes_equity(mock_get_portfolios, mock_portfolio_history, mock_equity_history, mock_savings_history, mock_snapshots, mock_boundaries):
     """Test that net worth history includes equity from equity grants."""
     mock_get_portfolios.return_value = [{"portfolio_id": 1, "name": "PEA", "currency": "EUR"}]
+    mock_savings_history.return_value = []
+    mock_boundaries.return_value = {}
     mock_portfolio_history.return_value = [
         ("2024-01-31", 50000.0),
         ("2024-02-28", 52000.0),
