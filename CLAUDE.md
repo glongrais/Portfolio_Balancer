@@ -21,6 +21,9 @@ cd stock_portfolio_app && ../.venv/bin/uvicorn api.app:app --reload --host 0.0.0
 
 # Start the API server, prometheus and grafana
 docker compose --build -d
+
+# Restart the API after code changes (service=portfolio-api, container=portfolio-balancer-api)
+docker compose restart portfolio-api
 ```
 
 No linter is configured. The venv lives at `.venv/` in the repo root.
@@ -41,13 +44,15 @@ FastAPI app serving a stock portfolio tracker with SQLite storage. All applicati
 
 ### Key Design Patterns
 
-**In-memory caches on DatabaseService:** `stocks` (Dict[int, Stock]), `positions` (Dict[int, Dict[int, Position]]), `symbol_map` (Dict[str, int]) are class-level dicts loaded at startup via the FastAPI lifespan hook. They are updated in-place when mutations happen. Tests must reset these caches in fixtures.
+**In-memory caches on DatabaseService:** `stocks` (Dict[int, Stock]), `positions` (Dict[int, Dict[int, Position]]), `symbol_map` (Dict[str, int]) are class-level dicts loaded at startup via the FastAPI lifespan hook (`getStocks()` and `getPositions()` populate caches as a side effect — there is no explicit `loadFromDB` method). They are updated in-place when mutations happen. Tests must reset these caches in fixtures.
 
 **Multi-portfolio support:** Positions are nested: `positions[portfolio_id][stockid] → Position`. Most methods accept `portfolio_id` (default=1). Three portfolios exist: PEA (EUR), ISK (SEK), CTO (USD). Non-EUR values are converted using FX rates.
 
 **Naming convention:** Python methods use camelCase (e.g., `calculatePortfolioValue`, `getPortfolioValueHistory`), not snake_case.
 
 **Schema field naming:** Pydantic schemas in `schemas.py` use `datestamp` for date fields, but the frontend may send `date`. When adding or modifying schemas, use Pydantic `alias` + `populate_by_name=True` to accept both names if needed. Check the frontend's API client (`../Portfolio_Dashboard`) for the actual field names it sends.
+
+**Equity share fields are `float`:** Equity schemas and `DatabaseService` methods use `float` for all share counts (shares, taxed_shares, net_shares, total_shares, vested/unvested). When computing derived values from float subtraction (e.g., `net_shares = shares - taxed_shares`), use `round(..., 10)` to avoid IEEE 754 epsilon noise.
 
 ### API Routes
 
@@ -60,7 +65,7 @@ All routes are prefixed with `/api/v1/`. Portfolio-scoped routes use `/{portfoli
 
 ### Database
 
-SQLite at `data/portfolio.db`. Key tables: `stocks`, `positions`, `transactions`, `deposits`, `portfolios`, `historicalstocks`, `fx_rates_history`, `net_worth_assets`, `net_worth_snapshots`, `equity_grants`, `equity_vesting_events`. Views are managed by dbt (in `dbt/` at repo root).
+SQLite at `data/portfolio.db`. Key tables: `stocks`, `positions`, `transactions`, `deposits`, `portfolios`, `historicalstocks` (columns: `closeprice`, `stockid`, `datestamp`), `fx_rates_history`, `net_worth_assets`, `net_worth_snapshots`, `equity_grants`, `equity_vesting_events`. Views are managed by dbt (in `dbt/` at repo root).
 
 Transaction types are uppercase strings: `'BUY'`, `'SELL'` and `'DIVIDEND'`.
 
@@ -69,6 +74,8 @@ Transaction types are uppercase strings: `'BUY'`, `'SELL'` and `'DIVIDEND'`.
 Tests use `fastapi.testclient.TestClient` with minimal FastAPI apps (one router per test file). External dependencies are mocked via `unittest.mock.patch`. Every test file that touches endpoints has an `autouse` fixture that resets `DatabaseService.symbol_map`, `stocks`, and `positions` to empty dicts.
 
 Test files: `test_portfolio_api.py`, `test_stocks_api.py`, `test_transactions_api.py`, `test_net_worth_api.py`, `test_equity_api.py`, `test_dividend_calendar.py`, `test_database_service.py`, `test_portfolio_service.py`, `test_stock.py`, `test_position.py`.
+
+**Net worth history tests:** The `/history` endpoint aggregates 4+ data sources. Tests must mock ALL of them (`getPortfolios`, `getPortfolioValueHistory`, `getEquityValueHistory`, `getSavingsBalanceHistory`, `getNetWorthSnapshots`, `getNetWorthSnapshotBoundaries`) or unmocked methods hit the real DB.
 
 ## Environment Variables
 
