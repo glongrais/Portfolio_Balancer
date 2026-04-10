@@ -75,6 +75,7 @@ class PositionCreate(BaseModel):
 
 class PositionUpdate(BaseModel):
     quantity: Optional[float] = Field(None, description="New quantity of shares", gt=0)
+    average_cost_basis: Optional[float] = Field(None, description="New average cost basis", ge=0)
     distribution_target: Optional[float] = Field(None, description="New target distribution percentage", ge=0, le=100)
 
 # Portfolio Schemas
@@ -274,27 +275,27 @@ class NetWorthAssetResponse(BaseModel):
 # Equity Schemas
 class VestingEventCreate(BaseModel):
     date: str = Field(..., description="Vesting date (YYYY-MM-DD)")
-    shares: int = Field(..., description="Number of shares vesting (gross)", gt=0)
-    taxed_shares: int = Field(default=0, description="Shares withheld for tax", ge=0)
+    shares: float = Field(..., description="Number of shares vesting (gross)", gt=0)
+    taxed_shares: float = Field(default=0, description="Shares withheld for tax", ge=0)
 
 class VestingEventResponse(BaseModel):
     id: int = Field(..., description="Vesting event ID")
     grant_id: int = Field(..., description="Grant ID")
     date: str = Field(..., description="Vesting date (YYYY-MM-DD)")
-    shares: int = Field(..., description="Number of shares vesting (gross)")
-    taxed_shares: int = Field(default=0, description="Shares withheld for tax")
-    net_shares: int = Field(..., description="Shares actually received (shares - taxed_shares)")
+    shares: float = Field(..., description="Number of shares vesting (gross)")
+    taxed_shares: float = Field(default=0, description="Shares withheld for tax")
+    net_shares: float = Field(..., description="Shares actually received (shares - taxed_shares)")
     vested: bool = Field(..., description="Whether this event has vested (date <= today)")
 
 class VestingEventUpdate(BaseModel):
     date: Optional[str] = Field(None, description="New vesting date (YYYY-MM-DD)")
-    shares: Optional[int] = Field(None, description="New number of shares vesting (gross)", gt=0)
-    taxed_shares: Optional[int] = Field(None, description="New shares withheld for tax", ge=0)
+    shares: Optional[float] = Field(None, description="New number of shares vesting (gross)", gt=0)
+    taxed_shares: Optional[float] = Field(None, description="New shares withheld for tax", ge=0)
 
 class EquityGrantCreate(BaseModel):
     name: str = Field(..., description="Grant name (e.g. 'Initial Grant 2024')")
     symbol: str = Field(..., description="Stock ticker symbol (added to stocks table)")
-    total_shares: int = Field(..., description="Total number of shares granted", gt=0)
+    total_shares: float = Field(..., description="Total number of shares granted", gt=0)
     grant_date: str = Field(..., description="Grant date (YYYY-MM-DD)")
     grant_price: float = Field(..., description="Share price at grant date", gt=0)
     vesting_events: List[VestingEventCreate] = Field(default=[], description="Initial vesting schedule")
@@ -307,14 +308,14 @@ class EquityGrantResponse(BaseModel):
     name: str = Field(..., description="Grant name")
     symbol: str = Field(..., description="Stock ticker symbol")
     stock_name: str = Field(default="", description="Company name from stocks table")
-    total_shares: int = Field(..., description="Total shares granted")
+    total_shares: float = Field(..., description="Total shares granted")
     grant_date: str = Field(..., description="Grant date (YYYY-MM-DD)")
     grant_price: float = Field(..., description="Share price at grant date")
     share_price: float = Field(..., description="Current share price (live)")
     currency: str = Field(..., description="Stock's native currency")
     fx_rate: float = Field(..., description="FX rate to EUR")
-    vested_shares: int = Field(..., description="Number of vested shares")
-    unvested_shares: int = Field(..., description="Number of unvested shares")
+    vested_shares: float = Field(..., description="Number of vested shares")
+    unvested_shares: float = Field(..., description="Number of unvested shares")
     vested_value: float = Field(..., description="Vested value in stock currency")
     unvested_value: float = Field(..., description="Unvested value in stock currency")
     total_value: float = Field(..., description="Total value of all shares in stock currency")

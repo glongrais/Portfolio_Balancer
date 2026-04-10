@@ -237,6 +237,7 @@ async def update_position(
         DatabaseService.updatePosition(
             symbol=symbol,
             quantity=position_update.quantity,
+            average_cost_basis=position_update.average_cost_basis,
             distribution_target=position_update.distribution_target,
             portfolio_id=portfolio_id,
         )
