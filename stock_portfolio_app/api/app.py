@@ -1,6 +1,7 @@
 """
 FastAPI application for Portfolio Balancer API
 """
+
 import asyncio
 import logging
 import sqlite3
@@ -18,9 +19,19 @@ from api.middleware import (
     log_requests_middleware,
     validation_exception_handler,
     http_exception_handler,
-    general_exception_handler
+    general_exception_handler,
 )
-from api.routers import portfolio, stocks, transactions, deposits, dev, net_worth, equity, savings, crypto
+from api.routers import (
+    portfolio,
+    stocks,
+    transactions,
+    deposits,
+    dev,
+    net_worth,
+    equity,
+    savings,
+    crypto,
+)
 from utils.file_utils import FileUtils
 
 # Configure structured JSON logging
@@ -37,6 +48,7 @@ logger = logging.getLogger(__name__)
 
 UPDATE_INTERVAL_SECONDS = 86400  # 24 hours
 
+
 async def _periodic_historical_update():
     """Background task that refreshes historical prices, FX rates, and dividends daily."""
     while True:
@@ -44,26 +56,35 @@ async def _periodic_historical_update():
         logger.info("Starting periodic historical data update...")
         loop = asyncio.get_event_loop()
         try:
-            await loop.run_in_executor(None, DatabaseService.updateHistoricalStocksPortfolio, "", "")
+            await loop.run_in_executor(
+                None, DatabaseService.updateHistoricalStocksPortfolio, "", ""
+            )
             logger.info("Historical stock prices updated")
         except Exception as e:
             logger.error("Historical stock prices update failed: %s", e)
         try:
-            await loop.run_in_executor(None, DatabaseService.updateFxRatesHistory, ["USDEUR", "SEKEUR"])
+            await loop.run_in_executor(
+                None, DatabaseService.updateFxRatesHistory, ["USDEUR", "SEKEUR"]
+            )
             logger.info("FX rates history updated")
         except Exception as e:
             logger.error("FX rates history update failed: %s", e)
         try:
-            await loop.run_in_executor(None, DatabaseService.updateHistoricalDividendsPortfolio)
+            await loop.run_in_executor(
+                None, DatabaseService.updateHistoricalDividendsPortfolio
+            )
             logger.info("Historical dividends updated")
         except Exception as e:
             logger.error("Historical dividends update failed: %s", e)
         try:
-            await loop.run_in_executor(None, DatabaseService.updatePortfolioPositionsPrice)
+            await loop.run_in_executor(
+                None, DatabaseService.updatePortfolioPositionsPrice
+            )
             logger.info("Current portfolio prices updated")
         except Exception as e:
             logger.error("Current portfolio prices update failed: %s", e)
         logger.info("Periodic historical data update complete")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -84,6 +105,7 @@ async def lifespan(app: FastAPI):
         # Load stocks and positions into memory
         DatabaseService.getStocks()
         DatabaseService.getPositions()
+        DatabaseService.ensureIndexes()
         DatabaseService.updatePortfolioPositionsPrice()
         DatabaseService.updateHistoricalStocksPortfolio("", "")
 
@@ -91,7 +113,9 @@ async def lifespan(app: FastAPI):
         try:
             DatabaseService.updateFxRatesHistory(["USDEUR", "SEKEUR"])
         except Exception as e:
-            logger.warning(f"FX rates history update failed on startup (non-blocking): {e}")
+            logger.warning(
+                f"FX rates history update failed on startup (non-blocking): {e}"
+            )
 
         # Refresh data from Numbers file
         # try:
@@ -105,7 +129,9 @@ async def lifespan(app: FastAPI):
         raise
 
     update_task = asyncio.create_task(_periodic_historical_update())
-    logger.info("Scheduled periodic historical data update every %ds", UPDATE_INTERVAL_SECONDS)
+    logger.info(
+        "Scheduled periodic historical data update every %ds", UPDATE_INTERVAL_SECONDS
+    )
 
     yield
 
@@ -117,20 +143,24 @@ async def lifespan(app: FastAPI):
         pass
     logger.info("Shutting down Portfolio Balancer API...")
 
+
 # Create FastAPI application
 app = FastAPI(
     title="Portfolio Balancer API",
     description="API for managing and balancing investment portfolios",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Prometheus metrics
 try:
     from prometheus_fastapi_instrumentator import Instrumentator
+
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 except ImportError:
-    logger.info("prometheus-fastapi-instrumentator not installed, /metrics endpoint disabled")
+    logger.info(
+        "prometheus-fastapi-instrumentator not installed, /metrics endpoint disabled"
+    )
 
 # Configure CORS
 app.add_middleware(
@@ -152,7 +182,9 @@ app.add_exception_handler(Exception, general_exception_handler)
 # Include routers
 app.include_router(portfolio.router, prefix="/api/v1/portfolios", tags=["portfolio"])
 app.include_router(deposits.router, prefix="/api/v1/portfolios", tags=["deposits"])
-app.include_router(transactions.router, prefix="/api/v1/portfolios", tags=["transactions"])
+app.include_router(
+    transactions.router, prefix="/api/v1/portfolios", tags=["transactions"]
+)
 app.include_router(stocks.router, prefix="/api/v1/stocks", tags=["stocks"])
 app.include_router(dev.router, prefix="/api/v1/dev", tags=["dev"])
 app.include_router(net_worth.router, prefix="/api/v1/net-worth", tags=["net-worth"])
@@ -160,16 +192,14 @@ app.include_router(equity.router, prefix="/api/v1/equity", tags=["equity"])
 app.include_router(savings.router, prefix="/api/v1/savings", tags=["savings"])
 app.include_router(crypto.router, prefix="/api/v1/crypto", tags=["crypto"])
 
+
 @app.get("/")
 async def root():
     """
     Root endpoint - API health check
     """
-    return {
-        "message": "Portfolio Balancer API",
-        "status": "online",
-        "version": "1.0.0"
-    }
+    return {"message": "Portfolio Balancer API", "status": "online", "version": "1.0.0"}
+
 
 @app.get("/api/health")
 async def health_check():
@@ -189,8 +219,9 @@ async def health_check():
         "status": status,
         "database": "ok" if db_ok else "unreachable",
         "stocks_count": len(DatabaseService.stocks),
-        "positions_count": sum(len(pp) for pp in DatabaseService.positions.values())
+        "positions_count": sum(len(pp) for pp in DatabaseService.positions.values()),
     }
+
 
 @app.get("/api/health/db")
 async def db_health():
@@ -203,7 +234,7 @@ async def db_health():
         return {
             "status": "ok" if not missing else "warning",
             "missing_objects": missing,
-            **stats
+            **stats,
         }
     except Exception as e:
         logger.error("DB health check failed: %s", e)

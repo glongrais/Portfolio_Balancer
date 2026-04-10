@@ -12,9 +12,11 @@ from utils.db_utils import get_connection
 
 logger = logging.getLogger(__name__)
 
-class DatabaseService:
 
-    INCOME_TYPES = ('DIVIDEND', 'STAKING')
+class DatabaseService:
+    INCOME_TYPES = ("DIVIDEND", "STAKING")
+
+    DEFAULT_INDEXES = ["^FCHI", "^GSPC", "^STOXX50E", "^FTSE"]
 
     symbol_map: Dict[str, int] = {}
     stocks: Dict[int, Stock] = {}
@@ -36,10 +38,11 @@ class DatabaseService:
         if symbol in cls.symbol_map:
             logger.warning("addStock(): Stock %s already in the database", symbol)
             return cls.symbol_map[symbol]
-        
+
         ticker_info = StockAPI.get_current_price(symbol)
         with get_connection(DB_PATH) as connection:
-            connection.execute('''
+            connection.execute(
+                """
             INSERT INTO stocks (symbol, name, price, currency, market_cap, sector, industry, country, previous_close, dividend, dividend_yield, logo_url, quote_type, ex_dividend_date)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(symbol) DO UPDATE SET
@@ -56,28 +59,30 @@ class DatabaseService:
                 logo_url=excluded.logo_url,
                 quote_type=excluded.quote_type,
                 ex_dividend_date=excluded.ex_dividend_date
-            ''', (
-                ticker_info["symbol"],
-                ticker_info.get("longName", ""),
-                ticker_info.get("currentPrice", None),
-                ticker_info.get("currency", ""),
-                ticker_info.get("marketCap", None),
-                ticker_info.get("sector", ""),
-                ticker_info.get("industry", ""),
-                ticker_info.get("country", ""),
-                ticker_info.get("previousClose", 0),
-                ticker_info.get("dividendRate", 0),
-                ticker_info.get("dividendYield", 0),
-                ticker_info.get("logo_url", ""),
-                ticker_info.get("quoteType", "EQUITY"),
-                ticker_info.get("exDividendDate"),
-            ))
+            """,
+                (
+                    ticker_info["symbol"],
+                    ticker_info.get("longName", ""),
+                    ticker_info.get("currentPrice", None),
+                    ticker_info.get("currency", ""),
+                    ticker_info.get("marketCap", None),
+                    ticker_info.get("sector", ""),
+                    ticker_info.get("industry", ""),
+                    ticker_info.get("country", ""),
+                    ticker_info.get("previousClose", 0),
+                    ticker_info.get("dividendRate", 0),
+                    ticker_info.get("dividendYield", 0),
+                    ticker_info.get("logo_url", ""),
+                    ticker_info.get("quoteType", "EQUITY"),
+                    ticker_info.get("exDividendDate"),
+                ),
+            )
             connection.commit()
-        
+
         stockid = cls.getStock(symbol=symbol)
         logger.info("addStock(): %s added in the database", symbol)
         return stockid
-    
+
     @classmethod
     def updateStocksPrice(cls) -> None:
         """
@@ -96,13 +101,20 @@ class DatabaseService:
                 if logo_url and not stock.logo_url:
                     stock.logo_url = logo_url
                 connection.execute(
-                    'UPDATE stocks SET price=?, previous_close=?, dividend=?, dividend_yield=?, logo_url=? WHERE stockid=?',
-                    (info["currentPrice"], stock.previous_close, stock.dividend, stock.dividend_yield, stock.logo_url, stockid,)
+                    "UPDATE stocks SET price=?, previous_close=?, dividend=?, dividend_yield=?, logo_url=? WHERE stockid=?",
+                    (
+                        info["currentPrice"],
+                        stock.previous_close,
+                        stock.dividend,
+                        stock.dividend_yield,
+                        stock.logo_url,
+                        stockid,
+                    ),
                 )
                 log_count += 1
             connection.commit()
         logger.info("updateStocksPrice(): Price updated for %d stock(s)", log_count)
-    
+
     @classmethod
     def getStocks(cls) -> None:
         """
@@ -128,31 +140,43 @@ class DatabaseService:
         :return: The stockid if the stock was found and updated in the cache, -1 otherwise.
         """
         if stockid is None and symbol is None:
-            logger.error("getStock(): At least one parameter (stockid or symbol) must be set.")
+            logger.error(
+                "getStock(): At least one parameter (stockid or symbol) must be set."
+            )
             return -1
         if stockid is not None and symbol is not None:
-            logger.warning("getStock(): Both stockid and symbol are set; the search will be done using stockid.")
+            logger.warning(
+                "getStock(): Both stockid and symbol are set; the search will be done using stockid."
+            )
         with get_connection(DB_PATH) as connection:
             connection.row_factory = Stock.dataclass_factory
             if stockid is not None:
-                answers = connection.execute("SELECT * FROM mar__stocks WHERE stockid = ?", (stockid,))
+                answers = connection.execute(
+                    "SELECT * FROM mar__stocks WHERE stockid = ?", (stockid,)
+                )
             else:
-                answers = connection.execute("SELECT * FROM mar__stocks WHERE symbol = ?", (symbol,))
+                answers = connection.execute(
+                    "SELECT * FROM mar__stocks WHERE symbol = ?", (symbol,)
+                )
         log_count = 0
         result = -1
         for answer in answers:
             cls.stocks[answer.stockid] = answer
             cls.symbol_map[answer.symbol] = answer.stockid
             result = answer.stockid
-            log_count +=1
+            log_count += 1
         if log_count == 0:
             if stockid is not None:
-                logger.warning("getStock(): Stock with stockid %d not in databse", stockid)
+                logger.warning(
+                    "getStock(): Stock with stockid %d not in databse", stockid
+                )
             else:
-                logger.warning("getStock(): Stock with symbol %s not in databse", symbol)
+                logger.warning(
+                    "getStock(): Stock with symbol %s not in databse", symbol
+                )
             return -1
         return result
-    
+
     @classmethod
     def updatePortfolioPositionsPrice(cls) -> None:
         """
@@ -166,13 +190,18 @@ class DatabaseService:
                     all_positions[stockid] = position
 
         if not all_positions:
-            logger.warning("updatePortfolioPositionsPrice(): No position in the portfolio")
+            logger.warning(
+                "updatePortfolioPositionsPrice(): No position in the portfolio"
+            )
             return
 
         def update_single_position(position_data):
             stockid, position = position_data
             if position.stock is None:
-                logger.warning("updatePortfolioPositionsPrice(): Position %d has no stock set. Skipping price update for this position", stockid)
+                logger.warning(
+                    "updatePortfolioPositionsPrice(): Position %d has no stock set. Skipping price update for this position",
+                    stockid,
+                )
                 return None
 
             info = StockAPI.get_current_price(position.stock.symbol)
@@ -188,8 +217,13 @@ class DatabaseService:
 
         # Run price updates in parallel
         with ThreadPoolExecutor() as executor:
-            future_to_position = {executor.submit(update_single_position, (stockid, position)):
-                                (stockid, position) for stockid, position in all_positions.items()}
+            future_to_position = {
+                executor.submit(update_single_position, (stockid, position)): (
+                    stockid,
+                    position,
+                )
+                for stockid, position in all_positions.items()
+            }
 
             # Update database with results
             with get_connection(DB_PATH) as connection:
@@ -199,14 +233,34 @@ class DatabaseService:
                         stockid, info = result
                         connection.execute(
                             "UPDATE stocks SET price=?,previous_close=?,dividend=?,dividend_yield=?,name=?,currency=?,market_cap=?,sector=?,industry=?,country=?,logo_url=?,quote_type=?,ex_dividend_date=? WHERE stockid=?",
-                            (info["currentPrice"], info.get("previousClose", 0), info.get("dividendRate", 0), info.get("dividendYield", 0),
-                             info["longName"], info["currency"], info["marketCap"],
-                             info["sector"], info["industry"], info["country"],
-                             info.get("logo_url", ""), info.get("quoteType", "EQUITY"),
-                             info.get("exDividendDate"), stockid,)
+                            (
+                                info["currentPrice"],
+                                info.get("previousClose", 0),
+                                info.get("dividendRate", 0),
+                                info.get("dividendYield", 0),
+                                info["longName"],
+                                info["currency"],
+                                info["marketCap"],
+                                info["sector"],
+                                info["industry"],
+                                info["country"],
+                                info.get("logo_url", ""),
+                                info.get("quoteType", "EQUITY"),
+                                info.get("exDividendDate"),
+                                stockid,
+                            ),
                         )
                 connection.commit()
-    
+
+    @classmethod
+    def ensureIndexes(cls) -> None:
+        """
+        Ensures that default index tickers are present in the database.
+        """
+        for symbol in cls.DEFAULT_INDEXES:
+            cls.addStock(symbol)
+        logger.info("ensureIndexes(): Default indexes verified/added")
+
     @classmethod
     def getPositions(cls) -> None:
         """
@@ -223,7 +277,10 @@ class DatabaseService:
                 if cls.getStock(stockid=answer.stockid) > -1:
                     answer.stock = cls.stocks[answer.stockid]
                 else:
-                    logger.error("getPosition(): Stock with id %d not in the database", answer.stockid)
+                    logger.error(
+                        "getPosition(): Stock with id %d not in the database",
+                        answer.stockid,
+                    )
             else:
                 answer.stock = cls.stocks[answer.stockid]
             pid = answer.portfolio_id
@@ -231,10 +288,19 @@ class DatabaseService:
                 cls.positions[pid] = {}
             cls.positions[pid][answer.stockid] = answer
             log_count += 1
-        logger.info("getPosition(): %d portfolio position(s) fetched from the database", log_count)
-    
+        logger.info(
+            "getPosition(): %d portfolio position(s) fetched from the database",
+            log_count,
+        )
+
     @classmethod
-    def addPosition(cls, symbol, quantity: float, distribution_target: float=None, portfolio_id: int=1) -> None:
+    def addPosition(
+        cls,
+        symbol,
+        quantity: float,
+        distribution_target: float = None,
+        portfolio_id: int = 1,
+    ) -> None:
         """
         Add a new position in the portfolio database and in-memory cache.
 
@@ -245,20 +311,41 @@ class DatabaseService:
 
         portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
         if stockid in portfolio_positions:
-            logger.warning("addPosition(): Position %s already in portfolio %d", symbol, portfolio_id)
+            logger.warning(
+                "addPosition(): Position %s already in portfolio %d",
+                symbol,
+                portfolio_id,
+            )
             return
         with get_connection(DB_PATH) as connection:
-            connection.execute("INSERT INTO positions (stockid, quantity, distribution_target, portfolio_id) VALUES (?, ?, ?, ?)", (stockid, quantity, distribution_target, portfolio_id))
+            connection.execute(
+                "INSERT INTO positions (stockid, quantity, distribution_target, portfolio_id) VALUES (?, ?, ?, ?)",
+                (stockid, quantity, distribution_target, portfolio_id),
+            )
             connection.commit()
         if portfolio_id not in cls.positions:
             cls.positions[portfolio_id] = {}
-        cls.positions[portfolio_id][stockid] = Position(stockid=stockid, quantity=quantity,
-                                          distribution_target=distribution_target,
-                                          stock=cls.stocks[stockid], portfolio_id=portfolio_id)
-        logger.info("addPosition(): Added position %s to portfolio %d", symbol, portfolio_id)
+        cls.positions[portfolio_id][stockid] = Position(
+            stockid=stockid,
+            quantity=quantity,
+            distribution_target=distribution_target,
+            stock=cls.stocks[stockid],
+            portfolio_id=portfolio_id,
+        )
+        logger.info(
+            "addPosition(): Added position %s to portfolio %d", symbol, portfolio_id
+        )
 
     @classmethod
-    def updatePosition(cls, symbol, quantity: float=None, average_cost_basis: float=None, distribution_target: float=None, distribution_real: float=None, portfolio_id: int=1) -> None:
+    def updatePosition(
+        cls,
+        symbol,
+        quantity: float = None,
+        average_cost_basis: float = None,
+        distribution_target: float = None,
+        distribution_real: float = None,
+        portfolio_id: int = 1,
+    ) -> None:
         """
         Update an existing position in the portfolio database and in-memory cache.
 
@@ -275,7 +362,11 @@ class DatabaseService:
         stockid = cls.symbol_map[symbol]
         portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
         if stockid not in portfolio_positions:
-            logger.warning("updatePosition(): Position %s not in portfolio %d", symbol, portfolio_id)
+            logger.warning(
+                "updatePosition(): Position %s not in portfolio %d",
+                symbol,
+                portfolio_id,
+            )
             return
 
         position = portfolio_positions[stockid]
@@ -299,11 +390,17 @@ class DatabaseService:
             fields_to_update.append("average_cost_basis = ?")
             params.append(average_cost_basis)
         if not fields_to_update:
-            logger.warning("updatePosition(): No fields to update for position %s", symbol)
+            logger.warning(
+                "updatePosition(): No fields to update for position %s", symbol
+            )
             return
 
         params.extend([stockid, portfolio_id])
-        query = "UPDATE positions SET " + ", ".join(fields_to_update) + " WHERE stockid = ? AND portfolio_id = ?"
+        query = (
+            "UPDATE positions SET "
+            + ", ".join(fields_to_update)
+            + " WHERE stockid = ? AND portfolio_id = ?"
+        )
 
         with get_connection(DB_PATH) as connection:
             connection.execute(query, params)
@@ -311,11 +408,18 @@ class DatabaseService:
 
         logger.debug(
             "updatePosition(): Position %s updated in portfolio %d. Quantity: %s, Average cost basis: %s, Distribution target: %s, Distribution real: %s",
-            symbol, portfolio_id, position.quantity, position.average_cost_basis, position.distribution_target, position.distribution_real
+            symbol,
+            portfolio_id,
+            position.quantity,
+            position.average_cost_basis,
+            position.distribution_target,
+            position.distribution_real,
         )
 
     @classmethod
-    def batchUpdatePositionDistribution(cls, portfolio_id: int, updates: List[tuple]) -> None:
+    def batchUpdatePositionDistribution(
+        cls, portfolio_id: int, updates: List[tuple]
+    ) -> None:
         """
         Batch updates `distribution_real` for multiple positions in one transaction.
 
@@ -329,13 +433,14 @@ class DatabaseService:
             for stockid, distribution_real in updates:
                 connection.execute(
                     "UPDATE positions SET distribution_real = ? WHERE stockid = ? AND portfolio_id = ?",
-                    (distribution_real, stockid, portfolio_id)
+                    (distribution_real, stockid, portfolio_id),
                 )
             connection.commit()
 
         logger.debug(
             "batchUpdatePositionDistribution(): Updated %d position(s) in portfolio %d",
-            len(updates), portfolio_id
+            len(updates),
+            portfolio_id,
         )
 
     @classmethod
@@ -355,7 +460,9 @@ class DatabaseService:
         stockid = cls.symbol_map[symbol]
         portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
         if stockid not in portfolio_positions:
-            raise KeyError(f"Position for '{symbol}' not found in portfolio {portfolio_id}")
+            raise KeyError(
+                f"Position for '{symbol}' not found in portfolio {portfolio_id}"
+            )
 
         current_qty = portfolio_positions[stockid].quantity
         if current_qty != 0:
@@ -364,11 +471,18 @@ class DatabaseService:
             )
 
         with get_connection(DB_PATH) as connection:
-            connection.execute("DELETE FROM positions WHERE stockid = ? AND portfolio_id = ?", (stockid, portfolio_id))
+            connection.execute(
+                "DELETE FROM positions WHERE stockid = ? AND portfolio_id = ?",
+                (stockid, portfolio_id),
+            )
             connection.commit()
 
         del cls.positions[portfolio_id][stockid]
-        logger.info("removePosition(): Removed position %s from portfolio %d", symbol, portfolio_id)
+        logger.info(
+            "removePosition(): Removed position %s from portfolio %d",
+            symbol,
+            portfolio_id,
+        )
 
     @classmethod
     def getPortfolios(cls) -> list:
@@ -403,12 +517,21 @@ class DatabaseService:
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "SELECT date, rate FROM fx_rates_history WHERE pair = ? AND date <= ? ORDER BY date ASC",
-                (pair, end_date)
+                (pair, end_date),
             )
             return {row[0]: row[1] for row in cursor.fetchall()}
 
     @classmethod
-    def upsertTransactions(cls, date: datetime, rowid: int = None, type: str = '', symbol: str = '', quantity: float = 0, price: float = 0, portfolio_id: int = 1) -> None:
+    def upsertTransactions(
+        cls,
+        date: datetime,
+        rowid: int = None,
+        type: str = "",
+        symbol: str = "",
+        quantity: float = 0,
+        price: float = 0,
+        portfolio_id: int = 1,
+    ) -> None:
         """
         Add or update a transaction in the database.
         For buy/sell transactions, automatically updates position quantity if the position exists.
@@ -425,7 +548,7 @@ class DatabaseService:
             with get_connection(DB_PATH) as connection:
                 cursor = connection.execute(
                     "SELECT COALESCE(MAX(rowid), 0) + 1 FROM transactions WHERE portfolioid = ?",
-                    (portfolio_id,)
+                    (portfolio_id,),
                 )
                 rowid = cursor.fetchone()[0]
 
@@ -436,7 +559,7 @@ class DatabaseService:
         portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
 
         # Validate sell quantity before inserting the transaction
-        if type == 'SELL' and stockid in portfolio_positions:
+        if type == "SELL" and stockid in portfolio_positions:
             current_qty = portfolio_positions[stockid].quantity
             if quantity > current_qty:
                 raise ValueError(
@@ -447,33 +570,58 @@ class DatabaseService:
             cursor = connection.execute(
                 "INSERT INTO transactions (stockid, portfolioid, rowid, quantity, price, type, datestamp) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(portfolioid, rowid) DO NOTHING",
-                (stockid, portfolio_id, rowid, quantity, price, type, date,)
+                (
+                    stockid,
+                    portfolio_id,
+                    rowid,
+                    quantity,
+                    price,
+                    type,
+                    date,
+                ),
             )
             connection.commit()
             rows_inserted = cursor.rowcount
 
-        logger.info("upsertTransactions(): Transaction added for stock %s in portfolio %d", symbol, portfolio_id)
+        logger.info(
+            "upsertTransactions(): Transaction added for stock %s in portfolio %d",
+            symbol,
+            portfolio_id,
+        )
 
         # Auto-update position quantity if a row was actually inserted
         if rows_inserted > 0 and stockid in portfolio_positions:
             old_qty = portfolio_positions[stockid].quantity
-            if type == 'SELL':
+            if type == "SELL":
                 new_qty = old_qty - quantity
                 cls.updatePosition(symbol, quantity=new_qty, portfolio_id=portfolio_id)
                 logger.info(
                     "upsertTransactions(): Sold %d shares of %s. Position quantity: %d -> %d",
-                    quantity, symbol, old_qty, new_qty
+                    quantity,
+                    symbol,
+                    old_qty,
+                    new_qty,
                 )
-            elif type in ('BUY', 'STAKING'):
+            elif type in ("BUY", "STAKING"):
                 new_qty = old_qty + quantity
                 cls.updatePosition(symbol, quantity=new_qty, portfolio_id=portfolio_id)
                 logger.info(
                     "upsertTransactions(): %s %d shares of %s. Position quantity: %d -> %d",
-                    type.capitalize(), quantity, symbol, old_qty, new_qty
+                    type.capitalize(),
+                    quantity,
+                    symbol,
+                    old_qty,
+                    new_qty,
                 )
 
     @classmethod
-    def getTransactions(cls, symbol: str = None, transaction_type: str = None, limit: int = 100, portfolio_id: int = 1) -> list:
+    def getTransactions(
+        cls,
+        symbol: str = None,
+        transaction_type: str = None,
+        limit: int = 100,
+        portfolio_id: int = 1,
+    ) -> list:
         """
         Fetches transaction history from the database with optional filtering.
 
@@ -483,8 +631,10 @@ class DatabaseService:
         :param portfolio_id: The portfolio to fetch transactions for.
         :return: List of transaction dicts.
         """
-        query = ("SELECT t.transactionid, t.stockid, s.symbol, t.quantity, t.price, t.type, t.datestamp, s.name "
-                 "FROM transactions t JOIN stocks s ON t.stockid = s.stockid")
+        query = (
+            "SELECT t.transactionid, t.stockid, s.symbol, t.quantity, t.price, t.type, t.datestamp, s.name "
+            "FROM transactions t JOIN stocks s ON t.stockid = s.stockid"
+        )
         params = []
         conditions = ["t.portfolioid = ?"]
         params.append(portfolio_id)
@@ -581,7 +731,10 @@ class DatabaseService:
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "SELECT depositid, datestamp, amount, portfolioid, currency FROM deposits WHERE portfolioid = ? ORDER BY datestamp DESC LIMIT ?",
-                (portfolio_id, limit,)
+                (
+                    portfolio_id,
+                    limit,
+                ),
             )
             rows = cursor.fetchall()
         return [
@@ -604,7 +757,10 @@ class DatabaseService:
         :return: Total deposit amount.
         """
         with get_connection(DB_PATH) as connection:
-            cursor = connection.execute("SELECT COALESCE(SUM(amount), 0) FROM deposits WHERE portfolioid = ?", (portfolio_id,))
+            cursor = connection.execute(
+                "SELECT COALESCE(SUM(amount), 0) FROM deposits WHERE portfolioid = ?",
+                (portfolio_id,),
+            )
             total = cursor.fetchone()[0]
         return round(total, 2)
 
@@ -621,7 +777,7 @@ class DatabaseService:
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "INSERT INTO deposits (datestamp, amount, portfolioid, currency) VALUES (?, ?, ?, 'EUR')",
-                (datestamp, amount, portfolio_id)
+                (datestamp, amount, portfolio_id),
             )
             connection.commit()
             deposit_id = cursor.lastrowid
@@ -666,12 +822,12 @@ class DatabaseService:
         :return: Dict with the created asset data.
         :raises ValueError: If an asset with this id already exists.
         """
-        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
         try:
             with get_connection(DB_PATH) as connection:
                 connection.execute(
                     "INSERT INTO net_worth_assets (id, label, current_value, updated_at) VALUES (?, ?, ?, ?)",
-                    (id, label, current_value, today)
+                    (id, label, current_value, today),
                 )
                 connection.commit()
         except sqlite3.IntegrityError:
@@ -684,7 +840,9 @@ class DatabaseService:
         }
 
     @classmethod
-    def updateNetWorthAsset(cls, id: str, label: str = None, current_value: float = None) -> dict:
+    def updateNetWorthAsset(
+        cls, id: str, label: str = None, current_value: float = None
+    ) -> dict:
         """
         Updates an existing net worth asset category.
 
@@ -697,7 +855,7 @@ class DatabaseService:
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "SELECT id, label, current_value, updated_at FROM net_worth_assets WHERE id = ?",
-                (id,)
+                (id,),
             )
             row = cursor.fetchone()
             if not row:
@@ -708,11 +866,11 @@ class DatabaseService:
 
             new_label = label if label is not None else current_label
             new_value = current_value if current_value is not None else current_val
-            today = datetime.datetime.now().strftime('%Y-%m-%d')
+            today = datetime.datetime.now().strftime("%Y-%m-%d")
 
             connection.execute(
                 "UPDATE net_worth_assets SET label = ?, current_value = ?, updated_at = ? WHERE id = ?",
-                (new_label, new_value, today, id)
+                (new_label, new_value, today, id),
             )
             connection.commit()
 
@@ -741,9 +899,7 @@ class DatabaseService:
             connection.execute(
                 "DELETE FROM net_worth_snapshots WHERE asset_id = ?", (id,)
             )
-            connection.execute(
-                "DELETE FROM net_worth_assets WHERE id = ?", (id,)
-            )
+            connection.execute("DELETE FROM net_worth_assets WHERE id = ?", (id,))
             connection.commit()
 
     @classmethod
@@ -759,13 +915,10 @@ class DatabaseService:
             cursor = connection.execute(
                 "SELECT date, asset_id, value FROM net_worth_snapshots "
                 "WHERE date >= ? AND date <= ? ORDER BY date ASC",
-                (start_date, end_date)
+                (start_date, end_date),
             )
             rows = cursor.fetchall()
-        return [
-            {"date": row[0], "asset_id": row[1], "value": row[2]}
-            for row in rows
-        ]
+        return [{"date": row[0], "asset_id": row[1], "value": row[2]} for row in rows]
 
     @classmethod
     def getNetWorthSnapshotBoundaries(cls, start_date: str, end_date: str) -> dict:
@@ -785,7 +938,7 @@ class DatabaseService:
                 "  SELECT MAX(date) FROM net_worth_snapshots s2 "
                 "  WHERE s2.asset_id = s1.asset_id AND s2.date <= ?"
                 ") ORDER BY asset_id",
-                (start_date, start_date)
+                (start_date, start_date),
             )
             for row in cursor.fetchall():
                 result.setdefault(row[0], {"before": None, "after": None})
@@ -798,7 +951,7 @@ class DatabaseService:
                 "  SELECT MIN(date) FROM net_worth_snapshots s2 "
                 "  WHERE s2.asset_id = s1.asset_id AND s2.date >= ?"
                 ") ORDER BY asset_id",
-                (end_date, end_date)
+                (end_date, end_date),
             )
             for row in cursor.fetchall():
                 result.setdefault(row[0], {"before": None, "after": None})
@@ -819,7 +972,7 @@ class DatabaseService:
             connection.execute(
                 "INSERT INTO net_worth_snapshots (date, asset_id, value) VALUES (?, ?, ?) "
                 "ON CONFLICT(date, asset_id) DO UPDATE SET value = excluded.value",
-                (date, asset_id, value)
+                (date, asset_id, value),
             )
             connection.commit()
 
@@ -830,7 +983,7 @@ class DatabaseService:
 
         :return: List of grant dicts with vested/unvested computation.
         """
-        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
 
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
@@ -849,17 +1002,19 @@ class DatabaseService:
         result = []
         for grant in grants:
             grant_id, name, stockid, total_shares, grant_date, grant_price = grant
-            result.append(cls._buildEquityGrantDict(
-                grant_id,
-                name,
-                stockid,
-                total_shares,
-                grant_date,
-                grant_price,
-                today,
-                vesting_events=events_by_grant.get(grant_id),
-                market_data=market_data.get(stockid),
-            ))
+            result.append(
+                cls._buildEquityGrantDict(
+                    grant_id,
+                    name,
+                    stockid,
+                    total_shares,
+                    grant_date,
+                    grant_price,
+                    today,
+                    vesting_events=events_by_grant.get(grant_id),
+                    market_data=market_data.get(stockid),
+                )
+            )
         return result
 
     @classmethod
@@ -876,7 +1031,7 @@ class DatabaseService:
             rows = connection.execute(
                 f"SELECT id, grant_id, date, shares, taxed_shares FROM equity_vesting_events "
                 f"WHERE grant_id IN ({placeholders}) ORDER BY grant_id ASC, date ASC",
-                grant_ids
+                grant_ids,
             ).fetchall()
 
         for row in rows:
@@ -939,12 +1094,12 @@ class DatabaseService:
         :return: Grant dict with vested/unvested computation.
         :raises KeyError: If the grant is not found.
         """
-        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
 
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "SELECT id, name, stockid, total_shares, grant_date, grant_price FROM equity_grants WHERE id = ?",
-                (grant_id,)
+                (grant_id,),
             )
             row = cursor.fetchone()
 
@@ -1001,7 +1156,7 @@ class DatabaseService:
                 cursor = connection.execute(
                     "SELECT id, grant_id, date, shares, taxed_shares FROM equity_vesting_events "
                     "WHERE grant_id = ? ORDER BY date ASC",
-                    (grant_id,)
+                    (grant_id,),
                 )
                 events = cursor.fetchall()
 
@@ -1011,15 +1166,17 @@ class DatabaseService:
             taxed = event[4] if event[4] else 0
             net = round(event[3] - taxed, 10)
             is_vested = event[2] <= today
-            vesting_events.append({
-                "id": event[0],
-                "grant_id": event[1],
-                "date": event[2],
-                "shares": event[3],
-                "taxed_shares": taxed,
-                "net_shares": net,
-                "vested": is_vested,
-            })
+            vesting_events.append(
+                {
+                    "id": event[0],
+                    "grant_id": event[1],
+                    "date": event[2],
+                    "shares": event[3],
+                    "taxed_shares": taxed,
+                    "net_shares": net,
+                    "vested": is_vested,
+                }
+            )
             if is_vested:
                 vested_shares += net
 
@@ -1028,7 +1185,11 @@ class DatabaseService:
         unvested_value = round(unvested_shares * share_price, 2)
         total_value = round(total_shares * share_price, 2)
         gain_loss = round((share_price - grant_price) * vested_shares, 2)
-        gain_loss_pct = round((share_price - grant_price) / grant_price * 100, 2) if grant_price > 0 else 0.0
+        gain_loss_pct = (
+            round((share_price - grant_price) / grant_price * 100, 2)
+            if grant_price > 0
+            else 0.0
+        )
 
         return {
             "id": grant_id,
@@ -1052,7 +1213,15 @@ class DatabaseService:
         }
 
     @classmethod
-    def addEquityGrant(cls, name: str, symbol: str, total_shares: float, grant_date: str, grant_price: float, vesting_events: list) -> dict:
+    def addEquityGrant(
+        cls,
+        name: str,
+        symbol: str,
+        total_shares: float,
+        grant_date: str,
+        grant_price: float,
+        vesting_events: list,
+    ) -> dict:
         """
         Creates a new equity grant with optional vesting events.
 
@@ -1076,14 +1245,19 @@ class DatabaseService:
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "INSERT INTO equity_grants (name, stockid, total_shares, grant_date, grant_price) VALUES (?, ?, ?, ?, ?)",
-                (name, stockid, total_shares, grant_date, grant_price)
+                (name, stockid, total_shares, grant_date, grant_price),
             )
             grant_id = cursor.lastrowid
 
             for event in vesting_events:
                 connection.execute(
                     "INSERT INTO equity_vesting_events (grant_id, date, shares, taxed_shares) VALUES (?, ?, ?, ?)",
-                    (grant_id, event["date"], event["shares"], event.get("taxed_shares", 0))
+                    (
+                        grant_id,
+                        event["date"],
+                        event["shares"],
+                        event.get("taxed_shares", 0),
+                    ),
                 )
             connection.commit()
 
@@ -1108,8 +1282,7 @@ class DatabaseService:
 
             if name is not None:
                 connection.execute(
-                    "UPDATE equity_grants SET name = ? WHERE id = ?",
-                    (name, grant_id)
+                    "UPDATE equity_grants SET name = ? WHERE id = ?", (name, grant_id)
                 )
                 connection.commit()
 
@@ -1133,13 +1306,13 @@ class DatabaseService:
             connection.execute(
                 "DELETE FROM equity_vesting_events WHERE grant_id = ?", (grant_id,)
             )
-            connection.execute(
-                "DELETE FROM equity_grants WHERE id = ?", (grant_id,)
-            )
+            connection.execute("DELETE FROM equity_grants WHERE id = ?", (grant_id,))
             connection.commit()
 
     @classmethod
-    def addEquityVestingEvent(cls, grant_id: int, date: str, shares: float, taxed_shares: float = 0) -> dict:
+    def addEquityVestingEvent(
+        cls, grant_id: int, date: str, shares: float, taxed_shares: float = 0
+    ) -> dict:
         """
         Adds a vesting event to a grant.
 
@@ -1163,7 +1336,7 @@ class DatabaseService:
 
             cursor = connection.execute(
                 "SELECT COALESCE(SUM(shares), 0) FROM equity_vesting_events WHERE grant_id = ?",
-                (grant_id,)
+                (grant_id,),
             )
             current_total = cursor.fetchone()[0]
 
@@ -1175,12 +1348,12 @@ class DatabaseService:
 
             cursor = connection.execute(
                 "INSERT INTO equity_vesting_events (grant_id, date, shares, taxed_shares) VALUES (?, ?, ?, ?)",
-                (grant_id, date, shares, taxed_shares)
+                (grant_id, date, shares, taxed_shares),
             )
             event_id = cursor.lastrowid
             connection.commit()
 
-        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
         return {
             "id": event_id,
             "grant_id": grant_id,
@@ -1192,7 +1365,13 @@ class DatabaseService:
         }
 
     @classmethod
-    def updateEquityVestingEvent(cls, event_id: int, date: str = None, shares: float = None, taxed_shares: float = None) -> dict:
+    def updateEquityVestingEvent(
+        cls,
+        event_id: int,
+        date: str = None,
+        shares: float = None,
+        taxed_shares: float = None,
+    ) -> dict:
         """
         Updates a vesting event.
 
@@ -1207,7 +1386,7 @@ class DatabaseService:
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "SELECT id, grant_id, date, shares, taxed_shares FROM equity_vesting_events WHERE id = ?",
-                (event_id,)
+                (event_id,),
             )
             row = cursor.fetchone()
             if not row:
@@ -1221,14 +1400,15 @@ class DatabaseService:
             # Validate total doesn't exceed total_shares if shares changed
             if shares is not None:
                 cursor = connection.execute(
-                    "SELECT total_shares FROM equity_grants WHERE id = ?", (current_grant_id,)
+                    "SELECT total_shares FROM equity_grants WHERE id = ?",
+                    (current_grant_id,),
                 )
                 total_shares = cursor.fetchone()[0]
 
                 cursor = connection.execute(
                     "SELECT COALESCE(SUM(shares), 0) FROM equity_vesting_events "
                     "WHERE grant_id = ? AND id != ?",
-                    (current_grant_id, event_id)
+                    (current_grant_id, event_id),
                 )
                 other_total = cursor.fetchone()[0]
 
@@ -1240,11 +1420,11 @@ class DatabaseService:
 
             connection.execute(
                 "UPDATE equity_vesting_events SET date = ?, shares = ?, taxed_shares = ? WHERE id = ?",
-                (new_date, new_shares, new_taxed, event_id)
+                (new_date, new_shares, new_taxed, event_id),
             )
             connection.commit()
 
-        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
         return {
             "id": event_id,
             "grant_id": current_grant_id,
@@ -1282,7 +1462,7 @@ class DatabaseService:
 
         :return: Total vested value in EUR.
         """
-        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        today = datetime.datetime.now().strftime("%Y-%m-%d")
         total = 0.0
 
         with get_connection(DB_PATH) as connection:
@@ -1334,7 +1514,11 @@ class DatabaseService:
             total_gain_loss += g["gain_loss"]
             total_grant_cost += g["vested_shares"] * g["grant_price"]
 
-        total_gain_loss_pct = round(total_gain_loss / total_grant_cost * 100, 2) if total_grant_cost > 0 else 0.0
+        total_gain_loss_pct = (
+            round(total_gain_loss / total_grant_cost * 100, 2)
+            if total_grant_cost > 0
+            else 0.0
+        )
         currency = grants[0]["currency"] if grants else "USD"
 
         return {
@@ -1347,7 +1531,13 @@ class DatabaseService:
         }
 
     @classmethod
-    def getEquityValueHistory(cls, start_date: str, end_date: str, target_dates: list = None, convert_to_eur: bool = False) -> list:
+    def getEquityValueHistory(
+        cls,
+        start_date: str,
+        end_date: str,
+        target_dates: list = None,
+        convert_to_eur: bool = False,
+    ) -> list:
         """
         Computes historical equity vested value for a set of target dates.
 
@@ -1386,7 +1576,7 @@ class DatabaseService:
                     f"SELECT stockid, datestamp, closeprice FROM historicalstocks "
                     f"WHERE stockid IN ({placeholders}) AND datestamp <= ? "
                     f"ORDER BY stockid ASC, datestamp ASC",
-                    params
+                    params,
                 ).fetchall()
             for row in rows:
                 prices_by_stockid[row[0]].append((row[1], row[2]))
@@ -1394,7 +1584,13 @@ class DatabaseService:
         # Preload FX rates by pair once (only for convert_to_eur mode).
         fx_by_pair = {}
         if convert_to_eur:
-            pairs = sorted({f"{currency}EUR" for _, _, currency in grants if currency and currency != "EUR"})
+            pairs = sorted(
+                {
+                    f"{currency}EUR"
+                    for _, _, currency in grants
+                    if currency and currency != "EUR"
+                }
+            )
             if pairs:
                 placeholders = ",".join(["?"] * len(pairs))
                 params = pairs + [end_date]
@@ -1403,7 +1599,7 @@ class DatabaseService:
                         f"SELECT pair, date, rate FROM fx_rates_history "
                         f"WHERE pair IN ({placeholders}) AND date <= ? "
                         f"ORDER BY pair ASC, date ASC",
-                        params
+                        params,
                     ).fetchall()
                 tmp = defaultdict(dict)
                 for pair, date, rate in rows:
@@ -1488,7 +1684,11 @@ class DatabaseService:
                     if date_str in fx_lookup:
                         last_fx = fx_lookup[date_str]
 
-                value = cumulative_vested * last_price * (last_fx if convert_to_eur else 1.0)
+                value = (
+                    cumulative_vested
+                    * last_price
+                    * (last_fx if convert_to_eur else 1.0)
+                )
                 result[date_str] = result.get(date_str, 0.0) + value
 
         return sorted(result.items())
@@ -1519,13 +1719,17 @@ class DatabaseService:
                     connection.execute(
                         "INSERT INTO fx_rates_history (pair, date, rate) VALUES (?, ?, ?) "
                         "ON CONFLICT(pair, date) DO UPDATE SET rate = excluded.rate",
-                        (pair, date_str, rate)
+                        (pair, date_str, rate),
                     )
                 connection.commit()
-            logger.info("updateFxRatesHistory(): Updated %d rate(s) for %s", len(rates), pair)
+            logger.info(
+                "updateFxRatesHistory(): Updated %d rate(s) for %s", len(rates), pair
+            )
 
     @classmethod
-    def getStockPriceHistory(cls, symbol: str, start_date: str = None, end_date: str = None) -> list:
+    def getStockPriceHistory(
+        cls, symbol: str, start_date: str = None, end_date: str = None
+    ) -> list:
         """
         Fetches historical price data for a single stock.
 
@@ -1556,10 +1760,7 @@ class DatabaseService:
             cursor = connection.execute(query, params)
             rows = cursor.fetchall()
 
-        return [
-            {"datestamp": row[0], "closeprice": row[1]}
-            for row in rows
-        ]
+        return [{"datestamp": row[0], "closeprice": row[1]} for row in rows]
 
     @classmethod
     def _insertHistoricalData(cls, historical_data) -> None:
@@ -1568,16 +1769,22 @@ class DatabaseService:
             cursor = connection.cursor()
             for stock_data in historical_data:
                 for _, row in stock_data.iterrows():
-                    stockid = cls.symbol_map.get(row['Ticker'])
+                    stockid = cls.symbol_map.get(row["Ticker"])
                     if stockid is None:
-                        logger.warning("updateHistoricalStocks(): Stock %s not found in symbol_map. Skipping.", row['Ticker'])
+                        logger.warning(
+                            "updateHistoricalStocks(): Stock %s not found in symbol_map. Skipping.",
+                            row["Ticker"],
+                        )
                         continue
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     INSERT INTO historicalstocks (closeprice, stockid, datestamp)
                     VALUES (?, ?, ?)
                     ON CONFLICT(stockid, datestamp) DO UPDATE SET
                         closeprice = excluded.closeprice
-                    ''', (row['Close'], stockid, row['Date'].strftime('%Y-%m-%d')))
+                    """,
+                        (row["Close"], stockid, row["Date"].strftime("%Y-%m-%d")),
+                    )
             connection.commit()
 
     @classmethod
@@ -1603,7 +1810,12 @@ class DatabaseService:
 
         # For each stock, find its last known date in a single grouped query.
         # Group symbols by start date to minimize API calls.
+
+        # Add default indexes to the list of symbols to update
+        all_symbols.update(cls.DEFAULT_INDEXES)
+
         symbol_to_stockid = {}
+
         for symbol in all_symbols:
             stockid = cls.symbol_map.get(symbol)
             if stockid is not None:
@@ -1618,7 +1830,7 @@ class DatabaseService:
                 rows = connection.execute(
                     f"SELECT stockid, MAX(datestamp) FROM historicalstocks "
                     f"WHERE stockid IN ({placeholders}) GROUP BY stockid",
-                    stockids
+                    stockids,
                 ).fetchall()
                 for stockid, last_date in rows:
                     last_date_by_stockid[stockid] = last_date
@@ -1641,8 +1853,10 @@ class DatabaseService:
             cls._insertHistoricalData(data)
             total += len(symbols)
 
-        logger.info("updateHistoricalStocks(): Historical data updated for %d symbol(s)", total)
-    
+        logger.info(
+            "updateHistoricalStocks(): Historical data updated for %d symbol(s)", total
+        )
+
     @classmethod
     def updateHistoricalDividendsPortfolio(cls) -> None:
         """
@@ -1651,7 +1865,11 @@ class DatabaseService:
         :param symbols: List of stock symbols to fetch historical dividends for.
         """
 
-        symbols = [p.stock.symbol for portfolio_positions in cls.positions.values() for p in portfolio_positions.values()]
+        symbols = [
+            p.stock.symbol
+            for portfolio_positions in cls.positions.values()
+            for p in portfolio_positions.values()
+        ]
         historical_dividends = StockAPI.get_historical_dividends(symbols)
 
         with get_connection(DB_PATH) as connection:
@@ -1659,17 +1877,26 @@ class DatabaseService:
             for symbol, dividends in historical_dividends.items():
                 stockid = cls.symbol_map.get(symbol)
                 if stockid is None:
-                    logger.warning("updateHistoricalDividends(): Stock %s not found in symbol_map. Skipping.", symbol)
+                    logger.warning(
+                        "updateHistoricalDividends(): Stock %s not found in symbol_map. Skipping.",
+                        symbol,
+                    )
                     continue
                 for date, dividend in dividends.items():
-                    cursor.execute('''
+                    cursor.execute(
+                        """
                     INSERT INTO historicaldividends (dividendvalue, stockid, datestamp)
                     VALUES (?, ?, ?)
                     ON CONFLICT(stockid, datestamp) DO UPDATE SET
                         dividendvalue = excluded.dividendvalue
-                    ''', (dividend, stockid, date))
+                    """,
+                        (dividend, stockid, date),
+                    )
             connection.commit()
-        logger.info("updateHistoricalDividends(): Historical dividends updated for %d symbol(s)", len(symbols))
+        logger.info(
+            "updateHistoricalDividends(): Historical dividends updated for %d symbol(s)",
+            len(symbols),
+        )
 
     @classmethod
     def getPortfolioValueHistory(cls, portfolio_id: int = 1) -> list:
@@ -1681,7 +1908,8 @@ class DatabaseService:
         - list: Portfolio value history
         """
         with get_connection(DB_PATH) as connection:
-            answers = connection.execute('''
+            answers = connection.execute(
+                """
                 WITH
                 transactions_all AS (
                     SELECT stockid, strftime('%Y-%m-%d', datestamp) AS datestamp,
@@ -1742,10 +1970,12 @@ class DatabaseService:
                 WHERE filled_quantity > 0
                 GROUP BY datestamp
                 ORDER BY datestamp
-            ''', (portfolio_id,))
+            """,
+                (portfolio_id,),
+            )
             rows = answers.fetchall()
         return rows
-    
+
     @classmethod
     def getDividendTotal(cls, portfolio_id: int = 1) -> float:
         """
@@ -1759,7 +1989,7 @@ class DatabaseService:
         with get_connection(DB_PATH) as connection:
             answers = connection.execute(
                 "SELECT COALESCE(SUM(quantity * price), 0) FROM transactions WHERE type IN ('DIVIDEND', 'STAKING') AND portfolioid = ?",
-                (portfolio_id,)
+                (portfolio_id,),
             )
             total_dividend = float(answers.fetchone()[0])
         return round(total_dividend, 2)
@@ -1778,10 +2008,13 @@ class DatabaseService:
         """
         with get_connection(DB_PATH) as connection:
             result = connection.execute(
-                '''SELECT COALESCE(SUM(quantity * price), 0)
+                """SELECT COALESCE(SUM(quantity * price), 0)
                    FROM transactions
-                   WHERE type IN ('DIVIDEND', 'STAKING') AND portfolioid = ? AND strftime('%Y', datestamp) = ?''',
-                (portfolio_id, year,)
+                   WHERE type IN ('DIVIDEND', 'STAKING') AND portfolioid = ? AND strftime('%Y', datestamp) = ?""",
+                (
+                    portfolio_id,
+                    year,
+                ),
             )
             row = result.fetchone()
             return round(row[0], 2) if row[0] else 0.0
@@ -1800,24 +2033,31 @@ class DatabaseService:
         """
         from datetime import datetime as dt, timedelta
 
-        default_result = {'stockid': None, 'dividend_rate': 0.0, 'date': None, 'is_total_amount': False}
-        today = dt.now().strftime('%Y-%m-%d')
-        end_date = (dt.now() + timedelta(days=365)).strftime('%Y-%m-%d')
+        default_result = {
+            "stockid": None,
+            "dividend_rate": 0.0,
+            "date": None,
+            "is_total_amount": False,
+        }
+        today = dt.now().strftime("%Y-%m-%d")
+        end_date = (dt.now() + timedelta(days=365)).strftime("%Y-%m-%d")
 
         portfolio_positions = cls.getPositionsForPortfolio(portfolio_id)
         earliest = None
         try:
-            projected_by_stock = cls._projectDividendsBatch(list(portfolio_positions.keys()), today, end_date)
+            projected_by_stock = cls._projectDividendsBatch(
+                list(portfolio_positions.keys()), today, end_date
+            )
             for stockid in portfolio_positions:
                 projected = projected_by_stock.get(stockid, [])
                 if projected:
                     first = projected[0]
                     if earliest is None or first["date"] < earliest["date"]:
                         earliest = {
-                            'stockid': stockid,
-                            'dividend_rate': first["amount_per_share"],
-                            'date': first["date"],
-                            'is_total_amount': first.get("is_total_amount", False),
+                            "stockid": stockid,
+                            "dividend_rate": first["amount_per_share"],
+                            "date": first["date"],
+                            "is_total_amount": first.get("is_total_amount", False),
                         }
         except Exception as e:
             logger.error(f"getNextDividendInfo(): Error projecting next dividend: {e}")
@@ -1825,7 +2065,9 @@ class DatabaseService:
         return earliest if earliest else default_result
 
     @classmethod
-    def getDividendCalendar(cls, start_date: str, end_date: str, portfolio_id: int = 1) -> list:
+    def getDividendCalendar(
+        cls, start_date: str, end_date: str, portfolio_id: int = 1
+    ) -> list:
         """
         Returns dividend calendar events (historical + projected) for the given date range.
 
@@ -1845,7 +2087,8 @@ class DatabaseService:
 
         # Fetch dividend transactions (actual payments received) within the date range
         with get_connection(DB_PATH) as connection:
-            cursor = connection.execute('''
+            cursor = connection.execute(
+                """
                 SELECT DATE(t.datestamp) as d, t.price, t.stockid,
                        s.symbol, s.name, t.quantity
                 FROM transactions t
@@ -1854,22 +2097,26 @@ class DatabaseService:
                   AND t.portfolioid = ?
                   AND DATE(t.datestamp) >= ? AND DATE(t.datestamp) <= ?
                 ORDER BY d ASC
-            ''', (portfolio_id, start_date, end_date))
+            """,
+                (portfolio_id, start_date, end_date),
+            )
             tx_rows = cursor.fetchall()
 
         for row in tx_rows:
             stockid = row[2]
             tx_dates_by_stock.setdefault(stockid, []).append(
-                dt.strptime(row[0], '%Y-%m-%d')
+                dt.strptime(row[0], "%Y-%m-%d")
             )
-            events.append({
-                "date": row[0],
-                "symbol": row[3],
-                "name": row[4],
-                "amount_per_share": round(row[1], 4),
-                "total_amount": round(row[1] * row[5], 2),
-                "type": "historical",
-            })
+            events.append(
+                {
+                    "date": row[0],
+                    "symbol": row[3],
+                    "name": row[4],
+                    "amount_per_share": round(row[1], 4),
+                    "total_amount": round(row[1] * row[5], 2),
+                    "type": "historical",
+                }
+            )
 
         # Fetch yfinance historical dividends only for stocks with NO dividend
         # transaction records at all. Transactions are the source of truth for
@@ -1878,12 +2125,13 @@ class DatabaseService:
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "SELECT DISTINCT stockid FROM transactions WHERE type IN ('DIVIDEND', 'STAKING') AND portfolioid = ?",
-                (portfolio_id,)
+                (portfolio_id,),
             )
             stocks_with_transactions = {row[0] for row in cursor.fetchall()}
 
         with get_connection(DB_PATH) as connection:
-            cursor = connection.execute('''
+            cursor = connection.execute(
+                """
                 SELECT hd.datestamp, hd.dividendvalue, hd.stockid,
                        s.symbol, s.name
                 FROM historicaldividends hd
@@ -1892,7 +2140,9 @@ class DatabaseService:
                 WHERE p.portfolio_id = ?
                   AND hd.datestamp >= ? AND hd.datestamp <= ?
                 ORDER BY hd.datestamp ASC
-            ''', (portfolio_id, start_date, end_date))
+            """,
+                (portfolio_id, start_date, end_date),
+            )
             hd_rows = cursor.fetchall()
 
         for row in hd_rows:
@@ -1901,18 +2151,26 @@ class DatabaseService:
             # the authoritative source for those stocks
             if stockid in stocks_with_transactions:
                 continue
-            quantity = portfolio_positions[stockid].quantity if stockid in portfolio_positions else 0
-            events.append({
-                "date": row[0],
-                "symbol": row[3],
-                "name": row[4],
-                "amount_per_share": round(row[1], 4),
-                "total_amount": round(row[1] * quantity, 2),
-                "type": "historical",
-            })
+            quantity = (
+                portfolio_positions[stockid].quantity
+                if stockid in portfolio_positions
+                else 0
+            )
+            events.append(
+                {
+                    "date": row[0],
+                    "symbol": row[3],
+                    "name": row[4],
+                    "amount_per_share": round(row[1], 4),
+                    "total_amount": round(row[1] * quantity, 2),
+                    "type": "historical",
+                }
+            )
 
         # Generate projected dividends for each position
-        projected_by_stock = cls._projectDividendsBatch(list(portfolio_positions.keys()), start_date, end_date)
+        projected_by_stock = cls._projectDividendsBatch(
+            list(portfolio_positions.keys()), start_date, end_date
+        )
         for stockid, position in portfolio_positions.items():
             if position.stock is None:
                 continue
@@ -1920,20 +2178,24 @@ class DatabaseService:
             for proj in projected:
                 amt = proj["amount_per_share"]
                 total = amt if proj.get("is_total_amount") else amt * position.quantity
-                events.append({
-                    "date": proj["date"],
-                    "symbol": position.stock.symbol,
-                    "name": position.stock.name,
-                    "amount_per_share": round(amt, 4),
-                    "total_amount": round(total, 2),
-                    "type": "projected",
-                })
+                events.append(
+                    {
+                        "date": proj["date"],
+                        "symbol": position.stock.symbol,
+                        "name": position.stock.name,
+                        "amount_per_share": round(amt, 4),
+                        "total_amount": round(total, 2),
+                        "type": "projected",
+                    }
+                )
 
         events.sort(key=lambda e: e["date"])
         return events
 
     @classmethod
-    def _projectDividendsBatch(cls, stockids: list, start_date: str, end_date: str) -> Dict[int, list]:
+    def _projectDividendsBatch(
+        cls, stockids: list, start_date: str, end_date: str
+    ) -> Dict[int, list]:
         """
         Projects dividends for multiple stocks with batched DB reads.
         """
@@ -1948,7 +2210,7 @@ class DatabaseService:
             rows = connection.execute(
                 f"SELECT stockid, datestamp, dividendvalue FROM historicaldividends "
                 f"WHERE stockid IN ({placeholders}) ORDER BY stockid ASC, datestamp ASC",
-                stockids
+                stockids,
             ).fetchall()
         for row in rows:
             if len(row) == 3:
@@ -1961,7 +2223,11 @@ class DatabaseService:
                 continue
             historical_rows_by_stockid[stockid].append((datestamp, dividendvalue))
 
-        fallback_stockids = [stockid for stockid in stockids if len(historical_rows_by_stockid.get(stockid, [])) < 2]
+        fallback_stockids = [
+            stockid
+            for stockid in stockids
+            if len(historical_rows_by_stockid.get(stockid, [])) < 2
+        ]
         tx_rows_by_stockid = defaultdict(list)
         if fallback_stockids:
             fallback_placeholders = ",".join(["?"] * len(fallback_stockids))
@@ -1972,7 +2238,7 @@ class DatabaseService:
                     f"type FROM transactions "
                     f"WHERE type IN ('DIVIDEND', 'STAKING') AND stockid IN ({fallback_placeholders}) "
                     f"ORDER BY stockid ASC, d ASC",
-                    fallback_stockids
+                    fallback_stockids,
                 ).fetchall()
             for stockid, date_str, amount, tx_type in tx_rows:
                 tx_rows_by_stockid[stockid].append((date_str, amount, tx_type))
@@ -1984,7 +2250,7 @@ class DatabaseService:
 
             if len(rows) < 2:
                 rows = tx_rows_by_stockid.get(stockid, [])
-                if rows and rows[0][2] == 'STAKING':
+                if rows and rows[0][2] == "STAKING":
                     is_total_amount = True
 
             projected_by_stockid[stockid] = cls._projectDividendsFromRows(
@@ -1997,7 +2263,9 @@ class DatabaseService:
         return projected_by_stockid
 
     @classmethod
-    def _projectDividendsFromRows(cls, rows: list, start_date: str, end_date: str, is_total_amount: bool = False) -> list:
+    def _projectDividendsFromRows(
+        cls, rows: list, start_date: str, end_date: str, is_total_amount: bool = False
+    ) -> list:
         """
         Shared projection logic used by single-stock and batch paths.
         """
@@ -2010,7 +2278,7 @@ class DatabaseService:
         dates = []
         amounts = []
         for row in rows:
-            dates.append(dt.strptime(row[0], '%Y-%m-%d'))
+            dates.append(dt.strptime(row[0], "%Y-%m-%d"))
             amounts.append(row[1])
 
         intervals = [(dates[i + 1] - dates[i]).days for i in range(len(dates) - 1)]
@@ -2031,23 +2299,25 @@ class DatabaseService:
 
         last_date = dates[-1]
         last_amount = amounts[-1]
-        historical_dates_set = {d.strftime('%Y-%m-%d') for d in dates}
+        historical_dates_set = {d.strftime("%Y-%m-%d") for d in dates}
 
-        start_dt = dt.strptime(start_date, '%Y-%m-%d')
-        end_dt = dt.strptime(end_date, '%Y-%m-%d')
+        start_dt = dt.strptime(start_date, "%Y-%m-%d")
+        end_dt = dt.strptime(end_date, "%Y-%m-%d")
         max_projection = last_date + timedelta(days=365)
 
         projected = []
         current = last_date + timedelta(days=frequency_days)
 
         while current <= min(end_dt, max_projection):
-            date_str = current.strftime('%Y-%m-%d')
+            date_str = current.strftime("%Y-%m-%d")
             if current >= start_dt and date_str not in historical_dates_set:
-                projected.append({
-                    "date": date_str,
-                    "amount_per_share": last_amount,
-                    "is_total_amount": is_total_amount,
-                })
+                projected.append(
+                    {
+                        "date": date_str,
+                        "amount_per_share": last_amount,
+                        "is_total_amount": is_total_amount,
+                    }
+                )
             current += timedelta(days=frequency_days)
 
         return projected
@@ -2075,9 +2345,9 @@ class DatabaseService:
         """
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
-                'SELECT datestamp, dividendvalue FROM historicaldividends '
-                'WHERE stockid = ? ORDER BY datestamp ASC',
-                (stockid,)
+                "SELECT datestamp, dividendvalue FROM historicaldividends "
+                "WHERE stockid = ? ORDER BY datestamp ASC",
+                (stockid,),
             )
             rows = cursor.fetchall()
 
@@ -2094,13 +2364,15 @@ class DatabaseService:
                     "CASE WHEN type = 'STAKING' THEN quantity * price ELSE price END as amount, "
                     "type FROM transactions "
                     "WHERE type IN ('DIVIDEND', 'STAKING') AND stockid = ? ORDER BY d ASC",
-                    (stockid,)
+                    (stockid,),
                 )
                 rows = cursor.fetchall()
-            if rows and rows[0][2] == 'STAKING':
+            if rows and rows[0][2] == "STAKING":
                 is_total_amount = True
 
-        return cls._projectDividendsFromRows(rows, start_date, end_date, is_total_amount=is_total_amount)
+        return cls._projectDividendsFromRows(
+            rows, start_date, end_date, is_total_amount=is_total_amount
+        )
 
     # ── Savings Accounts ──────────────────────────────────────────────
 
@@ -2115,9 +2387,14 @@ class DatabaseService:
             rows = cursor.fetchall()
         return [
             {
-                "id": r[0], "name": r[1], "bank": r[2], "currency": r[3],
-                "balance": r[4], "interest_rate": r[5],
-                "created_at": r[6], "updated_at": r[7],
+                "id": r[0],
+                "name": r[1],
+                "bank": r[2],
+                "currency": r[3],
+                "balance": r[4],
+                "interest_rate": r[5],
+                "created_at": r[6],
+                "updated_at": r[7],
             }
             for r in rows
         ]
@@ -2128,51 +2405,70 @@ class DatabaseService:
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "SELECT id, name, bank, currency, balance, interest_rate, created_at, updated_at "
-                "FROM savings_accounts WHERE id = ?", (account_id,)
+                "FROM savings_accounts WHERE id = ?",
+                (account_id,),
             )
             row = cursor.fetchone()
         if not row:
             raise KeyError(f"Savings account with id {account_id} not found")
         return {
-            "id": row[0], "name": row[1], "bank": row[2], "currency": row[3],
-            "balance": row[4], "interest_rate": row[5],
-            "created_at": row[6], "updated_at": row[7],
+            "id": row[0],
+            "name": row[1],
+            "bank": row[2],
+            "currency": row[3],
+            "balance": row[4],
+            "interest_rate": row[5],
+            "created_at": row[6],
+            "updated_at": row[7],
         }
 
     @classmethod
-    def addSavingsAccount(cls, name: str, bank: str, currency: str = "EUR",
-                          balance: float = 0.0, interest_rate: float = 0.0) -> dict:
+    def addSavingsAccount(
+        cls,
+        name: str,
+        bank: str,
+        currency: str = "EUR",
+        balance: float = 0.0,
+        interest_rate: float = 0.0,
+    ) -> dict:
         """Creates a savings account. If balance > 0, auto-inserts an initial DEPOSIT transaction."""
-        now = datetime.datetime.now().strftime('%Y-%m-%d')
+        now = datetime.datetime.now().strftime("%Y-%m-%d")
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "INSERT INTO savings_accounts (name, bank, currency, balance, interest_rate, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (name, bank, currency, balance, interest_rate, now, now)
+                (name, bank, currency, balance, interest_rate, now, now),
             )
             account_id = cursor.lastrowid
             if balance > 0:
                 connection.execute(
                     "INSERT INTO savings_transactions (account_id, type, amount, datestamp, note) "
                     "VALUES (?, 'DEPOSIT', ?, ?, 'Initial balance')",
-                    (account_id, balance, now)
+                    (account_id, balance, now),
                 )
             connection.commit()
         return cls.getSavingsAccount(account_id)
 
     @classmethod
-    def updateSavingsAccount(cls, account_id: int, name: str = None,
-                             bank: str = None, interest_rate: float = None) -> dict:
+    def updateSavingsAccount(
+        cls,
+        account_id: int,
+        name: str = None,
+        bank: str = None,
+        interest_rate: float = None,
+    ) -> dict:
         """Updates savings account metadata (not balance)."""
         account = cls.getSavingsAccount(account_id)  # raises KeyError if missing
-        now = datetime.datetime.now().strftime('%Y-%m-%d')
+        now = datetime.datetime.now().strftime("%Y-%m-%d")
         new_name = name if name is not None else account["name"]
         new_bank = bank if bank is not None else account["bank"]
-        new_rate = interest_rate if interest_rate is not None else account["interest_rate"]
+        new_rate = (
+            interest_rate if interest_rate is not None else account["interest_rate"]
+        )
         with get_connection(DB_PATH) as connection:
             connection.execute(
                 "UPDATE savings_accounts SET name = ?, bank = ?, interest_rate = ?, updated_at = ? WHERE id = ?",
-                (new_name, new_bank, new_rate, now, account_id)
+                (new_name, new_bank, new_rate, now, account_id),
             )
             connection.commit()
         return cls.getSavingsAccount(account_id)
@@ -2182,8 +2478,12 @@ class DatabaseService:
         """Deletes a savings account and its transactions."""
         cls.getSavingsAccount(account_id)  # raises KeyError if missing
         with get_connection(DB_PATH) as connection:
-            connection.execute("DELETE FROM savings_transactions WHERE account_id = ?", (account_id,))
-            connection.execute("DELETE FROM savings_accounts WHERE id = ?", (account_id,))
+            connection.execute(
+                "DELETE FROM savings_transactions WHERE account_id = ?", (account_id,)
+            )
+            connection.execute(
+                "DELETE FROM savings_accounts WHERE id = ?", (account_id,)
+            )
             connection.commit()
 
     @classmethod
@@ -2194,20 +2494,25 @@ class DatabaseService:
             cursor = connection.execute(
                 "SELECT id, account_id, type, amount, datestamp, note "
                 "FROM savings_transactions WHERE account_id = ? ORDER BY datestamp DESC, id DESC",
-                (account_id,)
+                (account_id,),
             )
             rows = cursor.fetchall()
         return [
             {
-                "id": r[0], "account_id": r[1], "type": r[2],
-                "amount": r[3], "datestamp": r[4], "note": r[5] or "",
+                "id": r[0],
+                "account_id": r[1],
+                "type": r[2],
+                "amount": r[3],
+                "datestamp": r[4],
+                "note": r[5] or "",
             }
             for r in rows
         ]
 
     @classmethod
-    def addSavingsTransaction(cls, account_id: int, type: str, amount: float,
-                              datestamp: str, note: str = "") -> dict:
+    def addSavingsTransaction(
+        cls, account_id: int, type: str, amount: float, datestamp: str, note: str = ""
+    ) -> dict:
         """Adds a transaction and updates account balance. Validates withdrawal <= balance."""
         account = cls.getSavingsAccount(account_id)
         if type == "WITHDRAWAL" and amount > account["balance"]:
@@ -2215,32 +2520,38 @@ class DatabaseService:
                 f"Cannot withdraw {amount}: only {account['balance']} available"
             )
         balance_delta = amount if type in ("DEPOSIT", "INTEREST") else -amount
-        now = datetime.datetime.now().strftime('%Y-%m-%d')
+        now = datetime.datetime.now().strftime("%Y-%m-%d")
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "INSERT INTO savings_transactions (account_id, type, amount, datestamp, note) "
                 "VALUES (?, ?, ?, ?, ?)",
-                (account_id, type, amount, datestamp, note)
+                (account_id, type, amount, datestamp, note),
             )
             txn_id = cursor.lastrowid
             connection.execute(
                 "UPDATE savings_accounts SET balance = balance + ?, updated_at = ? WHERE id = ?",
-                (balance_delta, now, account_id)
+                (balance_delta, now, account_id),
             )
             connection.commit()
         return {
-            "id": txn_id, "account_id": account_id, "type": type,
-            "amount": amount, "datestamp": datestamp, "note": note or "",
+            "id": txn_id,
+            "account_id": account_id,
+            "type": type,
+            "amount": amount,
+            "datestamp": datestamp,
+            "note": note or "",
         }
 
     @classmethod
-    def updateSavingsTransaction(cls, txn_id: int, amount: float = None,
-                                 datestamp: str = None, note: str = None) -> dict:
+    def updateSavingsTransaction(
+        cls, txn_id: int, amount: float = None, datestamp: str = None, note: str = None
+    ) -> dict:
         """Updates a savings transaction and recalculates account balance from all transactions."""
         with get_connection(DB_PATH) as connection:
             cursor = connection.execute(
                 "SELECT id, account_id, type, amount, datestamp, note "
-                "FROM savings_transactions WHERE id = ?", (txn_id,)
+                "FROM savings_transactions WHERE id = ?",
+                (txn_id,),
             )
             row = cursor.fetchone()
         if not row:
@@ -2251,16 +2562,16 @@ class DatabaseService:
         new_datestamp = datestamp if datestamp is not None else row[4]
         new_note = note if note is not None else (row[5] or "")
 
-        now = datetime.datetime.now().strftime('%Y-%m-%d')
+        now = datetime.datetime.now().strftime("%Y-%m-%d")
         with get_connection(DB_PATH) as connection:
             connection.execute(
                 "UPDATE savings_transactions SET amount = ?, datestamp = ?, note = ? WHERE id = ?",
-                (new_amount, new_datestamp, new_note, txn_id)
+                (new_amount, new_datestamp, new_note, txn_id),
             )
             # Recalculate balance from all transactions
             cursor = connection.execute(
                 "SELECT type, amount FROM savings_transactions WHERE account_id = ?",
-                (account_id,)
+                (account_id,),
             )
             balance = 0.0
             for txn_row in cursor.fetchall():
@@ -2270,12 +2581,16 @@ class DatabaseService:
                     balance -= txn_row[1]
             connection.execute(
                 "UPDATE savings_accounts SET balance = ?, updated_at = ? WHERE id = ?",
-                (balance, now, account_id)
+                (balance, now, account_id),
             )
             connection.commit()
         return {
-            "id": txn_id, "account_id": account_id, "type": row[2],
-            "amount": new_amount, "datestamp": new_datestamp, "note": new_note,
+            "id": txn_id,
+            "account_id": account_id,
+            "type": row[2],
+            "amount": new_amount,
+            "datestamp": new_datestamp,
+            "note": new_note,
         }
 
     @classmethod
@@ -2290,12 +2605,14 @@ class DatabaseService:
             raise KeyError(f"Savings transaction with id {txn_id} not found")
 
         account_id = row[0]
-        now = datetime.datetime.now().strftime('%Y-%m-%d')
+        now = datetime.datetime.now().strftime("%Y-%m-%d")
         with get_connection(DB_PATH) as connection:
-            connection.execute("DELETE FROM savings_transactions WHERE id = ?", (txn_id,))
+            connection.execute(
+                "DELETE FROM savings_transactions WHERE id = ?", (txn_id,)
+            )
             cursor = connection.execute(
                 "SELECT type, amount FROM savings_transactions WHERE account_id = ?",
-                (account_id,)
+                (account_id,),
             )
             balance = 0.0
             for txn_row in cursor.fetchall():
@@ -2305,7 +2622,7 @@ class DatabaseService:
                     balance -= txn_row[1]
             connection.execute(
                 "UPDATE savings_accounts SET balance = ?, updated_at = ? WHERE id = ?",
-                (balance, now, account_id)
+                (balance, now, account_id),
             )
             connection.commit()
 
@@ -2323,8 +2640,9 @@ class DatabaseService:
         return round(total, 2)
 
     @classmethod
-    def getSavingsBalanceHistory(cls, start_date: str, end_date: str,
-                                target_dates: list = None) -> list:
+    def getSavingsBalanceHistory(
+        cls, start_date: str, end_date: str, target_dates: list = None
+    ) -> list:
         """
         Computes running savings balance per date, FX-converted to EUR.
         Returns list of (date_str, balance_eur) tuples for dates in target_dates.
@@ -2344,7 +2662,7 @@ class DatabaseService:
                 cursor = connection.execute(
                     "SELECT type, amount, datestamp FROM savings_transactions "
                     "WHERE account_id = ? ORDER BY datestamp ASC",
-                    (account_id,)
+                    (account_id,),
                 )
                 txns = cursor.fetchall()
 
@@ -2371,8 +2689,12 @@ class DatabaseService:
             if not balance_timeline:
                 continue
 
-            dates_to_process = target_dates if target_dates else sorted(
-                set(d for d, _ in balance_timeline if start_date <= d <= end_date)
+            dates_to_process = (
+                target_dates
+                if target_dates
+                else sorted(
+                    set(d for d, _ in balance_timeline if start_date <= d <= end_date)
+                )
             )
 
             # Walk through target dates with forward-filled balance
@@ -2402,7 +2724,10 @@ class DatabaseService:
                     continue
 
                 # Forward-fill balance
-                while bal_idx < len(balance_timeline) and balance_timeline[bal_idx][0] <= date_str:
+                while (
+                    bal_idx < len(balance_timeline)
+                    and balance_timeline[bal_idx][0] <= date_str
+                ):
                     last_bal = balance_timeline[bal_idx][1]
                     bal_idx += 1
 
@@ -2451,15 +2776,17 @@ class DatabaseService:
             stock = cls.stocks.get(stockid)
             if stock is None or stock.quote_type != "CRYPTOCURRENCY":
                 continue
-            result.append({
-                "stockid": stockid,
-                "symbol": stock.symbol,
-                "name": stock.name,
-                "quantity": pos.quantity,
-                "average_cost_basis": pos.average_cost_basis,
-                "current_price": stock.price or 0.0,
-                "currency": stock.currency or "USD",
-            })
+            result.append(
+                {
+                    "stockid": stockid,
+                    "symbol": stock.symbol,
+                    "name": stock.name,
+                    "quantity": pos.quantity,
+                    "average_cost_basis": pos.average_cost_basis,
+                    "current_price": stock.price or 0.0,
+                    "currency": stock.currency or "USD",
+                }
+            )
         return result
 
     @classmethod
@@ -2495,7 +2822,9 @@ class DatabaseService:
             total_cost += qty * cost_basis * fx_rate
 
         gain_loss = total_value - total_cost
-        gain_loss_pct = round(gain_loss / total_cost * 100, 2) if total_cost > 0 else 0.0
+        gain_loss_pct = (
+            round(gain_loss / total_cost * 100, 2) if total_cost > 0 else 0.0
+        )
 
         return {
             "total_value": round(total_value, 2),
