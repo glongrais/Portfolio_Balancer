@@ -648,7 +648,28 @@ def test_delete_position_case_insensitive(monkeypatch):
     assert called_with["symbol"] == "AAPL"
 
 
-# --- Stock Search Endpoint Tests ---
+@patch("services.database_service.DatabaseService.getStockPriceHistory")
+def test_get_index_price_history(mock_get_history):
+    """Test getting price history for an index ticker."""
+    symbol = "^FCHI"
+    s = Stock(stockid=100, symbol=symbol, name="CAC 40", price=7000.0, currency="EUR")
+    DatabaseService.stocks = {100: s}
+    DatabaseService.symbol_map = {symbol: 100}
+
+    mock_get_history.return_value = [
+        {"datestamp": "2024-01-15", "closeprice": 6900.0},
+        {"datestamp": "2024-01-16", "closeprice": 6950.0},
+    ]
+
+    client = create_test_client()
+    resp = client.get(f"/api/stocks/{symbol}/price-history")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["symbol"] == symbol
+    assert len(data["data"]) == 2
+    assert data["data"][0]["closeprice"] == 6900.0
+    mock_get_history.assert_called_once_with(symbol, None, None)
 
 
 @patch.object(StockAPI, "search_stocks")
