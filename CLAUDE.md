@@ -69,6 +69,8 @@ SQLite at `data/portfolio.db`. Key tables: `stocks`, `positions`, `transactions`
 
 Transaction types are uppercase strings: `'BUY'`, `'SELL'` and `'DIVIDEND'`.
 
+**Indexes:** Index tickers (e.g., `^FCHI`, `^GSPC`) are treated as stocks and stored in the `stocks` and `historicalstocks` tables. They are automatically verified/added at startup via `DatabaseService.ensureIndexes()` and included in daily historical syncs.
+
 ## Testing Patterns
 
 Tests use `fastapi.testclient.TestClient` with minimal FastAPI apps (one router per test file). External dependencies are mocked via `unittest.mock.patch`. Every test file that touches endpoints has an `autouse` fixture that resets `DatabaseService.symbol_map`, `stocks`, and `positions` to empty dicts.
