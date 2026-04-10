@@ -30,81 +30,91 @@ def create_test_client():
     """Create a minimal FastAPI app including the stocks and portfolio routers to avoid app lifespan/startup logic."""
     app = FastAPI()
     app.include_router(stocks_router.router, prefix="/api/stocks", tags=["stocks"])
-    app.include_router(portfolio_router.router, prefix="/api/portfolio", tags=["portfolio"])
+    app.include_router(
+        portfolio_router.router, prefix="/api/portfolio", tags=["portfolio"]
+    )
     return TestClient(app)
 
 
 def test_get_all_stocks_returns_list():
     # prepare in-memory stock
-    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    s = Stock(stockid=1, symbol="AAPL", name="Apple Inc.", price=150.0, currency="USD")
     DatabaseService.stocks = {1: s}
-    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.symbol_map = {"AAPL": 1}
 
     client = create_test_client()
-    resp = client.get('/api/stocks/')
+    resp = client.get("/api/stocks/")
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
     assert len(data) == 1
-    assert data[0]['symbol'] == 'AAPL'
+    assert data[0]["symbol"] == "AAPL"
 
 
 def test_get_stock_by_symbol_found():
-    s = Stock(stockid=2, symbol='MSFT', name='Microsoft Corp.', price=250.0, currency='USD')
+    s = Stock(
+        stockid=2, symbol="MSFT", name="Microsoft Corp.", price=250.0, currency="USD"
+    )
     DatabaseService.stocks = {2: s}
-    DatabaseService.symbol_map = {'MSFT': 2}
+    DatabaseService.symbol_map = {"MSFT": 2}
 
     client = create_test_client()
-    resp = client.get('/api/stocks/MSFT')
+    resp = client.get("/api/stocks/MSFT")
     assert resp.status_code == 200
     data = resp.json()
-    assert data['symbol'] == 'MSFT'
-    assert data['price'] == 250.0
+    assert data["symbol"] == "MSFT"
+    assert data["price"] == 250.0
 
 
 def test_get_stock_not_found_returns_404():
     client = create_test_client()
-    resp = client.get('/api/stocks/UNKNOWN')
+    resp = client.get("/api/stocks/UNKNOWN")
     assert resp.status_code == 404
 
 
 def test_add_stock_existing_returns_existing_stock():
-    s = Stock(stockid=3, symbol='NFLX', name='Netflix, Inc.', price=500.0, currency='USD')
+    s = Stock(
+        stockid=3, symbol="NFLX", name="Netflix, Inc.", price=500.0, currency="USD"
+    )
     DatabaseService.stocks = {3: s}
-    DatabaseService.symbol_map = {'NFLX': 3}
+    DatabaseService.symbol_map = {"NFLX": 3}
 
     client = create_test_client()
-    resp = client.post('/api/stocks/', json={'symbol': 'nflx'})
+    resp = client.post("/api/stocks/", json={"symbol": "nflx"})
     # endpoint decorator sets 201_CREATED; existing path returns the existing stock
     assert resp.status_code == 201
     data = resp.json()
-    assert data['symbol'] == 'NFLX'
-    assert data['stockid'] == 3
+    assert data["symbol"] == "NFLX"
+    assert data["stockid"] == 3
 
 
 def test_update_prices_calls_service_and_returns_count(monkeypatch):
     # prepare some stocks
-    s1 = Stock(stockid=4, symbol='BABA', price=80.0)
-    s2 = Stock(stockid=5, symbol='TSLA', price=700.0)
+    s1 = Stock(stockid=4, symbol="BABA", price=80.0)
+    s2 = Stock(stockid=5, symbol="TSLA", price=700.0)
     DatabaseService.stocks = {4: s1, 5: s2}
-    DatabaseService.symbol_map = {'BABA': 4, 'TSLA': 5}
+    DatabaseService.symbol_map = {"BABA": 4, "TSLA": 5}
 
-    called = {'count': 0}
+    called = {"count": 0}
 
     def fake_update_prices():
         # simulate updating prices
-        called['count'] += 1
+        called["count"] += 1
         for st in DatabaseService.stocks.values():
             st.price = st.price + 1.0
 
-    monkeypatch.setattr(DatabaseService, 'updateStocksPrice', classmethod(lambda cls: fake_update_prices()))
+    monkeypatch.setattr(
+        DatabaseService,
+        "updateStocksPrice",
+        classmethod(lambda cls: fake_update_prices()),
+    )
 
     client = create_test_client()
-    resp = client.post('/api/stocks/update-prices')
+    resp = client.post("/api/stocks/update-prices")
     assert resp.status_code == 200
     data = resp.json()
-    assert data['message'] == 'Stock prices updated successfully'
-    assert data['updated_count'] == 2
+    assert data["message"] == "Stock prices updated successfully"
+    assert data["updated_count"] == 2
 
 
 def test_add_position_creates_position(monkeypatch):
@@ -115,31 +125,59 @@ def test_add_position_creates_position(monkeypatch):
         stock = Stock(stockid=stockid, symbol=symbol, name=symbol, price=10.0)
         DatabaseService.stocks[stockid] = stock
         DatabaseService.symbol_map[symbol] = stockid
-        pos = Position(stockid=stockid, quantity=quantity, distribution_target=distribution_target, stock=stock, portfolio_id=portfolio_id)
+        pos = Position(
+            stockid=stockid,
+            quantity=quantity,
+            distribution_target=distribution_target,
+            stock=stock,
+            portfolio_id=portfolio_id,
+        )
         DatabaseService.positions.setdefault(portfolio_id, {})[stockid] = pos
 
-    monkeypatch.setattr(DatabaseService, 'addPosition', classmethod(lambda cls, symbol, quantity, distribution_target=None, portfolio_id=1: fake_add_position(symbol, quantity, distribution_target, portfolio_id)))
+    monkeypatch.setattr(
+        DatabaseService,
+        "addPosition",
+        classmethod(
+            lambda cls, symbol, quantity, distribution_target=None, portfolio_id=1: (
+                fake_add_position(symbol, quantity, distribution_target, portfolio_id)
+            )
+        ),
+    )
 
     client = create_test_client()
-    payload = {'symbol': 'NVDA', 'quantity': 5, 'distribution_target': 0.2}
-    resp = client.post('/api/portfolio/1/positions', json=payload)
+    payload = {"symbol": "NVDA", "quantity": 5, "distribution_target": 0.2}
+    resp = client.post("/api/portfolio/1/positions", json=payload)
     assert resp.status_code == 201
     data = resp.json()
-    assert data['quantity'] == 5
-    assert data['distribution_target'] == 0.2
-    assert data['stock']['symbol'] == 'NVDA'
+    assert data["quantity"] == 5
+    assert data["distribution_target"] == 0.2
+    assert data["stock"]["symbol"] == "NVDA"
 
 
 def test_update_position_changes_values(monkeypatch):
     # prepare existing stock and position
-    stock = Stock(stockid=10, symbol='AMZN', name='Amazon', price=3300.0)
-    pos = Position(stockid=10, quantity=2, distribution_target=0.1, distribution_real=0.05, stock=stock, portfolio_id=1)
+    stock = Stock(stockid=10, symbol="AMZN", name="Amazon", price=3300.0)
+    pos = Position(
+        stockid=10,
+        quantity=2,
+        distribution_target=0.1,
+        distribution_real=0.05,
+        stock=stock,
+        portfolio_id=1,
+    )
     DatabaseService.stocks = {10: stock}
-    DatabaseService.symbol_map = {'AMZN': 10}
+    DatabaseService.symbol_map = {"AMZN": 10}
     DatabaseService.positions = {1: {10: pos}}
 
     # Monkeypatch updatePosition to change the in-memory position
-    def fake_update_position(symbol, quantity=None, distribution_target=None, distribution_real=None, portfolio_id=1):
+    def fake_update_position(
+        symbol,
+        quantity=None,
+        distribution_target=None,
+        distribution_real=None,
+        portfolio_id=1,
+        **kwargs,
+    ):
         sid = DatabaseService.symbol_map[symbol]
         p = DatabaseService.positions[portfolio_id][sid]
         if quantity is not None:
@@ -147,22 +185,26 @@ def test_update_position_changes_values(monkeypatch):
         if distribution_target is not None:
             p.distribution_target = distribution_target
 
-    monkeypatch.setattr(DatabaseService, 'updatePosition', classmethod(lambda cls, symbol, quantity=None, distribution_target=None, distribution_real=None, portfolio_id=1: fake_update_position(symbol, quantity, distribution_target, distribution_real, portfolio_id)))
+    monkeypatch.setattr(
+        DatabaseService,
+        "updatePosition",
+        classmethod(lambda cls, *args, **kwargs: fake_update_position(*args, **kwargs)),
+    )
 
     client = create_test_client()
-    payload = {'quantity': 4, 'distribution_target': 0.15}
-    resp = client.put('/api/portfolio/1/positions/AMZN', json=payload)
+    payload = {"quantity": 4, "distribution_target": 0.15}
+    resp = client.put("/api/portfolio/1/positions/AMZN", json=payload)
     assert resp.status_code == 200
     data = resp.json()
-    assert data['quantity'] == 4
-    assert data['distribution_target'] == 0.15
-    assert data['stock']['symbol'] == 'AMZN'
+    assert data["quantity"] == 4
+    assert data["distribution_target"] == 0.15
+    assert data["stock"]["symbol"] == "AMZN"
 
 
 def test_get_all_stocks_empty_database():
     """Test getting all stocks when database is empty."""
     client = create_test_client()
-    resp = client.get('/api/stocks/')
+    resp = client.get("/api/stocks/")
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
@@ -171,107 +213,108 @@ def test_get_all_stocks_empty_database():
 
 def test_get_stock_case_insensitive():
     """Test that stock lookup is case insensitive."""
-    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    s = Stock(stockid=1, symbol="AAPL", name="Apple Inc.", price=150.0, currency="USD")
     DatabaseService.stocks = {1: s}
-    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.symbol_map = {"AAPL": 1}
 
     client = create_test_client()
     # Use lowercase symbol
-    resp = client.get('/api/stocks/aapl')
+    resp = client.get("/api/stocks/aapl")
     assert resp.status_code == 200
     data = resp.json()
-    assert data['symbol'] == 'AAPL'
+    assert data["symbol"] == "AAPL"
 
 
 def test_add_position_already_exists():
     """Test adding a position that already exists returns 400."""
-    stock = Stock(stockid=1, symbol='TSLA', name='Tesla Inc.', price=700.0)
+    stock = Stock(stockid=1, symbol="TSLA", name="Tesla Inc.", price=700.0)
     position = Position(stockid=1, quantity=10, stock=stock, portfolio_id=1)
     DatabaseService.stocks = {1: stock}
-    DatabaseService.symbol_map = {'TSLA': 1}
+    DatabaseService.symbol_map = {"TSLA": 1}
     DatabaseService.positions = {1: {1: position}}
 
     client = create_test_client()
-    payload = {'symbol': 'TSLA', 'quantity': 5, 'distribution_target': 0.2}
-    resp = client.post('/api/portfolio/1/positions', json=payload)
+    payload = {"symbol": "TSLA", "quantity": 5, "distribution_target": 0.2}
+    resp = client.post("/api/portfolio/1/positions", json=payload)
     assert resp.status_code == 400
-    assert 'already exists' in resp.json()['detail']
+    assert "already exists" in resp.json()["detail"]
 
 
 def test_update_position_not_found():
     """Test updating a position that doesn't exist returns 404."""
     client = create_test_client()
-    payload = {'quantity': 10, 'distribution_target': 0.2}
-    resp = client.put('/api/portfolio/1/positions/UNKNOWN', json=payload)
+    payload = {"quantity": 10, "distribution_target": 0.2}
+    resp = client.put("/api/portfolio/1/positions/UNKNOWN", json=payload)
     assert resp.status_code == 404
-    assert 'not found' in resp.json()['detail']
+    assert "not found" in resp.json()["detail"]
 
 
 def test_update_position_stock_exists_but_no_position():
     """Test updating when stock exists but position doesn't."""
-    stock = Stock(stockid=1, symbol='NFLX', name='Netflix', price=500.0)
+    stock = Stock(stockid=1, symbol="NFLX", name="Netflix", price=500.0)
     DatabaseService.stocks = {1: stock}
-    DatabaseService.symbol_map = {'NFLX': 1}
+    DatabaseService.symbol_map = {"NFLX": 1}
     # No position created
 
     client = create_test_client()
-    payload = {'quantity': 10}
-    resp = client.put('/api/portfolio/1/positions/NFLX', json=payload)
+    payload = {"quantity": 10}
+    resp = client.put("/api/portfolio/1/positions/NFLX", json=payload)
     assert resp.status_code == 404
-    assert 'Position for NFLX not found' in resp.json()['detail']
+    assert "Position for NFLX not found" in resp.json()["detail"]
 
 
 def test_get_stock_returns_all_fields():
     """Test that stock response includes all expected fields."""
     s = Stock(
         stockid=1,
-        symbol='AAPL',
-        name='Apple Inc.',
+        symbol="AAPL",
+        name="Apple Inc.",
         price=150.0,
-        currency='USD',
+        currency="USD",
         market_cap=2500000000000,
-        sector='Technology',
-        industry='Consumer Electronics',
-        country='USA',
+        sector="Technology",
+        industry="Consumer Electronics",
+        country="USA",
         dividend=0.92,
-        dividend_yield=0.0061
+        dividend_yield=0.0061,
     )
     DatabaseService.stocks = {1: s}
-    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.symbol_map = {"AAPL": 1}
 
     client = create_test_client()
-    resp = client.get('/api/stocks/AAPL')
+    resp = client.get("/api/stocks/AAPL")
     assert resp.status_code == 200
     data = resp.json()
-    assert data['stockid'] == 1
-    assert data['symbol'] == 'AAPL'
-    assert data['name'] == 'Apple Inc.'
-    assert data['price'] == 150.0
-    assert data['currency'] == 'USD'
-    assert data['market_cap'] == 2500000000000
-    assert data['sector'] == 'Technology'
-    assert data['industry'] == 'Consumer Electronics'
-    assert data['country'] == 'USA'
-    assert data['dividend'] == 0.92
-    assert data['dividend_yield'] == 0.0061
+    assert data["stockid"] == 1
+    assert data["symbol"] == "AAPL"
+    assert data["name"] == "Apple Inc."
+    assert data["price"] == 150.0
+    assert data["currency"] == "USD"
+    assert data["market_cap"] == 2500000000000
+    assert data["sector"] == "Technology"
+    assert data["industry"] == "Consumer Electronics"
+    assert data["country"] == "USA"
+    assert data["dividend"] == 0.92
+    assert data["dividend_yield"] == 0.0061
 
 
 def test_add_position_includes_all_stock_fields():
     """Test that adding a position returns all stock fields."""
+
     def fake_add_position(symbol, quantity, distribution_target=None, portfolio_id=1):
         stockid = 1
         stock = Stock(
             stockid=stockid,
             symbol=symbol,
-            name='Test Company',
+            name="Test Company",
             price=100.0,
-            currency='USD',
+            currency="USD",
             market_cap=1000000000,
-            sector='Tech',
-            industry='Software',
-            country='USA',
+            sector="Tech",
+            industry="Software",
+            country="USA",
             dividend=1.0,
-            dividend_yield=0.01
+            dividend_yield=0.01,
         )
         DatabaseService.stocks[stockid] = stock
         DatabaseService.symbol_map[symbol] = stockid
@@ -286,21 +329,30 @@ def test_add_position_includes_all_stock_fields():
 
     # Use monkeypatch fixture properly
     import unittest.mock
-    with unittest.mock.patch.object(DatabaseService, 'addPosition', classmethod(lambda cls, symbol, quantity, distribution_target=None, portfolio_id=1: fake_add_position(symbol, quantity, distribution_target, portfolio_id))):
+
+    with unittest.mock.patch.object(
+        DatabaseService,
+        "addPosition",
+        classmethod(
+            lambda cls, symbol, quantity, distribution_target=None, portfolio_id=1: (
+                fake_add_position(symbol, quantity, distribution_target, portfolio_id)
+            )
+        ),
+    ):
         client = create_test_client()
-        payload = {'symbol': 'TEST', 'quantity': 10, 'distribution_target': 0.25}
-        resp = client.post('/api/portfolio/1/positions', json=payload)
+        payload = {"symbol": "TEST", "quantity": 10, "distribution_target": 0.25}
+        resp = client.post("/api/portfolio/1/positions", json=payload)
         assert resp.status_code == 201
         data = resp.json()
-        assert 'stock' in data
-        assert data['stock']['symbol'] == 'TEST'
-        assert data['stock']['sector'] == 'Tech'
-        assert data['stock']['dividend'] == 1.0
+        assert "stock" in data
+        assert data["stock"]["symbol"] == "TEST"
+        assert data["stock"]["sector"] == "Tech"
+        assert data["stock"]["dividend"] == 1.0
 
 
 def test_position_response_includes_delta():
     """Test that position response includes calculated delta."""
-    stock = Stock(stockid=1, symbol='AAPL', name='Apple', price=150.0)
+    stock = Stock(stockid=1, symbol="AAPL", name="Apple", price=150.0)
     position = Position(
         stockid=1,
         quantity=10,
@@ -316,19 +368,28 @@ def test_position_response_includes_delta():
         DatabaseService.positions.setdefault(portfolio_id, {})[1] = position
 
     import unittest.mock
-    with unittest.mock.patch.object(DatabaseService, 'addPosition', classmethod(lambda cls, symbol, quantity, distribution_target=None, portfolio_id=1: fake_add_position(symbol, quantity, distribution_target, portfolio_id))):
+
+    with unittest.mock.patch.object(
+        DatabaseService,
+        "addPosition",
+        classmethod(
+            lambda cls, symbol, quantity, distribution_target=None, portfolio_id=1: (
+                fake_add_position(symbol, quantity, distribution_target, portfolio_id)
+            )
+        ),
+    ):
         client = create_test_client()
-        payload = {'symbol': 'AAPL', 'quantity': 10, 'distribution_target': 30.0}
-        resp = client.post('/api/portfolio/1/positions', json=payload)
+        payload = {"symbol": "AAPL", "quantity": 10, "distribution_target": 30.0}
+        resp = client.post("/api/portfolio/1/positions", json=payload)
         assert resp.status_code == 201
         data = resp.json()
-        assert 'delta' in data
-        assert data['delta'] == 10.0  # 30 - 20
+        assert "delta" in data
+        assert data["delta"] == 10.0  # 30 - 20
 
 
 def test_update_position_partial_update():
     """Test updating only quantity without changing target."""
-    stock = Stock(stockid=1, symbol='MSFT', name='Microsoft', price=300.0)
+    stock = Stock(stockid=1, symbol="MSFT", name="Microsoft", price=300.0)
     pos = Position(
         stockid=1,
         quantity=5,
@@ -338,10 +399,17 @@ def test_update_position_partial_update():
         portfolio_id=1,
     )
     DatabaseService.stocks = {1: stock}
-    DatabaseService.symbol_map = {'MSFT': 1}
+    DatabaseService.symbol_map = {"MSFT": 1}
     DatabaseService.positions = {1: {1: pos}}
 
-    def fake_update_position(symbol, quantity=None, distribution_target=None, distribution_real=None, portfolio_id=1):
+    def fake_update_position(
+        symbol,
+        quantity=None,
+        distribution_target=None,
+        distribution_real=None,
+        portfolio_id=1,
+        **kwargs,
+    ):
         sid = DatabaseService.symbol_map[symbol]
         p = DatabaseService.positions[portfolio_id][sid]
         if quantity is not None:
@@ -350,25 +418,31 @@ def test_update_position_partial_update():
             p.distribution_target = distribution_target
 
     import unittest.mock
-    with unittest.mock.patch.object(DatabaseService, 'updatePosition', classmethod(lambda cls, symbol, quantity=None, distribution_target=None, distribution_real=None, portfolio_id=1: fake_update_position(symbol, quantity, distribution_target, distribution_real, portfolio_id))):
+
+    with unittest.mock.patch.object(
+        DatabaseService,
+        "updatePosition",
+        classmethod(lambda cls, *args, **kwargs: fake_update_position(*args, **kwargs)),
+    ):
         client = create_test_client()
         # Only update quantity
-        payload = {'quantity': 10}
-        resp = client.put('/api/portfolio/1/positions/MSFT', json=payload)
+        payload = {"quantity": 10}
+        resp = client.put("/api/portfolio/1/positions/MSFT", json=payload)
         assert resp.status_code == 200
         data = resp.json()
-        assert data['quantity'] == 10
-        assert data['distribution_target'] == 0.2  # Unchanged
+        assert data["quantity"] == 10
+        assert data["distribution_target"] == 0.2  # Unchanged
 
 
 # --- Price History Endpoint Tests ---
 
-@patch('services.database_service.DatabaseService.getStockPriceHistory')
+
+@patch("services.database_service.DatabaseService.getStockPriceHistory")
 def test_get_stock_price_history(mock_get_history):
     """Test getting price history for a stock."""
-    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    s = Stock(stockid=1, symbol="AAPL", name="Apple Inc.", price=150.0, currency="USD")
     DatabaseService.stocks = {1: s}
-    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.symbol_map = {"AAPL": 1}
 
     mock_get_history.return_value = [
         {"datestamp": "2024-01-15", "closeprice": 185.92},
@@ -376,102 +450,105 @@ def test_get_stock_price_history(mock_get_history):
     ]
 
     client = create_test_client()
-    resp = client.get('/api/stocks/AAPL/price-history')
+    resp = client.get("/api/stocks/AAPL/price-history")
 
     assert resp.status_code == 200
     data = resp.json()
-    assert data['symbol'] == 'AAPL'
-    assert data['name'] == 'Apple Inc.'
-    assert data['currency'] == 'USD'
-    assert len(data['data']) == 2
-    assert data['data'][0]['datestamp'] == '2024-01-15'
-    assert data['data'][0]['closeprice'] == 185.92
-    mock_get_history.assert_called_once_with('AAPL', None, None)
+    assert data["symbol"] == "AAPL"
+    assert data["name"] == "Apple Inc."
+    assert data["currency"] == "USD"
+    assert len(data["data"]) == 2
+    assert data["data"][0]["datestamp"] == "2024-01-15"
+    assert data["data"][0]["closeprice"] == 185.92
+    mock_get_history.assert_called_once_with("AAPL", None, None)
 
 
-@patch('services.database_service.DatabaseService.getStockPriceHistory')
+@patch("services.database_service.DatabaseService.getStockPriceHistory")
 def test_get_stock_price_history_with_date_range(mock_get_history):
     """Test getting price history with date filters."""
-    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    s = Stock(stockid=1, symbol="AAPL", name="Apple Inc.", price=150.0, currency="USD")
     DatabaseService.stocks = {1: s}
-    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.symbol_map = {"AAPL": 1}
 
     mock_get_history.return_value = [
         {"datestamp": "2024-06-01", "closeprice": 190.0},
     ]
 
     client = create_test_client()
-    resp = client.get('/api/stocks/AAPL/price-history?start_date=2024-06-01&end_date=2024-06-30')
+    resp = client.get(
+        "/api/stocks/AAPL/price-history?start_date=2024-06-01&end_date=2024-06-30"
+    )
 
     assert resp.status_code == 200
-    mock_get_history.assert_called_once_with('AAPL', '2024-06-01', '2024-06-30')
+    mock_get_history.assert_called_once_with("AAPL", "2024-06-01", "2024-06-30")
 
 
 def test_get_stock_price_history_not_found():
     """Test price history for unknown stock returns 404."""
     client = create_test_client()
-    resp = client.get('/api/stocks/UNKNOWN/price-history')
+    resp = client.get("/api/stocks/UNKNOWN/price-history")
     assert resp.status_code == 404
 
 
-@patch('services.database_service.DatabaseService.getStockPriceHistory')
+@patch("services.database_service.DatabaseService.getStockPriceHistory")
 def test_get_stock_price_history_empty(mock_get_history):
     """Test price history when no data exists."""
-    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    s = Stock(stockid=1, symbol="AAPL", name="Apple Inc.", price=150.0, currency="USD")
     DatabaseService.stocks = {1: s}
-    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.symbol_map = {"AAPL": 1}
 
     mock_get_history.return_value = []
 
     client = create_test_client()
-    resp = client.get('/api/stocks/AAPL/price-history')
+    resp = client.get("/api/stocks/AAPL/price-history")
 
     assert resp.status_code == 200
     data = resp.json()
-    assert data['symbol'] == 'AAPL'
-    assert len(data['data']) == 0
+    assert data["symbol"] == "AAPL"
+    assert len(data["data"]) == 0
 
 
-@patch('services.database_service.DatabaseService.getStockPriceHistory')
+@patch("services.database_service.DatabaseService.getStockPriceHistory")
 def test_get_stock_price_history_case_insensitive(mock_get_history):
     """Test that price history lookup is case insensitive."""
-    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    s = Stock(stockid=1, symbol="AAPL", name="Apple Inc.", price=150.0, currency="USD")
     DatabaseService.stocks = {1: s}
-    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.symbol_map = {"AAPL": 1}
 
     mock_get_history.return_value = []
 
     client = create_test_client()
-    resp = client.get('/api/stocks/aapl/price-history')
+    resp = client.get("/api/stocks/aapl/price-history")
 
     assert resp.status_code == 200
-    mock_get_history.assert_called_once_with('AAPL', None, None)
+    mock_get_history.assert_called_once_with("AAPL", None, None)
 
 
-@patch('services.database_service.DatabaseService.getStockPriceHistory')
+@patch("services.database_service.DatabaseService.getStockPriceHistory")
 def test_get_stock_price_history_error(mock_get_history):
     """Test error handling for price history."""
-    s = Stock(stockid=1, symbol='AAPL', name='Apple Inc.', price=150.0, currency='USD')
+    s = Stock(stockid=1, symbol="AAPL", name="Apple Inc.", price=150.0, currency="USD")
     DatabaseService.stocks = {1: s}
-    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.symbol_map = {"AAPL": 1}
 
     mock_get_history.side_effect = Exception("Database error")
 
     client = create_test_client()
-    resp = client.get('/api/stocks/AAPL/price-history')
+    resp = client.get("/api/stocks/AAPL/price-history")
 
     assert resp.status_code == 500
-    assert 'Failed to fetch price history' in resp.json()['detail']
+    assert "Failed to fetch price history" in resp.json()["detail"]
 
 
 # --- DELETE position tests ---
 
+
 def test_delete_position_success(monkeypatch):
     """Test deleting a position with 0 shares returns 204."""
-    stock = Stock(stockid=1, symbol='AAPL', name='Apple', price=150.0)
+    stock = Stock(stockid=1, symbol="AAPL", name="Apple", price=150.0)
     position = Position(stockid=1, quantity=0, stock=stock, portfolio_id=1)
     DatabaseService.stocks = {1: stock}
-    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.symbol_map = {"AAPL": 1}
     DatabaseService.positions = {1: {1: position}}
 
     def fake_remove_position(symbol, portfolio_id=1):
@@ -479,115 +556,157 @@ def test_delete_position_success(monkeypatch):
         del DatabaseService.positions[portfolio_id][stockid]
 
     monkeypatch.setattr(
-        DatabaseService, 'removePosition',
-        classmethod(lambda cls, symbol, portfolio_id=1: fake_remove_position(symbol, portfolio_id))
+        DatabaseService,
+        "removePosition",
+        classmethod(
+            lambda cls, symbol, portfolio_id=1: fake_remove_position(
+                symbol, portfolio_id
+            )
+        ),
     )
 
     client = create_test_client()
-    resp = client.delete('/api/portfolio/1/positions/AAPL')
+    resp = client.delete("/api/portfolio/1/positions/AAPL")
     assert resp.status_code == 204
-    assert resp.content == b''
+    assert resp.content == b""
 
 
 def test_delete_position_not_found(monkeypatch):
     """Test deleting a non-existent position returns 404."""
+
     def fake_remove_position(symbol, portfolio_id=1):
         raise KeyError(f"Stock with symbol '{symbol}' not found")
 
     monkeypatch.setattr(
-        DatabaseService, 'removePosition',
-        classmethod(lambda cls, symbol, portfolio_id=1: fake_remove_position(symbol, portfolio_id))
+        DatabaseService,
+        "removePosition",
+        classmethod(
+            lambda cls, symbol, portfolio_id=1: fake_remove_position(
+                symbol, portfolio_id
+            )
+        ),
     )
 
     client = create_test_client()
-    resp = client.delete('/api/portfolio/1/positions/UNKNOWN')
+    resp = client.delete("/api/portfolio/1/positions/UNKNOWN")
     assert resp.status_code == 404
-    assert 'not found' in resp.json()['detail']
+    assert "not found" in resp.json()["detail"]
 
 
 def test_delete_position_has_shares(monkeypatch):
     """Test deleting a position with shares > 0 returns 400."""
+
     def fake_remove_position(symbol, portfolio_id=1):
-        raise ValueError(f"Cannot remove position '{symbol}': quantity is 10. Sell all shares first.")
+        raise ValueError(
+            f"Cannot remove position '{symbol}': quantity is 10. Sell all shares first."
+        )
 
     monkeypatch.setattr(
-        DatabaseService, 'removePosition',
-        classmethod(lambda cls, symbol, portfolio_id=1: fake_remove_position(symbol, portfolio_id))
+        DatabaseService,
+        "removePosition",
+        classmethod(
+            lambda cls, symbol, portfolio_id=1: fake_remove_position(
+                symbol, portfolio_id
+            )
+        ),
     )
 
     client = create_test_client()
-    resp = client.delete('/api/portfolio/1/positions/AAPL')
+    resp = client.delete("/api/portfolio/1/positions/AAPL")
     assert resp.status_code == 400
-    assert 'Sell all shares first' in resp.json()['detail']
+    assert "Sell all shares first" in resp.json()["detail"]
 
 
 def test_delete_position_case_insensitive(monkeypatch):
     """Test that delete endpoint uppercases the symbol."""
-    stock = Stock(stockid=1, symbol='AAPL', name='Apple', price=150.0)
+    stock = Stock(stockid=1, symbol="AAPL", name="Apple", price=150.0)
     position = Position(stockid=1, quantity=0, stock=stock, portfolio_id=1)
     DatabaseService.stocks = {1: stock}
-    DatabaseService.symbol_map = {'AAPL': 1}
+    DatabaseService.symbol_map = {"AAPL": 1}
     DatabaseService.positions = {1: {1: position}}
 
     called_with = {}
+
     def fake_remove_position(symbol, portfolio_id=1):
-        called_with['symbol'] = symbol
+        called_with["symbol"] = symbol
         stockid = DatabaseService.symbol_map[symbol]
         del DatabaseService.positions[portfolio_id][stockid]
 
     monkeypatch.setattr(
-        DatabaseService, 'removePosition',
-        classmethod(lambda cls, symbol, portfolio_id=1: fake_remove_position(symbol, portfolio_id))
+        DatabaseService,
+        "removePosition",
+        classmethod(
+            lambda cls, symbol, portfolio_id=1: fake_remove_position(
+                symbol, portfolio_id
+            )
+        ),
     )
 
     client = create_test_client()
-    resp = client.delete('/api/portfolio/1/positions/aapl')
+    resp = client.delete("/api/portfolio/1/positions/aapl")
     assert resp.status_code == 204
-    assert called_with['symbol'] == 'AAPL'
+    assert called_with["symbol"] == "AAPL"
 
 
 # --- Stock Search Endpoint Tests ---
 
-@patch.object(StockAPI, 'search_stocks')
+
+@patch.object(StockAPI, "search_stocks")
 def test_search_stocks(mock_search):
     """Test searching stocks returns results with correct shape."""
     mock_search.return_value = [
-        {"symbol": "AAPL", "name": "Apple Inc.", "exchange": "NMS", "currency": "USD", "price": 150.0, "quote_type": "EQUITY", "logo_url": "https://example.com/aapl.png"},
-        {"symbol": "AMAT", "name": "Applied Materials", "exchange": "NMS", "currency": "USD", "price": 200.0, "quote_type": "EQUITY", "logo_url": "https://example.com/amat.png"},
+        {
+            "symbol": "AAPL",
+            "name": "Apple Inc.",
+            "exchange": "NMS",
+            "currency": "USD",
+            "price": 150.0,
+            "quote_type": "EQUITY",
+            "logo_url": "https://example.com/aapl.png",
+        },
+        {
+            "symbol": "AMAT",
+            "name": "Applied Materials",
+            "exchange": "NMS",
+            "currency": "USD",
+            "price": 200.0,
+            "quote_type": "EQUITY",
+            "logo_url": "https://example.com/amat.png",
+        },
     ]
     client = create_test_client()
-    resp = client.get('/api/stocks/search?q=apple')
+    resp = client.get("/api/stocks/search?q=apple")
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
     assert len(data) == 2
-    assert data[0]['symbol'] == 'AAPL'
-    assert data[0]['name'] == 'Apple Inc.'
-    assert data[0]['exchange'] == 'NMS'
-    assert data[0]['currency'] == 'USD'
-    assert data[0]['price'] == 150.0
-    assert data[0]['quote_type'] == 'EQUITY'
-    assert 'logo_url' in data[0]
-    mock_search.assert_called_once_with('apple')
+    assert data[0]["symbol"] == "AAPL"
+    assert data[0]["name"] == "Apple Inc."
+    assert data[0]["exchange"] == "NMS"
+    assert data[0]["currency"] == "USD"
+    assert data[0]["price"] == 150.0
+    assert data[0]["quote_type"] == "EQUITY"
+    assert "logo_url" in data[0]
+    mock_search.assert_called_once_with("apple")
 
 
-@patch.object(StockAPI, 'search_stocks')
+@patch.object(StockAPI, "search_stocks")
 def test_search_stocks_empty(mock_search):
     """Test searching stocks with no matches returns empty array."""
     mock_search.return_value = []
     client = create_test_client()
-    resp = client.get('/api/stocks/search?q=xyznonexistent')
+    resp = client.get("/api/stocks/search?q=xyznonexistent")
     assert resp.status_code == 200
     data = resp.json()
     assert isinstance(data, list)
     assert len(data) == 0
 
 
-@patch.object(StockAPI, 'search_stocks')
+@patch.object(StockAPI, "search_stocks")
 def test_search_stocks_error(mock_search):
     """Test search endpoint returns 500 on exception."""
     mock_search.side_effect = Exception("yfinance API error")
     client = create_test_client()
-    resp = client.get('/api/stocks/search?q=apple')
+    resp = client.get("/api/stocks/search?q=apple")
     assert resp.status_code == 500
-    assert 'Failed to search stocks' in resp.json()['detail']
+    assert "Failed to search stocks" in resp.json()["detail"]
