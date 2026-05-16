@@ -1,3 +1,4 @@
+import math
 import sqlite3
 import time
 import logging
@@ -6,9 +7,17 @@ from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
+
+def _sqlite_exp(x):
+    return math.exp(x) if x is not None else None
+
+
+def _sqlite_ln(x):
+    return math.log(x) if x is not None and x > 0 else None
+
 SLOW_QUERY_THRESHOLD_MS = float(os.environ.get('SLOW_QUERY_THRESHOLD_MS', '100'))
 
-REQUIRED_TABLES = ['stocks', 'positions', 'transactions', 'historicalstocks', 'historicaldividends', 'deposits', 'net_worth_assets', 'net_worth_snapshots', 'equity_grants', 'equity_vesting_events', 'fx_rates_history', 'savings_accounts', 'savings_transactions']
+REQUIRED_TABLES = ['stocks', 'positions', 'transactions', 'historicalstocks', 'historicaldividends', 'deposits', 'net_worth_assets', 'net_worth_snapshots', 'equity_grants', 'equity_vesting_events', 'fx_rates_history', 'savings_accounts', 'savings_transactions', 'stock_splits']
 REQUIRED_VIEWS = ['mar__stocks', 'int__portfolio_value_evolution', 'int__portfolio_dividends_total', 'int__transactions_dividends']
 
 
@@ -74,6 +83,8 @@ class TimedConnection:
 def get_connection(db_path: str):
     """Context manager that yields a TimedConnection wrapping sqlite3.connect()."""
     with sqlite3.connect(db_path) as conn:
+        conn.create_function("EXP", 1, _sqlite_exp, deterministic=True)
+        conn.create_function("LN", 1, _sqlite_ln, deterministic=True)
         yield TimedConnection(conn)
 
 
@@ -275,6 +286,16 @@ def initialize_database(db_path: str):
                     datestamp TEXT NOT NULL,
                     note TEXT DEFAULT '',
                     FOREIGN KEY (account_id) REFERENCES savings_accounts (id)
+    )
+    ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS stock_splits (
+                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                     stockid INTEGER NOT NULL,
+                     datestamp TEXT NOT NULL,
+                     ratio REAL NOT NULL,
+                     FOREIGN KEY (stockid) REFERENCES stocks (stockid),
+                     UNIQUE(stockid, datestamp)
     )
     ''')
     # Create indexes for query performance

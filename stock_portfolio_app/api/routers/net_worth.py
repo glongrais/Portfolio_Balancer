@@ -114,6 +114,8 @@ async def get_net_worth_history(
         # Portfolio history from all portfolios
         all_dates = []
         portfolios = DatabaseService.getPortfolios()
+        portfolio_raw = {}  # {asset_key: [(date, value), ...]}
+
         for p in portfolios:
             pid = p["portfolio_id"]
             name = p["name"]
@@ -129,6 +131,7 @@ async def get_net_worth_history(
                 fx_lookup = DatabaseService.getFxRateLookup(pair, start_date, end_date)
 
             last_fx = 1.0
+            rows_in_range = []
             for row in history:
                 date_str = row[0] if isinstance(row[0], str) else row[0].strftime('%Y-%m-%d')
                 if start_date <= date_str <= end_date and row[1] is not None:
@@ -138,8 +141,19 @@ async def get_net_worth_history(
                         value = round(float(row[1]) * last_fx, 2)
                     else:
                         value = float(row[1])
-                    monthly_data[date_str][asset_key] = value
+                    rows_in_range.append((date_str, value))
                     all_dates.append(date_str)
+            portfolio_raw[asset_key] = rows_in_range
+
+        # Forward-fill each portfolio across all dates to cover exchange-specific gaps
+        all_sorted_dates = sorted(set(all_dates))
+        for asset_key, rows_in_range in portfolio_raw.items():
+            last_value = None
+            for date in all_sorted_dates:
+                if rows_in_range and rows_in_range[0][0] == date:
+                    _, last_value = rows_in_range.pop(0)
+                if last_value is not None:
+                    monthly_data[date][asset_key] = last_value
 
         # Equity history: compute for every portfolio date using forward-filled prices
         equity_history = DatabaseService.getEquityValueHistory(

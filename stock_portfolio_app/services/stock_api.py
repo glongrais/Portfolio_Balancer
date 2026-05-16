@@ -144,6 +144,32 @@ class StockAPI:
         return data
     
     @classmethod
+    def get_splits(cls, symbols: list) -> dict:
+        """
+        Fetches stock split history for the given symbols.
+
+        Parameters:
+        - symbols: list of stock symbols
+
+        Returns:
+        - dict: symbol -> list of {"date": str, "ratio": float}
+        """
+        data = {}
+        for symbol in symbols:
+            try:
+                splits = cls._get_ticker(symbol).splits
+                if splits.empty:
+                    continue
+                data[symbol] = [
+                    {"date": dt.strftime("%Y-%m-%d"), "ratio": float(ratio)}
+                    for dt, ratio in splits.items()
+                    if ratio > 0
+                ]
+            except Exception as e:
+                cls.logger.warning(f"Failed to fetch splits for {symbol}: {e}")
+        return data
+
+    @classmethod
     def get_historical_dividends(cls, symbols: list):
         data = {}
         for symbol in symbols:

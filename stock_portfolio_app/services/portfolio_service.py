@@ -94,13 +94,29 @@ class PortfolioService:
     @classmethod
     def getPortfolioValueHistory(cls, portfolio_id: int = 1) -> list:
         """
-        Retrieves the portfolio value history.
+        Retrieves the portfolio value history, ensuring the latest point
+        matches the current live portfolio value.
 
         :param portfolio_id: The portfolio to fetch history for.
         Returns:
         - list: Portfolio value history
         """
-        return DatabaseService.getPortfolioValueHistory(portfolio_id)
+        from datetime import date
+
+        history = DatabaseService.getPortfolioValueHistory(portfolio_id)
+        today = date.today().isoformat()
+        current_value = cls.calculatePortfolioValue(portfolio_id)
+
+        if not history:
+            return [(today, current_value)]
+
+        last_date = history[-1][0]
+        if last_date == today:
+            history[-1] = (today, current_value)
+        else:
+            history.append((today, current_value))
+
+        return history
 
     @classmethod
     def getDividendTotal(cls, portfolio_id: int = 1) -> float:

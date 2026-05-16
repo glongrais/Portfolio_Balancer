@@ -59,6 +59,7 @@ async def _periodic_historical_update():
             await loop.run_in_executor(
                 None, DatabaseService.updateHistoricalStocksPortfolio, "", ""
             )
+            DatabaseService.updateStockSplits()
             logger.info("Historical stock prices updated")
         except Exception as e:
             logger.error("Historical stock prices update failed: %s", e)
@@ -108,6 +109,7 @@ async def lifespan(app: FastAPI):
         DatabaseService.ensureIndexes()
         DatabaseService.updatePortfolioPositionsPrice()
         DatabaseService.updateHistoricalStocksPortfolio("", "")
+        DatabaseService.updateStockSplits()
 
         # Update historical FX rates (non-blocking)
         try:

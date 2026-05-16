@@ -1858,6 +1858,45 @@ class DatabaseService:
         )
 
     @classmethod
+    def updateStockSplits(cls) -> None:
+        """
+        Fetches stock split history for all tracked stocks and stores in stock_splits table.
+        """
+        all_symbols = set()
+        for portfolio_positions in cls.positions.values():
+            for p in portfolio_positions.values():
+                all_symbols.add(p.stock.symbol)
+
+        splits_by_symbol = StockAPI.get_splits(list(all_symbols))
+        if not splits_by_symbol:
+            logger.info("updateStockSplits(): No splits found")
+            return
+
+        total_inserted = 0
+        with get_connection(DB_PATH) as connection:
+            for symbol, splits in splits_by_symbol.items():
+                stockid = cls.symbol_map.get(symbol)
+                if stockid is None:
+                    continue
+                for split in splits:
+                    rows = connection.execute(
+                        """
+                        INSERT INTO stock_splits (stockid, datestamp, ratio)
+                        VALUES (?, ?, ?)
+                        ON CONFLICT(stockid, datestamp) DO UPDATE SET
+                            ratio = excluded.ratio
+                        """,
+                        (stockid, split["date"], split["ratio"]),
+                    ).rowcount
+                    total_inserted += rows
+
+        logger.info(
+            "updateStockSplits(): Split data updated for %d symbol(s), %d rows",
+            len(splits_by_symbol),
+            total_inserted,
+        )
+
+    @classmethod
     def updateHistoricalDividendsPortfolio(cls) -> None:
         """
         Updates the historicaldividends table with data fetched from the StockAPI.
@@ -1903,6 +1942,12 @@ class DatabaseService:
         """
         Retrieves the portfolio value history for a specific portfolio.
 
+        Quantities are computed backwards from current position quantities:
+            qty_on_date = current_position - cumulative_transactions_after_date
+
+        This anchors the chart to the current position (source of truth) and
+        traces back using BUY/SELL transaction deltas.
+
         :param portfolio_id: The portfolio to fetch history for.
         Returns:
         - list: Portfolio value history
@@ -1911,6 +1956,11 @@ class DatabaseService:
             answers = connection.execute(
                 """
                 WITH
+                current_positions AS (
+                    SELECT stockid, quantity AS current_qty
+                    FROM positions
+                    WHERE portfolio_id = ?
+                ),
                 transactions_all AS (
                     SELECT stockid, strftime('%Y-%m-%d', datestamp) AS datestamp,
                            CASE WHEN type = 'SELL' THEN -quantity ELSE quantity END AS quantity
@@ -1922,56 +1972,72 @@ class DatabaseService:
                     FROM transactions_all
                     GROUP BY stockid, datestamp
                 ),
-                cumulative_positions AS (
-                    SELECT stockid, datestamp,
-                           SUM(daily_quantity) OVER (PARTITION BY stockid ORDER BY datestamp) AS cumulative_quantity
+                total_transactions AS (
+                    SELECT stockid, SUM(daily_quantity) AS total_qty
+                    FROM daily_transactions
+                    GROUP BY stockid
+                ),
+                daily_cumulative AS (
+                    SELECT
+                        stockid,
+                        datestamp,
+                        SUM(daily_quantity) OVER (PARTITION BY stockid ORDER BY datestamp) AS cumulative_before
                     FROM daily_transactions
                 ),
                 portfolio_stocks AS (
-                    SELECT DISTINCT stockid FROM cumulative_positions
+                    SELECT stockid FROM current_positions
+                ),
+                first_tx_date AS (
+                    SELECT stockid, MIN(datestamp) AS min_datestamp
+                    FROM transactions_all
+                    GROUP BY stockid
                 ),
                 date_range AS (
-                    SELECT DISTINCT datestamp FROM historicalstocks
-                    WHERE datestamp >= (SELECT MIN(datestamp) FROM cumulative_positions)
+                    SELECT DISTINCT hs.datestamp
+                    FROM historicalstocks hs
+                    INNER JOIN portfolio_stocks ps ON hs.stockid = ps.stockid
                 ),
                 all_combos AS (
-                    SELECT dr.datestamp, ps.stockid
+                    SELECT dr.datestamp, ftd.stockid, cp.current_qty
                     FROM date_range dr
-                    CROSS JOIN portfolio_stocks ps
+                    INNER JOIN first_tx_date ftd ON dr.datestamp >= ftd.min_datestamp
+                    LEFT JOIN current_positions cp ON cp.stockid = ftd.stockid
                 ),
-                with_raw_data AS (
+                with_raw AS (
                     SELECT
                         ac.datestamp,
                         ac.stockid,
+                        ac.current_qty,
+                        tt.total_qty,
                         hs.closeprice,
-                        cp.cumulative_quantity,
+                        dc.cumulative_before,
                         MAX(CASE WHEN hs.closeprice IS NOT NULL THEN ac.datestamp END)
                             OVER (PARTITION BY ac.stockid ORDER BY ac.datestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
                             AS last_price_date,
-                        MAX(CASE WHEN cp.cumulative_quantity IS NOT NULL THEN ac.datestamp END)
+                        MAX(CASE WHEN dc.cumulative_before IS NOT NULL THEN ac.datestamp END)
                             OVER (PARTITION BY ac.stockid ORDER BY ac.datestamp ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW)
                             AS last_qty_date
                     FROM all_combos ac
                     LEFT JOIN historicalstocks hs ON ac.datestamp = hs.datestamp AND ac.stockid = hs.stockid
-                    LEFT JOIN cumulative_positions cp ON ac.datestamp = cp.datestamp AND ac.stockid = cp.stockid
+                    LEFT JOIN total_transactions tt ON tt.stockid = ac.stockid
+                    LEFT JOIN daily_cumulative dc ON dc.datestamp = ac.datestamp AND dc.stockid = ac.stockid
                 ),
                 filled AS (
                     SELECT
-                        wrd.datestamp,
-                        wrd.stockid,
-                        COALESCE(wrd.closeprice, hs2.closeprice) AS closeprice,
-                        COALESCE(wrd.cumulative_quantity, cp2.cumulative_quantity) AS filled_quantity
-                    FROM with_raw_data wrd
-                    LEFT JOIN historicalstocks hs2 ON wrd.last_price_date = hs2.datestamp AND wrd.stockid = hs2.stockid
-                    LEFT JOIN cumulative_positions cp2 ON wrd.last_qty_date = cp2.datestamp AND wrd.stockid = cp2.stockid
+                        wr.datestamp,
+                        wr.stockid,
+                        COALESCE(wr.closeprice, hs2.closeprice) AS closeprice,
+                        MAX(0, COALESCE(wr.current_qty, 0) - COALESCE(wr.total_qty, 0) + COALESCE(dc2.cumulative_before, 0)) AS filled_quantity
+                    FROM with_raw wr
+                    LEFT JOIN historicalstocks hs2 ON wr.last_price_date = hs2.datestamp AND wr.stockid = hs2.stockid
+                    LEFT JOIN daily_cumulative dc2 ON wr.last_qty_date = dc2.datestamp AND wr.stockid = dc2.stockid
                 )
-                SELECT datestamp, ROUND(SUM(filled_quantity * closeprice), 2) AS portfolio_value
-                FROM filled
-                WHERE filled_quantity > 0
-                GROUP BY datestamp
+              SELECT datestamp, ROUND(SUM(filled_quantity * closeprice), 2) AS portfolio_value
+               FROM filled
+               GROUP BY datestamp
                 ORDER BY datestamp
             """,
-                (portfolio_id,),
+                (portfolio_id, portfolio_id),
             )
             rows = answers.fetchall()
         return rows
@@ -2304,13 +2370,14 @@ class DatabaseService:
         start_dt = dt.strptime(start_date, "%Y-%m-%d")
         end_dt = dt.strptime(end_date, "%Y-%m-%d")
         max_projection = last_date + timedelta(days=365)
+        today = dt.today()
 
         projected = []
         current = last_date + timedelta(days=frequency_days)
 
         while current <= min(end_dt, max_projection):
             date_str = current.strftime("%Y-%m-%d")
-            if current >= start_dt and date_str not in historical_dates_set:
+            if current >= start_dt and current >= today and date_str not in historical_dates_set:
                 projected.append(
                     {
                         "date": date_str,
